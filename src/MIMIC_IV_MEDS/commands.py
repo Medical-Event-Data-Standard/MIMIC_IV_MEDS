@@ -39,9 +39,9 @@ def run_command(
         >>> run_command(["hello"], cfg={"do_overwrite": False}, runner_fn=fake_shell_succeed)
         hello ++do_overwrite=False
         >>> run_command(["hello"], cfg={"do_copy": True}, runner_fn=fake_shell_succeed)
-        hello ++do_overwrite=True
+        hello ++do_copy=True
         >>> run_command(["hello"], cfg={"do_copy": False}, runner_fn=fake_shell_succeed)
-        hello ++do_overwrite=False
+        hello ++do_copy=False
         >>> run_command(["hello"], cfg={"do_profile": True}, runner_fn=fake_shell_succeed)
         hello ++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback
         >>> run_command(["hello"], cfg={"do_profile": False}, runner_fn=fake_shell_succeed)
@@ -52,13 +52,13 @@ def run_command(
 
     if cfg is None:
         do_overwrite = None
+        do_copy = None
         do_profile = False
-        do_copy = False
         seed = None
     else:
         do_overwrite = cfg.get("do_overwrite", None)
+        do_copy = cfg.get("do_copy", None)
         do_profile = cfg.get("do_profile", False)
-        do_copy = cfg.get("do_copy", False)
         seed = cfg.get("seed", None)
 
     if do_overwrite is not None:

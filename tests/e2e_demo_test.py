@@ -9,6 +9,7 @@ def test_e2e():
         root = Path(temp_dir)
 
         do_overwrite = True
+        do_copy = False
         do_demo = True
         do_download = True
 
@@ -17,6 +18,7 @@ def test_e2e():
             f"root_output_dir={str(root.resolve())}",
             f"do_download={do_download}",
             f"do_overwrite={do_overwrite}",
+            f"do_copy={do_copy}",
             f"do_demo={do_demo}",
         ]
 
