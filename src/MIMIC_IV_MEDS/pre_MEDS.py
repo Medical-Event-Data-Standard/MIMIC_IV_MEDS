@@ -1,7 +1,7 @@
 """Performs pre-MEDS data wrangling for MIMIC-IV."""
 
-import shutil
 import logging
+import shutil
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -260,7 +260,8 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
                 shutil.copy(fp, out_fp)
             else:
                 logger.info(
-                    f"No function needed for {pfx}: " f"Symlinking {str(fp.resolve())} to {str(out_fp.resolve())}"
+                    f"No function needed for {pfx}: "
+                    f"Symlinking {str(fp.resolve())} to {str(out_fp.resolve())}"
                 )
                 out_fp.symlink_to(fp)
             continue
