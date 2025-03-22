@@ -38,6 +38,10 @@ def run_command(
         hello ++do_overwrite=True
         >>> run_command(["hello"], cfg={"do_overwrite": False}, runner_fn=fake_shell_succeed)
         hello ++do_overwrite=False
+        >>> run_command(["hello"], cfg={"do_copy": True}, runner_fn=fake_shell_succeed)
+        hello ++do_overwrite=True
+        >>> run_command(["hello"], cfg={"do_copy": False}, runner_fn=fake_shell_succeed)
+        hello ++do_overwrite=False
         >>> run_command(["hello"], cfg={"do_profile": True}, runner_fn=fake_shell_succeed)
         hello ++hydra.callbacks.profiler._target_=hydra_profiler.profiler.ProfilerCallback
         >>> run_command(["hello"], cfg={"do_profile": False}, runner_fn=fake_shell_succeed)
@@ -49,14 +53,18 @@ def run_command(
     if cfg is None:
         do_overwrite = None
         do_profile = False
+        do_copy = False
         seed = None
     else:
         do_overwrite = cfg.get("do_overwrite", None)
         do_profile = cfg.get("do_profile", False)
+        do_copy = cfg.get("do_copy", False)
         seed = cfg.get("seed", None)
 
     if do_overwrite is not None:
         command_parts.append(f"++do_overwrite={do_overwrite}")
+    if do_copy is not None:
+        command_parts.append(f"++do_copy={do_copy}")
     if seed is not None:
         command_parts.append(f"++seed={seed}")
     if do_profile:

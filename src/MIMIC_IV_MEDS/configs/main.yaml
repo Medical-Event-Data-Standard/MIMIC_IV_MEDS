@@ -11,6 +11,7 @@ stage_runner_fp: null
 
 do_download: True
 do_overwrite: False
+do_copy: False
 do_demo: False
 
 log_dir: ${root_output_dir}/.logs
