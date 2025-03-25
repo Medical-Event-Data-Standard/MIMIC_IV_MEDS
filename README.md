@@ -57,3 +57,19 @@ data is 9.8 GB. This can be reduced significantly as well as intermediate files 
 MEDS dataset are retained in additional folders. See
 [this github issue](https://github.com/Medical-Event-Data-Standard/MEDS_transforms/issues/235) for tracking on ensuring these
 directories are automatically cleaned up in the future.
+
+## 🔧 Common Issues / FAQ
+
+### ❓ Issue: `FileNotFoundError` or pipeline errors during the `pre_MEDS` step on Ubuntu (symlinks not recognized)
+
+#### Problem:
+
+Some users running the pipeline encounter errors during the `pre_MEDS` step, where the scripts attempt to **create symlinks** but later fails to recognize or access them — even though the symlinks appear to exist in the file system.
+
+#### Solution:
+
+A `do_copy=True` option is available in the CLI that allows the pipeline to **copy files instead of symlinking**, avoiding this issue entirely (at the cost of additional disk usage). You can enable this by adding `do_copy=True` to your command:
+
+```bash
+MEDS_extract-MIMIC_IV root_output_dir=$ROOT_OUTPUT_DIR do_copy=True
+```

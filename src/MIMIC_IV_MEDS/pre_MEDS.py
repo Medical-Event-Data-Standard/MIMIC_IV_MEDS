@@ -1,6 +1,7 @@
 """Performs pre-MEDS data wrangling for MIMIC-IV."""
 
 import logging
+import shutil
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -204,7 +205,7 @@ ICD_DFS_TO_FIX = [
 ]
 
 
-def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None):
+def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do_copy: bool | None = None):
     """Performs pre-MEDS data wrangling for MIMIC-IV.
 
     Inputs are the raw MIMIC files, read from the `input_dir` config parameter. Output files are either
@@ -252,10 +253,17 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None):
         out_fp.parent.mkdir(parents=True, exist_ok=True)
 
         if pfx not in FUNCTIONS and pfx not in [p for p, _ in ICD_DFS_TO_FIX]:
-            logger.info(
-                f"No function needed for {pfx}: " f"Symlinking {str(fp.resolve())} to {str(out_fp.resolve())}"
-            )
-            out_fp.symlink_to(fp)
+            if do_copy:
+                logger.info(
+                    f"No function needed for {pfx}: Copying {str(fp.resolve())} to {str(out_fp.resolve())}"
+                )
+                shutil.copy(fp, out_fp)
+            else:
+                logger.info(
+                    f"No function needed for {pfx}: "
+                    f"Symlinking {str(fp.resolve())} to {str(out_fp.resolve())}"
+                )
+                out_fp.symlink_to(fp)
             continue
         elif pfx in FUNCTIONS:
             out_fp = output_dir / f"{pfx}.parquet"

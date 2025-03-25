@@ -42,7 +42,10 @@ def main(cfg: DictConfig):
     # Step 1: Pre-MEDS Data Wrangling
     if HAS_PRE_MEDS:
         pre_MEDS_transform(
-            input_dir=raw_input_dir, output_dir=pre_MEDS_dir, do_overwrite=cfg.get("do_overwrite", None)
+            input_dir=raw_input_dir,
+            output_dir=pre_MEDS_dir,
+            do_overwrite=cfg.get("do_overwrite", None),
+            do_copy=cfg.get("do_copy", None),
         )
     else:
         pre_MEDS_dir = raw_input_dir
