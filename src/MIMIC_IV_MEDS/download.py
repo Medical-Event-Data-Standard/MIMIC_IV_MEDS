@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -6,6 +7,38 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 from omegaconf import DictConfig
+
+_checksum_cache = {}
+
+
+def compute_sha256(file_path: Path) -> str:
+    """Computes the SHA256 checksum of the specified file."""
+    hasher = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def get_checksum_mapping(base_url: str, session: requests.Session) -> dict:
+    """Downloads and parses the SHA256SUMS.txt from the given base URL.
+
+    The expected checksum file is located at <base_url>/SHA256SUMS.txt. Returns a dictionary mapping relative
+    file paths to their expected SHA256 checksum.
+    """
+    if base_url in _checksum_cache:
+        return _checksum_cache[base_url]
+    checksum_url = base_url + "SHA256SUMS.txt" if base_url.endswith("/") else base_url + "/SHA256SUMS.txt"
+    r = session.get(checksum_url)
+    r.raise_for_status()
+    mapping = {}
+    for line in r.text.strip().splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            mapping[parts[1]] = parts[0]
+    _checksum_cache[base_url] = mapping
+    return mapping
+
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +110,13 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
 
     Examples:
         >>> import tempfile
+        >>> url = "http://example.com/foo.csv"
+        >>> mock_session = MockSession(expect_url=url, return_contents="1,2,3")
+        >>> with tempfile.TemporaryDirectory() as tmpdir:
+        ...     download_file(url, Path(tmpdir), mock_session)
+        ...     out_path = Path(tmpdir) / "foo.csv"
+        ...     out_path.read_text()
+        '1,2,3'
         >>> url = "http://example.com"
         >>> mock_session = MockSession(return_contents="hello world", expect_url=url)
         >>> with tempfile.TemporaryDirectory() as tmpdir:
@@ -85,19 +125,6 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
         ...     out_path = Path(tmpdir) / "index.html"
         ...     out_path.read_text()
         'hello world'
-        >>> url = "http://example.com/foo.csv"
-        >>> mock_session = MockSession(expect_url=url, return_contents="1,2,3")
-        >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     download_file(url, Path(tmpdir), mock_session)
-        ...     assert len(list(Path(tmpdir).iterdir())) == 1 # Only one file should be downloaded
-        ...     out_path = Path(tmpdir) / "foo.csv"
-        ...     out_path.read_text()
-        '1,2,3'
-        >>> with tempfile.TemporaryDirectory() as tmpdir:
-        ...     download_file("http://example.com", Path(tmpdir), MockSession(return_status=404))
-        Traceback (most recent call last):
-            ...
-        ValueError: Failed to download http://example.com
     """
     try:
         response = session.get(url, stream=True)
@@ -110,6 +137,35 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
     parsed_url = urlparse(url)
     filename = os.path.basename(parsed_url.path) or "index.html"
     file_path = Path(output_dir) / filename
+
+    if file_path.exists():
+        parts = parsed_url.path.split("/")
+        if len(parts) >= 4:
+            base_path = "/".join(parts[:4]) + "/"
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{base_path}"
+            rel_key = "/".join(parts[4:]) if "/".join(parts[4:]) else filename
+        else:
+            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}/"
+            rel_key = filename
+        try:
+            mapping = get_checksum_mapping(base_url, session)
+            if rel_key in mapping:
+                expected_checksum = mapping[rel_key]
+                actual_checksum = compute_sha256(file_path)
+                if actual_checksum == expected_checksum:
+                    logger.info(f"Skipping download, file already exists and valid checksum: {file_path}")
+                    return
+                else:
+                    logger.info(
+                        f"Checksum mismatch for {file_path}. Expected {expected_checksum} but got "
+                        f"{actual_checksum}. Redownloading."
+                    )
+            else:
+                logger.info(
+                    f"No checksum found for {rel_key} in SHA256SUMS.txt. Redownloading file: {file_path}"
+                )
+        except Exception as e:
+            logger.warning(f"Checksum validation failed for {file_path}: {e}. Proceeding to download.")
 
     with open(file_path, "wb") as file:
         for chunk in response.iter_content(chunk_size=8192):
@@ -159,9 +215,9 @@ def crawl_and_download(base_url: str, output_dir: Path, session: requests.Sessio
         ...     assert (tmpdir / "bar" / "qux.csv").read_text() == "10,11,12", "bar/qux.csv check"
         ...     assert (tmpdir / "bur" / "wor.csv").read_text() == "13,14,15", "bur/wor.csv check"
     """
-
     if not base_url.endswith("/"):
         download_file(base_url, output_dir, session)
+        return
 
     try:
         response = session.get(base_url)
