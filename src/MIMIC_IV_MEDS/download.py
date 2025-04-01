@@ -111,10 +111,16 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
     filename = os.path.basename(parsed_url.path) or "index.html"
     file_path = Path(output_dir) / filename
 
+    if file_path.exists():
+        logger.info(f"Skipping download, file already exists: {file_path}")
+        return
+
+    # If the file doesn't exist, proceed with the download
+    logger.info(f"Downloading {url} to {file_path}")
     with open(file_path, "wb") as file:
         for chunk in response.iter_content(chunk_size=8192):
             file.write(chunk)
-    logger.info(f"Downloaded: {file_path}")
+    logger.info(f"Finished download: {file_path}")
 
 
 def crawl_and_download(base_url: str, output_dir: Path, session: requests.Session):
