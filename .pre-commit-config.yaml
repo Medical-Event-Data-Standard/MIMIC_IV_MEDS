@@ -100,7 +100,7 @@ repos:
           - mdformat-shfmt
           - mdformat-mkdocs
           - mdformat-toc
-          - mdformat-admon
+          - mdformat-gfm-alerts
 
   # word spelling linter
   - repo: https://github.com/codespell-project/codespell
