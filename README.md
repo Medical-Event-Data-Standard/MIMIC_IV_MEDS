@@ -57,6 +57,12 @@ MEDS dataset are retained in additional folders. See
 [this github issue](https://github.com/Medical-Event-Data-Standard/MEDS_transforms/issues/235) for tracking on ensuring these
 directories are automatically cleaned up in the future.
 
+## 📚 Citing this work
+
+If you use this software in your research, please cite it! You can use the **"Cite this repository"** button on GitHub.
+
+The citation information is maintained in the `CITATION.cff` file in this repository.
+
 ## 🔧 Common Issues / FAQ
 
 ### ❓ Issue: `FileNotFoundError` or pipeline errors during the `pre_MEDS` step on Ubuntu (symlinks not recognized)
