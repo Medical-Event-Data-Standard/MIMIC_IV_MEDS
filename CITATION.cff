@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "McDermott"
+  given-names: "Matthew"
+  email: "mattmcdermott8@gmail.com"
+  orcid: "https://orcid.org/0000-0001-6048-9707"
+- family-names: "Xu"
+  given-names: "Justin"
+  orcid: "https://orcid.org/0000-0003-4700-6277"
+title: "MIMIC-IV MEDS: An ETL pipeline to extract MIMIC-IV data into the MEDS format"
+version: "0.0.6"
+date-released: 2025-05-13
+url: "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"
+repository-code: "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"
+license: MIT
+keywords:
+  - medical-data
+  - healthcare
+  - ETL
+  - MEDS
+  - MIMIC-IV
+  - electronic-health-records
+abstract: "This pipeline extracts the MIMIC-IV dataset (from physionet) into the MEDS (Medical Event Data Standard) format, providing a standardized approach to processing electronic health record data for research and analysis."
+type: software
