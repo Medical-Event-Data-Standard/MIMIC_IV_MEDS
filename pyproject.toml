@@ -21,7 +21,9 @@ dependencies = [
   "meds-transforms~=0.2.1",
   "requests",
   "beautifulsoup4",
-  "hydra-core"
+  "hydra-core",
+  "hydra-joblib-launcher"
+
 ]
 
 [tool.setuptools_scm]
