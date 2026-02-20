@@ -25,7 +25,7 @@ def main(cfg: DictConfig):
 
     raw_input_dir = Path(cfg.raw_input_dir)
     pre_MEDS_dir = Path(cfg.pre_MEDS_dir)
-    MEDS_cohort_dir = Path(cfg.MEDS_cohort_dir)
+    MEDS_output_dir = Path(cfg.MEDS_output_dir)
     stage_runner_fp = cfg.get("stage_runner_fp", None)
 
     # Step 0: Data downloading
@@ -57,27 +57,30 @@ def main(cfg: DictConfig):
         f"DATASET_VERSION={dataset_info.raw_dataset_version}:{PKG_VERSION}",
         f"EVENT_CONVERSION_CONFIG_FP={str(EVENT_CFG.resolve())}",
         f"PRE_MEDS_DIR={str(pre_MEDS_dir.resolve())}",
-        f"MEDS_COHORT_DIR={str(MEDS_cohort_dir.resolve())}",
+        f"MEDS_OUTPUT_DIR={str(MEDS_output_dir.resolve())}",
     ]
 
-    # Then we construct the rest of the command
-    command_parts.extend(
-        [
-            "MEDS_transform-runner",
-            f"--config-path={str(RUNNER_CFG.parent.resolve())}",
-            f"--config-name={RUNNER_CFG.stem}",
-            f"pipeline_config_fp={str(ETL_CFG.resolve())}",
-        ]
-    )
-    if int(os.getenv("N_WORKERS", 1)) <= 1:
-        logger.info("Running in serial mode as N_WORKERS is not set.")
-        command_parts.append("~parallelize")
+
+    command_parts.append("MEDS_transform-pipeline")
+    command_parts.append(str(ETL_CFG.resolve()))
 
     if stage_runner_fp:
         command_parts.append(f"stage_runner_fp={stage_runner_fp}")
 
-    command_parts.append("'hydra.searchpath=[pkg://MEDS_transforms.configs]'")
-    run_command(command_parts, cfg)
+    # Build overrides list
+    overrides = []
+
+    # Add output_dir as it's required by the pipeline
+    overrides.append(f"output_dir={str(MEDS_output_dir.resolve())}")
+
+    if int(os.getenv("N_WORKERS", 1)) <= 1:
+        logger.info("Running in serial mode as N_WORKERS is not set.")
+        overrides.append("~parallelize")
+    # Add any overrides to the command
+    if overrides:
+        command_parts.append("--overrides")
+        command_parts.extend(overrides)
+    run_command(command_parts, cfg=None)
 
 
 if __name__ == "__main__":
