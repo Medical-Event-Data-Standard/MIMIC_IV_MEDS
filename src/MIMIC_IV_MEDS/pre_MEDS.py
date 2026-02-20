@@ -194,6 +194,46 @@ def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -
         "gender",
     )
 
+def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv", ".parquet")) -> Path:
+    """Resolve an exact file match from a list of candidate paths for a given prefix.
+
+    When ``get_supported_fp`` returns multiple candidates (a list) instead of a single
+    ``Path``, this function selects the one that exactly matches ``input_dir / pfx`` with
+    one of the allowed suffixes, in priority order.
+
+    Args:
+        fps: List of candidate file paths returned by ``get_supported_fp``.
+        input_dir: The root input directory in which to look for the file.
+        pfx: The relative path prefix (without extension) of the target file,
+            e.g. ``"hosp/admissions"``.
+        suffixes: Ordered tuple of file extensions to try. The first suffix whose
+            resolved path matches a candidate is returned. Defaults to
+            ``(".csv.gz", ".csv", ".parquet")``.
+
+    Returns:
+        The first candidate path whose resolved path matches ``input_dir / pfx<suffix>``
+        for some suffix in ``suffixes``.
+
+    Raises:
+        FileExistsError: If none of the candidates match any of the allowed suffixes
+            under ``input_dir / pfx``.
+
+    Example:
+        >>> fps = [Path("/data/hosp/admissions.csv.gz"), Path("/data/hosp/admissions.parquet")]
+        >>> pick_exact_match(fps, Path("/data"), "hosp/admissions")
+        PosixPath('/data/hosp/admissions.csv.gz')
+    """
+    # Try exact match for allowed suffixes, in priority order
+    for suf in suffixes:
+        exact = input_dir / f"{pfx}{suf}"
+        for cand in fps:
+            if Path(cand).resolve() == exact.resolve():
+                return Path(cand)
+
+    raise FileExistsError(
+        f"Ambiguous prefix {pfx}: {fps}. "
+        f"No exact match among {[str((input_dir / f'{pfx}{s}').resolve()) for s in suffixes]}"
+    )
 
 FUNCTIONS = {
     "hosp/diagnoses_icd": (add_discharge_time_by_hadm_id, ("hosp/admissions", ["hadm_id", "dischtime"])),
@@ -238,6 +278,8 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
             logger.info(f"Skipping {pfx} @ {str(in_fp.resolve())} as no compatible dataframe file was found.")
             continue
 
+        if isinstance(fp, list):
+            fp = pick_exact_match(fp, input_dir=input_dir, pfx=pfx)
         if fp.suffix in [".csv", ".csv.gz"]:
             read_fn = partial(read_fn, infer_schema_length=100000)
 
@@ -296,6 +338,9 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
 
         df_to_load_fp, df_to_load_read_fn = get_supported_fp(input_dir, df_to_load_pfx)
 
+        if isinstance(df_to_load_fp, list):
+            df_to_load_fp = pick_exact_match(df_to_load_fp, input_dir=input_dir, pfx=df_to_load_pfx)
+        
         st = datetime.now()
 
         logger.info(f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes...")
@@ -322,6 +367,10 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
 
     for pfx, fn in ICD_DFS_TO_FIX:
         fp, read_fn = get_supported_fp(input_dir, pfx)
+
+        if isinstance(fp, list):
+            fp = pick_exact_match(fp, input_dir=input_dir, pfx=pfx)
+
         out_fp = output_dir / f"{pfx}.parquet"
 
         if out_fp.is_file():
