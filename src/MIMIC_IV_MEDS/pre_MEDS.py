@@ -7,8 +7,10 @@ from functools import partial
 from pathlib import Path
 
 import polars as pl
-from MEDS_transforms.extract.utils import get_supported_fp
-from MEDS_transforms.utils import get_shard_prefix, write_lazyframe
+
+from MEDS_extract.extract_code_metadata.utils import get_supported_fp
+from MEDS_extract.shard_events.shard_events import get_shard_prefix
+from MEDS_transforms.dataframe import write_df
 
 logger = logging.getLogger(__name__)
 
@@ -278,7 +280,7 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
                 df = read_fn(fp)
                 logger.info(f"  Loaded raw {fp} in {datetime.now() - st}")
                 processed_df = fn(df)
-                write_lazyframe(processed_df, out_fp)
+                write_df(processed_df, out_fp)
                 logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
             else:
                 needed_pfx, needed_cols = need_df
@@ -315,7 +317,7 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
             fp_df = seen_fps[str(fp.resolve())](fp)
             logger.info(f"    Loaded in {datetime.now() - fp_st}")
             processed_df = fn(fp_df, df)
-            write_lazyframe(processed_df, out_fp)
+            write_df(processed_df, out_fp)
             logger.info(f"    Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - fp_st}")
 
     for pfx, fn in ICD_DFS_TO_FIX:
