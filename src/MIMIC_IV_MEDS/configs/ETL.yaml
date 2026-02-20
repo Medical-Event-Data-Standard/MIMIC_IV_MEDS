@@ -3,23 +3,25 @@ defaults:
   - _self_
 
 description: |-
-  This pipeline extracts a dataset in longitudinal, sparse form from an input dataset meeting
-  select criteria and converts them to the MEDS format.
-
-  This pipeline is for the ${etl_metadata.dataset_name} dataset version ${etl_metadata.dataset_version}.
-
-  Key variables for this pipeline are
-    - `input_dir=$PATH_TO_INPUT_DIR`
-    - `cohort_dir=$PATH_TO_OUTPUT_DIR`.
-    - `event_conversion_config_fp=$PATH_TO_EVENT_CONVERSION_CONFIG_FP`
-
-  See the MEDS-Transforms Extract documentation for configuration file details.
+  This pipeline extracts raw MEDS events in longitudinal, sparse form from an input dataset meeting select
+  criteria and converts them to the flattened, MEDS format. 
+  It can be run in its entirety, with controllable levels of parallelism, or in stages. 
+  
+  Arguments:
+    - `event_conversion_config_fp`: The path to the event conversion configuration file. This file defines
+      the events to extract from the various rows of the various input files encountered in the global input
+      directory.
+    - `input_dir`: The path to the directory containing the raw input files.
+    - `output_dir`: The path to the directory where the output cohort will be written. It will be written in
+      various subfolders of this dir depending on the stage, as intermediate stages cache their output during
+      computation for efficiency of re-running and distributing.
 
 # The event conversion configuration file is used throughout the pipeline to define the events to extract.
 event_conversion_config_fp: ${oc.env:EVENT_CONVERSION_CONFIG_FP}
 
 input_dir: ${oc.env:PRE_MEDS_DIR}
-cohort_dir: ${oc.env:MEDS_COHORT_DIR}
+output_dir: ${oc.env:MEDS_OUTPUT_DIR}
+shards_map_fp: "${output_dir}/metadata/.shards.json"
 
 etl_metadata:
   dataset_name: ${oc.env:DATASET_NAME}
