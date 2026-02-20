@@ -261,7 +261,7 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
             f"Pre-MEDS transformation already complete as {done_fp} exists and "
             f"do_overwrite={do_overwrite}. Returning."
         )
-        exit(0)
+        return
 
     all_fps = list(input_dir.rglob("*/*.*"))
     all_fps += list(input_dir.rglob("*.*"))
