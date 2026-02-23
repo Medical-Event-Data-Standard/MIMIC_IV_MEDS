@@ -7,7 +7,6 @@ from functools import partial
 from pathlib import Path
 
 import polars as pl
-
 from MEDS_extract.extract_code_metadata.utils import get_supported_fp
 from MEDS_extract.shard_events.shard_events import get_shard_prefix
 from MEDS_transforms.dataframe import write_df
@@ -194,6 +193,7 @@ def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -
         "gender",
     )
 
+
 def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv", ".parquet")) -> Path:
     """Resolve an exact file match from a list of candidate paths for a given prefix.
 
@@ -234,6 +234,7 @@ def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv"
         f"Ambiguous prefix {pfx}: {fps}. "
         f"No exact match among {[str((input_dir / f'{pfx}{s}').resolve()) for s in suffixes]}"
     )
+
 
 FUNCTIONS = {
     "hosp/diagnoses_icd": (add_discharge_time_by_hadm_id, ("hosp/admissions", ["hadm_id", "dischtime"])),
@@ -340,7 +341,7 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
 
         if isinstance(df_to_load_fp, list):
             df_to_load_fp = pick_exact_match(df_to_load_fp, input_dir=input_dir, pfx=df_to_load_pfx)
-        
+
         st = datetime.now()
 
         logger.info(f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes...")

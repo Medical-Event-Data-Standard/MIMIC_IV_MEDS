@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 
 import logging
-import os
 from pathlib import Path
 
 import hydra
 from omegaconf import DictConfig
 
-from . import ETL_CFG, EVENT_CFG, HAS_PRE_MEDS, MAIN_CFG, RUNNER_CFG
+from . import ETL_CFG, EVENT_CFG, HAS_PRE_MEDS, MAIN_CFG
 from . import __version__ as PKG_VERSION
 from . import dataset_info
 from .commands import run_command
@@ -60,7 +59,6 @@ def main(cfg: DictConfig):
         f"MEDS_OUTPUT_DIR={str(MEDS_output_dir.resolve())}",
     ]
 
-
     command_parts.append("MEDS_transform-pipeline")
     command_parts.append(str(ETL_CFG.resolve()))
 
@@ -73,9 +71,6 @@ def main(cfg: DictConfig):
     # Add output_dir as it's required by the pipeline
     overrides.append(f"output_dir={str(MEDS_output_dir.resolve())}")
 
-    if int(os.getenv("N_WORKERS", 1)) <= 1:
-        logger.info("Running in serial mode as N_WORKERS is not set.")
-        overrides.append("~parallelize")
     # Add any overrides to the command
     if overrides:
         command_parts.append("--overrides")

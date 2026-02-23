@@ -1,12 +1,11 @@
 defaults:
-  - _extract
   - _self_
 
 description: |-
   This pipeline extracts raw MEDS events in longitudinal, sparse form from an input dataset meeting select
-  criteria and converts them to the flattened, MEDS format. 
-  It can be run in its entirety, with controllable levels of parallelism, or in stages. 
-  
+  criteria and converts them to the flattened, MEDS format.
+  It can be run in its entirety, with controllable levels of parallelism, or in stages.
+
   Arguments:
     - `event_conversion_config_fp`: The path to the event conversion configuration file. This file defines
       the events to extract from the various rows of the various input files encountered in the global input
@@ -40,5 +39,5 @@ stages:
   - finalize_MEDS_data
 
 parallelize:
-  n_workers: ${oc.env:N_WORKERS}
+  n_workers: ${oc.env:N_WORKERS,1}
   launcher: "joblib"
