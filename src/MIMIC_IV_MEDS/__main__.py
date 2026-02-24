@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import logging
+import os
 from pathlib import Path
 
 import hydra
@@ -73,7 +74,8 @@ def main(cfg: DictConfig):
         overrides.append(f"do_overwrite={cfg.do_overwrite}")
     if cfg.get("seed") is not None:
         overrides.append(f"seed={cfg.seed}")
-
+    if int(os.getenv("N_WORKERS", 1)) <= 1:
+        overrides.append("~parallelize")  # disable joblib for serial execution
     # Add any overrides to the command
     if overrides:
         command_parts.append("--overrides")
