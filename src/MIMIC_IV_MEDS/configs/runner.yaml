@@ -1,7 +1,0 @@
-defaults:
-  - _runner
-  - _self_
-
-parallelize:
-  n_workers: ${oc.env:N_WORKERS,1}
-  launcher: "joblib"

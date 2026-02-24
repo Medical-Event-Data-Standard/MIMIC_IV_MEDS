@@ -30,7 +30,7 @@ def run_extract_and_validate(root: Path, do_copy: bool):
     )
     assert command_out.returncode == 0, err_message
 
-    _validate_meds_dataset(root / "MEDS_cohort")
+    _validate_meds_dataset(root / "MEDS_output")
 
 
 def _validate_meds_dataset(dataset_path: Path):
