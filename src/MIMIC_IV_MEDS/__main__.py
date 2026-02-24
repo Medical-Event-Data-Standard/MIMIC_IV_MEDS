@@ -56,26 +56,29 @@ def main(cfg: DictConfig):
         f"DATASET_VERSION={dataset_info.raw_dataset_version}:{PKG_VERSION}",
         f"EVENT_CONVERSION_CONFIG_FP={str(EVENT_CFG.resolve())}",
         f"PRE_MEDS_DIR={str(pre_MEDS_dir.resolve())}",
-        f"MEDS_OUTPUT_DIR={str(MEDS_output_dir.resolve())}",
     ]
 
     command_parts.append("MEDS_transform-pipeline")
     command_parts.append(str(ETL_CFG.resolve()))
 
     if stage_runner_fp:
-        command_parts.append(f"stage_runner_fp={stage_runner_fp}")
+        command_parts.append(f"--stage_runner_fp={stage_runner_fp}")
+    if cfg.get("do_profile", False):
+        command_parts.append("--do_profile")
 
     # Build overrides list
-    overrides = []
+    overrides = [f"output_dir={str(MEDS_output_dir.resolve())}"]
 
-    # Add output_dir as it's required by the pipeline
-    overrides.append(f"output_dir={str(MEDS_output_dir.resolve())}")
+    if cfg.get("do_overwrite") is not None:
+        overrides.append(f"do_overwrite={cfg.do_overwrite}")
+    if cfg.get("seed") is not None:
+        overrides.append(f"seed={cfg.seed}")
 
     # Add any overrides to the command
     if overrides:
         command_parts.append("--overrides")
         command_parts.extend(overrides)
-    run_command(command_parts, cfg=None)
+    run_command(command_parts)
 
 
 if __name__ == "__main__":
