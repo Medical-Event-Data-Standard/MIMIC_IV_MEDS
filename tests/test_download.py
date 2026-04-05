@@ -8,9 +8,6 @@ from omegaconf import DictConfig
 
 from MIMIC_IV_MEDS.download import MockResponse, MockSession, download_data
 
-logging.basicConfig(level=logging.INFO)
-
-
 def fake_checksum_content(file_map: dict) -> str:
     lines = []
     for rel_path, content in file_map.items():
