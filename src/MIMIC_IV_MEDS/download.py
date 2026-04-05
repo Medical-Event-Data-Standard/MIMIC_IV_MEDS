@@ -126,14 +126,6 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
         ...     out_path.read_text()
         'hello world'
     """
-    try:
-        response = session.get(url, stream=True)
-        if response.status_code != 200:
-            logger.error(f"Failed to download {url} in streaming download_file get: {response.status_code}")
-        response.raise_for_status()
-    except Exception as e:
-        raise ValueError(f"Failed to download {url}") from e
-
     parsed_url = urlparse(url)
     filename = os.path.basename(parsed_url.path) or "index.html"
     file_path = Path(output_dir) / filename
@@ -166,6 +158,14 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
                 )
         except Exception as e:
             logger.warning(f"Checksum validation failed for {file_path}: {e}. Proceeding to download.")
+
+    try:
+        response = session.get(url, stream=True)
+        if response.status_code != 200:
+            logger.error(f"Failed to download {url} in streaming download_file get: {response.status_code}")
+        response.raise_for_status()
+    except Exception as e:
+        raise ValueError(f"Failed to download {url}") from e
 
     with open(file_path, "wb") as file:
         for chunk in response.iter_content(chunk_size=8192):
