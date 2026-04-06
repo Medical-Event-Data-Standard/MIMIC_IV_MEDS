@@ -136,28 +136,33 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
             base_path = "/".join(parts[:4]) + "/"
             base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{base_path}"
             rel_key = "/".join(parts[4:]) if "/".join(parts[4:]) else filename
-        else:
-            base_url = f"{parsed_url.scheme}://{parsed_url.netloc}/"
-            rel_key = filename
-        try:
-            mapping = get_checksum_mapping(base_url, session)
-            if rel_key in mapping:
-                expected_checksum = mapping[rel_key]
-                actual_checksum = compute_sha256(file_path)
-                if actual_checksum == expected_checksum:
-                    logger.info(f"Skipping download, file already exists and valid checksum: {file_path}")
-                    return
+            try:
+                mapping = get_checksum_mapping(base_url, session)
+                if rel_key in mapping:
+                    expected_checksum = mapping[rel_key]
+                    actual_checksum = compute_sha256(file_path)
+                    if actual_checksum == expected_checksum:
+                        logger.info(
+                            f"Skipping download, file already exists and valid checksum: {file_path}"
+                        )
+                        return
+                    else:
+                        logger.info(
+                            f"Checksum mismatch for {file_path}. Expected {expected_checksum} but got "
+                            f"{actual_checksum}. Redownloading."
+                        )
                 else:
                     logger.info(
-                        f"Checksum mismatch for {file_path}. Expected {expected_checksum} but got "
-                        f"{actual_checksum}. Redownloading."
+                        f"No checksum found for {rel_key} in SHA256SUMS.txt. Redownloading file: {file_path}"
                     )
-            else:
-                logger.info(
-                    f"No checksum found for {rel_key} in SHA256SUMS.txt. Redownloading file: {file_path}"
+            except Exception as e:
+                logger.warning(
+                    f"Checksum validation failed for {file_path}: {e}. Proceeding to download."
                 )
-        except Exception as e:
-            logger.warning(f"Checksum validation failed for {file_path}: {e}. Proceeding to download.")
+        else:
+            logger.debug(
+                f"Skipping checksum validation for {url}: URL path too short to derive SHA256SUMS.txt location"
+            )
 
     try:
         response = session.get(url, stream=True)

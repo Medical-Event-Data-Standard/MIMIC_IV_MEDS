@@ -215,7 +215,7 @@ def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv"
         for some suffix in ``suffixes``.
 
     Raises:
-        FileExistsError: If none of the candidates match any of the allowed suffixes
+        FileNotFoundError: If none of the candidates match any of the allowed suffixes
             under ``input_dir / pfx``.
 
     Example:
@@ -230,7 +230,7 @@ def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv"
             if Path(cand).resolve() == exact.resolve():
                 return Path(cand)
 
-    raise FileExistsError(
+    raise FileNotFoundError(
         f"Ambiguous prefix {pfx}: {fps}. "
         f"No exact match among {[str((input_dir / f'{pfx}{s}').resolve()) for s in suffixes]}"
     )

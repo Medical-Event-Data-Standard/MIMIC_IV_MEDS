@@ -51,16 +51,14 @@ def main(cfg: DictConfig):
         pre_MEDS_dir = raw_input_dir
 
     # Step 2: MEDS Cohort Creation
-    # First we need to set some environment variables
-    command_parts = [
-        f"DATASET_NAME={dataset_info.dataset_name}",
-        f"DATASET_VERSION={dataset_info.raw_dataset_version}:{PKG_VERSION}",
-        f"EVENT_CONVERSION_CONFIG_FP={str(EVENT_CFG.resolve())}",
-        f"PRE_MEDS_DIR={str(pre_MEDS_dir.resolve())}",
-    ]
+    env = {
+        "DATASET_NAME": dataset_info.dataset_name,
+        "DATASET_VERSION": f"{dataset_info.raw_dataset_version}:{PKG_VERSION}",
+        "EVENT_CONVERSION_CONFIG_FP": str(EVENT_CFG.resolve()),
+        "PRE_MEDS_DIR": str(pre_MEDS_dir.resolve()),
+    }
 
-    command_parts.append("MEDS_transform-pipeline")
-    command_parts.append(str(ETL_CFG.resolve()))
+    command_parts = ["MEDS_transform-pipeline", str(ETL_CFG.resolve())]
 
     if stage_runner_fp:
         command_parts.append(f"--stage_runner_fp={stage_runner_fp}")
@@ -80,7 +78,7 @@ def main(cfg: DictConfig):
     if overrides:
         command_parts.append("--overrides")
         command_parts.extend(overrides)
-    run_command(command_parts)
+    run_command(command_parts, env=env)
 
 
 if __name__ == "__main__":
