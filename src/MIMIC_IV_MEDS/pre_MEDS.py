@@ -243,6 +243,10 @@ FUNCTIONS = {
         add_discharge_time_by_hadm_id,
         ("hosp/admissions", ["hadm_id", "dischtime"]),
     ),
+    "hosp/procedures_icd": (
+        add_discharge_time_by_hadm_id,
+        ("hosp/admissions", ["hadm_id", "dischtime"]),
+    ),
     "hosp/drgcodes": (
         add_discharge_time_by_hadm_id,
         ("hosp/admissions", ["hadm_id", "dischtime"]),
