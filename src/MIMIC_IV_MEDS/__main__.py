@@ -19,9 +19,7 @@ if HAS_PRE_MEDS:
 logger = logging.getLogger(__name__)
 
 
-@hydra.main(
-    version_base=None, config_path=str(MAIN_CFG.parent), config_name=MAIN_CFG.stem
-)
+@hydra.main(version_base=None, config_path=str(MAIN_CFG.parent), config_name=MAIN_CFG.stem)
 def main(cfg: DictConfig):
     """Runs the end-to-end MEDS Extraction pipeline."""
 

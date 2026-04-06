@@ -51,9 +51,7 @@ def _validate_meds_dataset(dataset_path: Path):
 
     for fname in expected_files:
         fpath = metadata_path / fname
-        assert fpath.exists(), (
-            f"{fname} not found in {metadata_path}; found {all_meta_files}"
-        )
+        assert fpath.exists(), f"{fname} not found in {metadata_path}; found {all_meta_files}"
 
 
 def test_e2e_symlink():

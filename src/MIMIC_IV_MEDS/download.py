@@ -28,11 +28,7 @@ def get_checksum_mapping(base_url: str, session: requests.Session) -> dict:
     """
     if base_url in _checksum_cache:
         return _checksum_cache[base_url]
-    checksum_url = (
-        base_url + "SHA256SUMS.txt"
-        if base_url.endswith("/")
-        else base_url + "/SHA256SUMS.txt"
-    )
+    checksum_url = base_url + "SHA256SUMS.txt" if base_url.endswith("/") else base_url + "/SHA256SUMS.txt"
     r = session.get(checksum_url)
     r.raise_for_status()
     mapping = {}
@@ -55,10 +51,7 @@ class MockResponse:  # pragma: no cover
         self.contents = contents.encode()
 
     def iter_content(self, chunk_size):
-        return [
-            self.contents[i : i + chunk_size]
-            for i in range(0, len(self.contents), chunk_size)
-        ]
+        return [self.contents[i : i + chunk_size] for i in range(0, len(self.contents), chunk_size)]
 
     @property
     def text(self):
@@ -149,9 +142,7 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
                     expected_checksum = mapping[rel_key]
                     actual_checksum = compute_sha256(file_path)
                     if actual_checksum == expected_checksum:
-                        logger.info(
-                            f"Skipping download, file already exists and valid checksum: {file_path}"
-                        )
+                        logger.info(f"Skipping download, file already exists and valid checksum: {file_path}")
                         return
                     else:
                         logger.info(
@@ -163,20 +154,17 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
                         f"No checksum found for {rel_key} in SHA256SUMS.txt. Redownloading file: {file_path}"
                     )
             except Exception as e:
-                logger.warning(
-                    f"Checksum validation failed for {file_path}: {e}. Proceeding to download."
-                )
+                logger.warning(f"Checksum validation failed for {file_path}: {e}. Proceeding to download.")
         else:
             logger.debug(
-                f"Skipping checksum validation for {url}: URL path too short to derive SHA256SUMS.txt location"
+                f"Skipping checksum validation for {url}: "
+                "URL path too short to derive SHA256SUMS.txt location"
             )
 
     try:
         response = session.get(url, stream=True)
         if response.status_code != 200:
-            logger.error(
-                f"Failed to download {url} in streaming download_file get: {response.status_code}"
-            )
+            logger.error(f"Failed to download {url} in streaming download_file get: {response.status_code}")
         response.raise_for_status()
     except Exception as e:
         raise ValueError(f"Failed to download {url}") from e
@@ -236,9 +224,7 @@ def crawl_and_download(base_url: str, output_dir: Path, session: requests.Sessio
     try:
         response = session.get(base_url)
         if response.status_code != 200:
-            logger.error(
-                f"Failed to download {base_url} in initial get: {response.status_code}"
-            )
+            logger.error(f"Failed to download {base_url} in initial get: {response.status_code}")
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
         raise ValueError(f"Failed to download data from {base_url}") from e

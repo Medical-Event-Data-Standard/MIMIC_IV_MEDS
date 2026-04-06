@@ -65,9 +65,7 @@ def test_skip_existing_download(caplog, dataset_config):
         COMMON_URL: file_map["common.csv"],
         CHECKSUM_URL: checksum_txt,
     }
-    mock_session = TrackingMockSession(
-        return_contents=mock_contents, return_status=return_status
-    )
+    mock_session = TrackingMockSession(return_contents=mock_contents, return_status=return_status)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
@@ -100,25 +98,23 @@ def test_skip_existing_download(caplog, dataset_config):
 
         # Verify that logs mention skipping the download based on valid checksum.
         found_skip_demo = any(
-            f"Skipping download, file already exists and valid checksum: {demo_file}"
-            in rec.message
+            f"Skipping download, file already exists and valid checksum: {demo_file}" in rec.message
             for rec in caplog.records
         )
         found_skip_common = any(
-            f"Skipping download, file already exists and valid checksum: {common_file}"
-            in rec.message
+            f"Skipping download, file already exists and valid checksum: {common_file}" in rec.message
             for rec in caplog.records
         )
         assert found_skip_demo, "Did not find log message for skipping demo.csv"
         assert found_skip_common, "Did not find log message for skipping common.csv"
 
         # Verify no additional GET requests were made to file URLs (only SHA256SUMS.txt may be re-fetched).
-        assert mock_session.get_counts.get(DEMO_URL, 0) == demo_gets_after_first, (
-            "demo.csv was re-downloaded despite matching checksum"
-        )
-        assert mock_session.get_counts.get(COMMON_URL, 0) == common_gets_after_first, (
-            "common.csv was re-downloaded despite matching checksum"
-        )
+        assert (
+            mock_session.get_counts.get(DEMO_URL, 0) == demo_gets_after_first
+        ), "demo.csv was re-downloaded despite matching checksum"
+        assert (
+            mock_session.get_counts.get(COMMON_URL, 0) == common_gets_after_first
+        ), "common.csv was re-downloaded despite matching checksum"
 
 
 def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
@@ -150,9 +146,7 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
             status = return_status.get(url, 200)
             return MockResponse(status_code=status, contents=contents)
 
-    mock_session = SwitchMockSession(
-        return_contents=responses[0], return_status=return_status
-    )
+    mock_session = SwitchMockSession(return_contents=responses[0], return_status=return_status)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
@@ -178,9 +172,5 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
         )
         # Now the file should have been updated to the correct content.
         assert demo_file.read_text() == correct_content
-        redownloaded = any(
-            "Checksum mismatch for" in rec.message for rec in caplog.records
-        )
-        assert redownloaded, (
-            "Expected a checksum mismatch message prompting redownload."
-        )
+        redownloaded = any("Checksum mismatch for" in rec.message for rec in caplog.records)
+        assert redownloaded, "Expected a checksum mismatch message prompting redownload."
