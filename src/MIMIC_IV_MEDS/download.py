@@ -237,7 +237,7 @@ def crawl_and_download(base_url: str, output_dir: Path, session: requests.Sessio
             continue
 
         if full_url.endswith("/"):  # It's a directory
-            subdir = Path(output_dir) / href.strip("/")
+            subdir = Path(output_dir) / full_url.replace(base_url, "").strip("/")
             subdir.mkdir(parents=True, exist_ok=True)
             crawl_and_download(full_url, subdir, session)
         else:
@@ -339,7 +339,7 @@ def download_data(
 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    urls += dataset_info.urls.get("common", [])
+    urls = list(urls) + list(dataset_info.urls.get("common", []))
 
     for url in urls:
         session = session_factory()

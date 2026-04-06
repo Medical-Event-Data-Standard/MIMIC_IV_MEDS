@@ -6,7 +6,17 @@ from pathlib import Path
 import pytest
 from omegaconf import DictConfig
 
+from MIMIC_IV_MEDS import download as download_module
 from MIMIC_IV_MEDS.download import MockResponse, MockSession, download_data
+
+
+@pytest.fixture(autouse=True)
+def _clear_checksum_cache():
+    """Clear the module-level checksum cache between tests to prevent state leakage."""
+    download_module._checksum_cache.clear()
+    yield
+    download_module._checksum_cache.clear()
+
 
 # Use URLs with enough path segments (>= 4) to trigger checksum validation,
 # mirroring PhysioNet-style URL structure.

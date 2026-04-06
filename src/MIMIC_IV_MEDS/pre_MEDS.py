@@ -297,7 +297,7 @@ def main(
 
         if isinstance(fp, list):
             fp = pick_exact_match(fp, input_dir=input_dir, pfx=pfx)
-        if fp.suffix in [".csv", ".csv.gz"]:
+        if fp.suffix == ".csv" or fp.name.endswith(".csv.gz"):
             read_fn = partial(read_fn, infer_schema_length=100000)
 
         if str(fp.resolve()) in seen_fps:
@@ -324,7 +324,7 @@ def main(
                     f"No function needed for {pfx}: "
                     f"Symlinking {str(fp.resolve())} to {str(out_fp.resolve())}"
                 )
-                out_fp.symlink_to(fp)
+                out_fp.symlink_to(fp.resolve())
             continue
         elif pfx in FUNCTIONS:
             out_fp = output_dir / f"{pfx}.parquet"
@@ -361,7 +361,7 @@ def main(
         st = datetime.now()
 
         logger.info(f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes...")
-        if df_to_load_fp.suffix in [".csv.gz"]:
+        if df_to_load_fp.name.endswith(".csv.gz"):
             df = df_to_load_read_fn(df_to_load_fp, columns=cols)
         else:
             df = df_to_load_read_fn(df_to_load_fp)
