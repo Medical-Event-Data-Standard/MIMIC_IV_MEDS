@@ -65,12 +65,19 @@ def test_skip_existing_download(caplog, dataset_config):
         COMMON_URL: file_map["common.csv"],
         CHECKSUM_URL: checksum_txt,
     }
-    mock_session = TrackingMockSession(return_contents=mock_contents, return_status=return_status)
+    mock_session = TrackingMockSession(
+        return_contents=mock_contents, return_status=return_status
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
         # First download run.
-        download_data(tmpdir_path, dataset_config, do_demo=True, session_factory=lambda: mock_session)
+        download_data(
+            tmpdir_path,
+            dataset_config,
+            do_demo=True,
+            session_factory=lambda: mock_session,
+        )
         demo_file = tmpdir_path / "demo.csv"
         common_file = tmpdir_path / "common.csv"
         assert demo_file.exists()
@@ -84,15 +91,22 @@ def test_skip_existing_download(caplog, dataset_config):
 
         caplog.clear()
         # Second run: files exist; should skip downloading if checksum is valid.
-        download_data(tmpdir_path, dataset_config, do_demo=True, session_factory=lambda: mock_session)
+        download_data(
+            tmpdir_path,
+            dataset_config,
+            do_demo=True,
+            session_factory=lambda: mock_session,
+        )
 
         # Verify that logs mention skipping the download based on valid checksum.
         found_skip_demo = any(
-            f"Skipping download, file already exists and valid checksum: {demo_file}" in rec.message
+            f"Skipping download, file already exists and valid checksum: {demo_file}"
+            in rec.message
             for rec in caplog.records
         )
         found_skip_common = any(
-            f"Skipping download, file already exists and valid checksum: {common_file}" in rec.message
+            f"Skipping download, file already exists and valid checksum: {common_file}"
+            in rec.message
             for rec in caplog.records
         )
         assert found_skip_demo, "Did not find log message for skipping demo.csv"
@@ -136,12 +150,19 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
             status = return_status.get(url, 200)
             return MockResponse(status_code=status, contents=contents)
 
-    mock_session = SwitchMockSession(return_contents=responses[0], return_status=return_status)
+    mock_session = SwitchMockSession(
+        return_contents=responses[0], return_status=return_status
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
         # First run: wrong content is downloaded.
-        download_data(tmpdir_path, demo_only_config, do_demo=True, session_factory=lambda: mock_session)
+        download_data(
+            tmpdir_path,
+            demo_only_config,
+            do_demo=True,
+            session_factory=lambda: mock_session,
+        )
         demo_file = tmpdir_path / "demo.csv"
         assert demo_file.exists()
         assert demo_file.read_text() == wrong_content
@@ -149,8 +170,17 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
         caplog.clear()
         # Simulate that the source now returns the correct content.
         responses[0] = responses[1]
-        download_data(tmpdir_path, demo_only_config, do_demo=True, session_factory=lambda: mock_session)
+        download_data(
+            tmpdir_path,
+            demo_only_config,
+            do_demo=True,
+            session_factory=lambda: mock_session,
+        )
         # Now the file should have been updated to the correct content.
         assert demo_file.read_text() == correct_content
-        redownloaded = any("Checksum mismatch for" in rec.message for rec in caplog.records)
-        assert redownloaded, "Expected a checksum mismatch message prompting redownload."
+        redownloaded = any(
+            "Checksum mismatch for" in rec.message for rec in caplog.records
+        )
+        assert redownloaded, (
+            "Expected a checksum mismatch message prompting redownload."
+        )

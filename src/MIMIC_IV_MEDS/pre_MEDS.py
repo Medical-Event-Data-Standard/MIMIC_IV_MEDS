@@ -119,7 +119,9 @@ def add_icd_diagnosis_dot(icd_version: pl.Expr, icd_code: pl.Expr) -> pl.Expr:
     """
 
     icd9_code = (
-        pl.when(icd_code.str.starts_with("E")).then(add_dot(icd_code, 4)).otherwise(add_dot(icd_code, 3))
+        pl.when(icd_code.str.starts_with("E"))
+        .then(add_dot(icd_code, 4))
+        .otherwise(add_dot(icd_code, 3))
     )
 
     icd10_code = add_dot(icd_code, 3)
@@ -165,15 +167,21 @@ def add_icd_procedure_dot(icd_version: pl.Expr, icd_code: pl.Expr) -> pl.Expr:
 
 
 def add_discharge_time_by_hadm_id(
-    df: pl.LazyFrame, discharge_time_df: pl.LazyFrame, out_column_name: str = "hadm_discharge_time"
+    df: pl.LazyFrame,
+    discharge_time_df: pl.LazyFrame,
+    out_column_name: str = "hadm_discharge_time",
 ) -> pl.LazyFrame:
     """Joins the two dataframes by ``"hadm_id"`` and adds the discharge time to the original dataframe."""
 
-    discharge_time_df = discharge_time_df.select("hadm_id", pl.col("dischtime").alias(out_column_name))
+    discharge_time_df = discharge_time_df.select(
+        "hadm_id", pl.col("dischtime").alias(out_column_name)
+    )
     return df.join(discharge_time_df, on="hadm_id", how="left")
 
 
-def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -> pl.LazyFrame:
+def fix_static_data(
+    raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame
+) -> pl.LazyFrame:
     """Fixes the static data by adding the death time to the static data and fixes the DOB nonsense.
 
     Args:
@@ -184,7 +192,9 @@ def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -
         The fixed static data.
     """
 
-    death_times_df = death_times_df.group_by("subject_id").agg(pl.col("deathtime").min())
+    death_times_df = death_times_df.group_by("subject_id").agg(
+        pl.col("deathtime").min()
+    )
 
     return raw_static_df.join(death_times_df, on="subject_id", how="left").select(
         "subject_id",
@@ -194,7 +204,9 @@ def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -
     )
 
 
-def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv", ".parquet")) -> Path:
+def pick_exact_match(
+    fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv", ".parquet")
+) -> Path:
     """Resolve an exact file match from a list of candidate paths for a given prefix.
 
     When ``get_supported_fp`` returns multiple candidates (a list) instead of a single
@@ -237,9 +249,18 @@ def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv"
 
 
 FUNCTIONS = {
-    "hosp/diagnoses_icd": (add_discharge_time_by_hadm_id, ("hosp/admissions", ["hadm_id", "dischtime"])),
-    "hosp/drgcodes": (add_discharge_time_by_hadm_id, ("hosp/admissions", ["hadm_id", "dischtime"])),
-    "hosp/patients": (fix_static_data, ("hosp/admissions", ["subject_id", "deathtime"])),
+    "hosp/diagnoses_icd": (
+        add_discharge_time_by_hadm_id,
+        ("hosp/admissions", ["hadm_id", "dischtime"]),
+    ),
+    "hosp/drgcodes": (
+        add_discharge_time_by_hadm_id,
+        ("hosp/admissions", ["hadm_id", "dischtime"]),
+    ),
+    "hosp/patients": (
+        fix_static_data,
+        ("hosp/admissions", ["subject_id", "deathtime"]),
+    ),
 }
 
 ICD_DFS_TO_FIX = [
@@ -248,7 +269,12 @@ ICD_DFS_TO_FIX = [
 ]
 
 
-def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do_copy: bool | None = None):
+def main(
+    input_dir: Path,
+    output_dir: Path,
+    do_overwrite: bool | None = None,
+    do_copy: bool | None = None,
+):
     """Performs pre-MEDS data wrangling for MIMIC-IV.
 
     Inputs are the raw MIMIC files, read from the `input_dir` config parameter. Output files are either
@@ -276,7 +302,9 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
         try:
             fp, read_fn = get_supported_fp(input_dir, pfx)
         except FileNotFoundError:
-            logger.info(f"Skipping {pfx} @ {str(in_fp.resolve())} as no compatible dataframe file was found.")
+            logger.info(
+                f"Skipping {pfx} @ {str(in_fp.resolve())} as no compatible dataframe file was found."
+            )
             continue
 
         if isinstance(fp, list):
@@ -324,7 +352,9 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
                 logger.info(f"  Loaded raw {fp} in {datetime.now() - st}")
                 processed_df = fn(df)
                 write_df(processed_df, out_fp)
-                logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
+                logger.info(
+                    f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}"
+                )
             else:
                 needed_pfx, needed_cols = need_df
                 if needed_pfx not in dfs_to_load:
@@ -340,11 +370,15 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
         df_to_load_fp, df_to_load_read_fn = get_supported_fp(input_dir, df_to_load_pfx)
 
         if isinstance(df_to_load_fp, list):
-            df_to_load_fp = pick_exact_match(df_to_load_fp, input_dir=input_dir, pfx=df_to_load_pfx)
+            df_to_load_fp = pick_exact_match(
+                df_to_load_fp, input_dir=input_dir, pfx=df_to_load_pfx
+            )
 
         st = datetime.now()
 
-        logger.info(f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes...")
+        logger.info(
+            f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes..."
+        )
         if df_to_load_fp.suffix in [".csv.gz"]:
             df = df_to_load_read_fn(df_to_load_fp, columns=cols)
         else:
@@ -364,7 +398,9 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
             logger.info(f"    Loaded in {datetime.now() - fp_st}")
             processed_df = fn(fp_df, df)
             write_df(processed_df, out_fp)
-            logger.info(f"    Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - fp_st}")
+            logger.info(
+                f"    Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - fp_st}"
+            )
 
     for pfx, fn in ICD_DFS_TO_FIX:
         fp, read_fn = get_supported_fp(input_dir, pfx)
@@ -387,13 +423,18 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
             read_fn(fp)
             .collect()
             .with_columns(
-                fn(pl.col("icd_version").cast(pl.String), pl.col("icd_code").cast(pl.String)).alias(
-                    "norm_icd_code"
-                )
+                fn(
+                    pl.col("icd_version").cast(pl.String),
+                    pl.col("icd_code").cast(pl.String),
+                ).alias("norm_icd_code")
             )
         )
         processed_df.write_parquet(out_fp, use_pyarrow=True)
-        logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
+        logger.info(
+            f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}"
+        )
 
-    logger.info(f"Done! All dataframes processed and written to {str(output_dir.resolve())}")
+    logger.info(
+        f"Done! All dataframes processed and written to {str(output_dir.resolve())}"
+    )
     done_fp.write_text(f"Finished at {datetime.now()}")
