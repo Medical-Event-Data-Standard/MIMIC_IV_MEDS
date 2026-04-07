@@ -7,9 +7,8 @@ from pathlib import Path
 import hydra
 from omegaconf import DictConfig
 
-from . import ETL_CFG, EVENT_CFG, HAS_PRE_MEDS, MAIN_CFG
+from . import ETL_CFG, EVENT_CFG, HAS_PRE_MEDS, MAIN_CFG, dataset_info
 from . import __version__ as PKG_VERSION
-from . import dataset_info
 from .commands import run_command
 from .download import download_data
 
@@ -66,7 +65,7 @@ def main(cfg: DictConfig):
         command_parts.append("--do_profile")
 
     # Build overrides list
-    overrides = [f"output_dir={str(MEDS_output_dir.resolve())}"]
+    overrides = [f"output_dir={MEDS_output_dir.resolve()!s}"]
 
     if cfg.get("do_overwrite") is not None:
         overrides.append(f"do_overwrite={cfg.do_overwrite}")
