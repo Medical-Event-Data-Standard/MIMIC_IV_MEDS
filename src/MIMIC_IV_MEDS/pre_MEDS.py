@@ -296,7 +296,7 @@ def main(
         try:
             fp, read_fn = get_supported_fp(input_dir, pfx)
         except FileNotFoundError:
-            logger.info(f"Skipping {pfx} @ {str(in_fp.resolve())} as no compatible dataframe file was found.")
+            logger.info(f"Skipping {pfx} @ {in_fp.resolve()!s} as no compatible dataframe file was found.")
             continue
 
         if isinstance(fp, list):
@@ -319,14 +319,11 @@ def main(
 
         if pfx not in FUNCTIONS and pfx not in [p for p, _ in ICD_DFS_TO_FIX]:
             if do_copy:
-                logger.info(
-                    f"No function needed for {pfx}: Copying {str(fp.resolve())} to {str(out_fp.resolve())}"
-                )
+                logger.info(f"No function needed for {pfx}: Copying {fp.resolve()!s} to {out_fp.resolve()!s}")
                 shutil.copy(fp, out_fp)
             else:
                 logger.info(
-                    f"No function needed for {pfx}: "
-                    f"Symlinking {str(fp.resolve())} to {str(out_fp.resolve())}"
+                    f"No function needed for {pfx}: Symlinking {fp.resolve()!s} to {out_fp.resolve()!s}"
                 )
                 out_fp.symlink_to(fp.resolve())
             continue
@@ -344,7 +341,7 @@ def main(
                 logger.info(f"  Loaded raw {fp} in {datetime.now() - st}")
                 processed_df = fn(df)
                 write_df(processed_df, out_fp)
-                logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
+                logger.info(f"  Processed and wrote to {out_fp.resolve()!s} in {datetime.now() - st}")
             else:
                 needed_pfx, needed_cols = need_df
                 if needed_pfx not in dfs_to_load:
@@ -364,7 +361,7 @@ def main(
 
         st = datetime.now()
 
-        logger.info(f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes...")
+        logger.info(f"Loading {df_to_load_fp.resolve()!s} for manipulating other dataframes...")
         if df_to_load_fp.name.endswith(".csv.gz"):
             df = df_to_load_read_fn(df_to_load_fp, columns=cols)
         else:
@@ -379,12 +376,12 @@ def main(
             fn, _ = FUNCTIONS[pfx]
 
             fp_st = datetime.now()
-            logger.info(f"    Loading {str(fp.resolve())}...")
+            logger.info(f"    Loading {fp.resolve()!s}...")
             fp_df = seen_fps[str(fp.resolve())](fp)
             logger.info(f"    Loaded in {datetime.now() - fp_st}")
             processed_df = fn(fp_df, df)
             write_df(processed_df, out_fp)
-            logger.info(f"    Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - fp_st}")
+            logger.info(f"    Processed and wrote to {out_fp.resolve()!s} in {datetime.now() - fp_st}")
 
     for pfx, fn in ICD_DFS_TO_FIX:
         fp, read_fn = get_supported_fp(input_dir, pfx)
@@ -414,7 +411,7 @@ def main(
             )
         )
         processed_df.write_parquet(out_fp, use_pyarrow=True)
-        logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
+        logger.info(f"  Processed and wrote to {out_fp.resolve()!s} in {datetime.now() - st}")
 
-    logger.info(f"Done! All dataframes processed and written to {str(output_dir.resolve())}")
+    logger.info(f"Done! All dataframes processed and written to {output_dir.resolve()!s}")
     done_fp.write_text(f"Finished at {datetime.now()}")

@@ -21,21 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Setup package
+        uses: ./.github/actions/setup
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install packages
-        run: |
-          pip install -e .[tests]
-
-      #----------------------------------------------
-      #              run test suite
-      #----------------------------------------------
       - name: Run tests
         run: |
-          pytest src/ tests/ -v --doctest-modules --cov=src --junitxml=junit.xml -s
+          uv run pytest src/ tests/ -v --doctest-modules --cov=src --junitxml=junit.xml -s
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4.0.1

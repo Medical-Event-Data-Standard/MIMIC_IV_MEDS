@@ -17,14 +17,16 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-   "polars~=1.30.0","meds-transforms~=0.6","meds-extract~=0.5", "requests", "beautifulsoup4", "hydra-core", "hydra-joblib-launcher"
+   "polars~=1.30.0", "meds-transforms~=0.6", "meds-extract~=0.5", "requests", "beautifulsoup4",
+   "hydra-core", "hydra-joblib-launcher",
 ]
+
+[dependency-groups]
+dev = ["pre-commit<4", "ruff", "pytest", "pytest-cov"]
 
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
-dev = ["pre-commit<4"]
-tests = ["pytest", "pytest-cov"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 
 [project.scripts]
@@ -33,3 +35,25 @@ MEDS_extract-MIMIC_IV = "MIMIC_IV_MEDS.__main__:main"
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"
 Issues = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "RUF", # Ruff-specific rules
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "SIM108", # ternary operator suggestions
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
