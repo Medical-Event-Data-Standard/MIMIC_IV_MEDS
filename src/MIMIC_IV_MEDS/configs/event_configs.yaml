@@ -84,13 +84,28 @@ hosp/hcpcsevents:
         possibly_cpt_code: "code"
 
 hosp/labevents:
-  lab:
+  lab_specimen_collected:
     code:
       - LAB
+      - SPECIMEN_COLLECTED
+      - col(itemid)
+    hadm_id: hadm_id
+    time: col(charttime)
+    time_format: "%Y-%m-%d %H:%M:%S"
+    priority: priority
+    _metadata:
+      d_labitems_to_loinc:
+        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
+        itemid: "itemid (omop_source_code)"
+        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+  lab_result:
+    code:
+      - LAB
+      - RESULT
       - col(itemid)
       - col(valueuom)
     hadm_id: hadm_id
-    time: col(charttime)
+    time: col(storetime)
     time_format: "%Y-%m-%d %H:%M:%S"
     numeric_value: valuenum
     text_value: value
