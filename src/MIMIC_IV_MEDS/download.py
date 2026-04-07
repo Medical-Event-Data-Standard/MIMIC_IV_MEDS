@@ -344,7 +344,7 @@ def download_data(
     for url in urls:
         session = session_factory()
 
-        if isinstance(url, (dict, DictConfig)):
+        if isinstance(url, dict | DictConfig):
             username = url.get("username", None)
             password = url.get("password", None)
             logger.info(f"Authenticating for {username}")
