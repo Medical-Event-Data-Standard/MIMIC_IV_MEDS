@@ -23,14 +23,14 @@ HAS_PRE_MEDS = PRE_MEDS_PY.exists()
 event_config = OmegaConf.load(EVENT_CFG)
 
 __all__ = [
-    "event_config",
-    "EVENT_CFG",
-    "ETL_CFG",
-    "HAS_PRE_MEDS",
-    "PRE_MEDS_CFG",
-    "MAIN_CFG",
     "DATASET_CFG",
-    "dataset_info",
+    "ETL_CFG",
+    "EVENT_CFG",
+    "HAS_PRE_MEDS",
+    "MAIN_CFG",
+    "PRE_MEDS_CFG",
     "__package_name__",
     "__version__",
+    "dataset_info",
+    "event_config",
 ]

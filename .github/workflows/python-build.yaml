@@ -7,24 +7,19 @@ jobs:
     name: Build distribution 📦
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        python-version: ["3.12"]
-
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+
+      - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install pypa/build
-        run: >-
-          python3 -m
-          pip install
-          build
-          --user
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
       - name: Build a binary wheel and a source tarball
-        run: python3 -m build
+        run: uv build
+
       - name: Store the distribution packages
         uses: actions/upload-artifact@v4
         with:
@@ -40,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/MEDS-transforms # Replace <package-name> with your PyPI project name
+      url: https://pypi.org/p/MIMIC-IV-MEDS
     permissions:
       id-token: write # IMPORTANT: mandatory for trusted publishing
 
@@ -90,9 +85,6 @@ jobs:
       - name: Upload artifact signatures to GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        # Upload to GitHub Release using the `gh` CLI.
-        # `dist/` contains the built packages, and the
-        # sigstore-produced signatures and certificates.
         run: >-
           gh release upload
           '${{ github.ref_name }}' dist/**

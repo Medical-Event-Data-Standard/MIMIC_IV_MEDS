@@ -10,7 +10,7 @@ def run_extract_and_validate(root: Path, do_copy: bool):
 
     command_parts = [
         "MEDS_extract-MIMIC_IV",
-        f"root_output_dir={str(root.resolve())}",
+        f"root_output_dir={root.resolve()!s}",
         f"do_download={do_download}",
         f"do_overwrite={do_overwrite}",
         f"do_copy={do_copy}",

@@ -119,12 +119,12 @@ def test_skip_existing_download(caplog, dataset_config):
         assert found_skip_common, "Did not find log message for skipping common.csv"
 
         # Verify no additional GET requests were made to file URLs (only SHA256SUMS.txt may be re-fetched).
-        assert (
-            mock_session.get_counts.get(DEMO_URL, 0) == demo_gets_after_first
-        ), "demo.csv was re-downloaded despite matching checksum"
-        assert (
-            mock_session.get_counts.get(COMMON_URL, 0) == common_gets_after_first
-        ), "common.csv was re-downloaded despite matching checksum"
+        assert mock_session.get_counts.get(DEMO_URL, 0) == demo_gets_after_first, (
+            "demo.csv was re-downloaded despite matching checksum"
+        )
+        assert mock_session.get_counts.get(COMMON_URL, 0) == common_gets_after_first, (
+            "common.csv was re-downloaded despite matching checksum"
+        )
 
 
 def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
