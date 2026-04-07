@@ -17,11 +17,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "polars>=1.26.0,~=1.27.0",
-  "meds-transforms~=0.2.1",
-  "requests",
-  "beautifulsoup4",
-  "hydra-core"
+   "polars~=1.30.0","meds-transforms~=0.6","meds-extract~=0.5", "requests", "beautifulsoup4", "hydra-core", "hydra-joblib-launcher"
 ]
 
 [tool.setuptools_scm]
@@ -29,7 +25,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pre-commit<4"]
 tests = ["pytest", "pytest-cov"]
-local_parallelism = ["hydra-joblib-launcher"]
 slurm_parallelism = ["hydra-submitit-launcher"]
 
 [project.scripts]

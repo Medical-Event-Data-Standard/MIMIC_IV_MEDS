@@ -159,8 +159,8 @@ hosp/procedures_icd:
       - col(icd_version)
       - col(icd_code)
     hadm_id: hadm_id
-    time: col(chartdate)
-    time_format: "%Y-%m-%d"
+    time: col(hadm_discharge_time)
+    time_format: "%Y-%m-%d %H:%M:%S"
     _metadata:
       hosp/d_icd_procedures:
         description: "long_title"

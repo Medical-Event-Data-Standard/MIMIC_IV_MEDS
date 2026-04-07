@@ -7,8 +7,9 @@ from functools import partial
 from pathlib import Path
 
 import polars as pl
-from MEDS_transforms.extract.utils import get_supported_fp
-from MEDS_transforms.utils import get_shard_prefix, write_lazyframe
+from MEDS_extract.extract_code_metadata.utils import get_supported_fp
+from MEDS_extract.shard_events.shard_events import get_shard_prefix
+from MEDS_transforms.dataframe import write_df
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,9 @@ def add_icd_procedure_dot(icd_version: pl.Expr, icd_code: pl.Expr) -> pl.Expr:
 
 
 def add_discharge_time_by_hadm_id(
-    df: pl.LazyFrame, discharge_time_df: pl.LazyFrame, out_column_name: str = "hadm_discharge_time"
+    df: pl.LazyFrame,
+    discharge_time_df: pl.LazyFrame,
+    out_column_name: str = "hadm_discharge_time",
 ) -> pl.LazyFrame:
     """Joins the two dataframes by ``"hadm_id"`` and adds the discharge time to the original dataframe."""
 
@@ -193,10 +196,65 @@ def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -
     )
 
 
+def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv", ".parquet")) -> Path:
+    """Resolve an exact file match from a list of candidate paths for a given prefix.
+
+    When ``get_supported_fp`` returns multiple candidates (a list) instead of a single
+    ``Path``, this function selects the one that exactly matches ``input_dir / pfx`` with
+    one of the allowed suffixes, in priority order.
+
+    Args:
+        fps: List of candidate file paths returned by ``get_supported_fp``.
+        input_dir: The root input directory in which to look for the file.
+        pfx: The relative path prefix (without extension) of the target file,
+            e.g. ``"hosp/admissions"``.
+        suffixes: Ordered tuple of file extensions to try. The first suffix whose
+            resolved path matches a candidate is returned. Defaults to
+            ``(".csv.gz", ".csv", ".parquet")``.
+
+    Returns:
+        The first candidate path whose resolved path matches ``input_dir / pfx<suffix>``
+        for some suffix in ``suffixes``.
+
+    Raises:
+        FileNotFoundError: If none of the candidates match any of the allowed suffixes
+            under ``input_dir / pfx``.
+
+    Example:
+        >>> fps = [Path("/data/hosp/admissions.csv.gz"), Path("/data/hosp/admissions.parquet")]
+        >>> pick_exact_match(fps, Path("/data"), "hosp/admissions")
+        PosixPath('/data/hosp/admissions.csv.gz')
+    """
+    # Try exact match for allowed suffixes, in priority order
+    for suf in suffixes:
+        exact = input_dir / f"{pfx}{suf}"
+        for cand in fps:
+            if Path(cand).resolve() == exact.resolve():
+                return Path(cand)
+
+    raise FileNotFoundError(
+        f"Ambiguous prefix {pfx}: {fps}. "
+        f"No exact match among {[str((input_dir / f'{pfx}{s}').resolve()) for s in suffixes]}"
+    )
+
+
 FUNCTIONS = {
-    "hosp/diagnoses_icd": (add_discharge_time_by_hadm_id, ("hosp/admissions", ["hadm_id", "dischtime"])),
-    "hosp/drgcodes": (add_discharge_time_by_hadm_id, ("hosp/admissions", ["hadm_id", "dischtime"])),
-    "hosp/patients": (fix_static_data, ("hosp/admissions", ["subject_id", "deathtime"])),
+    "hosp/diagnoses_icd": (
+        add_discharge_time_by_hadm_id,
+        ("hosp/admissions", ["hadm_id", "dischtime"]),
+    ),
+    "hosp/procedures_icd": (
+        add_discharge_time_by_hadm_id,
+        ("hosp/admissions", ["hadm_id", "dischtime"]),
+    ),
+    "hosp/drgcodes": (
+        add_discharge_time_by_hadm_id,
+        ("hosp/admissions", ["hadm_id", "dischtime"]),
+    ),
+    "hosp/patients": (
+        fix_static_data,
+        ("hosp/admissions", ["subject_id", "deathtime"]),
+    ),
 }
 
 ICD_DFS_TO_FIX = [
@@ -205,7 +263,12 @@ ICD_DFS_TO_FIX = [
 ]
 
 
-def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do_copy: bool | None = None):
+def main(
+    input_dir: Path,
+    output_dir: Path,
+    do_overwrite: bool | None = None,
+    do_copy: bool | None = None,
+):
     """Performs pre-MEDS data wrangling for MIMIC-IV.
 
     Inputs are the raw MIMIC files, read from the `input_dir` config parameter. Output files are either
@@ -219,7 +282,7 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
             f"Pre-MEDS transformation already complete as {done_fp} exists and "
             f"do_overwrite={do_overwrite}. Returning."
         )
-        exit(0)
+        return
 
     all_fps = list(input_dir.rglob("*/*.*"))
     all_fps += list(input_dir.rglob("*.*"))
@@ -236,7 +299,9 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
             logger.info(f"Skipping {pfx} @ {str(in_fp.resolve())} as no compatible dataframe file was found.")
             continue
 
-        if fp.suffix in [".csv", ".csv.gz"]:
+        if isinstance(fp, list):
+            fp = pick_exact_match(fp, input_dir=input_dir, pfx=pfx)
+        if fp.suffix == ".csv" or fp.name.endswith(".csv.gz"):
             read_fn = partial(read_fn, infer_schema_length=100000)
 
         if str(fp.resolve()) in seen_fps:
@@ -263,7 +328,7 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
                     f"No function needed for {pfx}: "
                     f"Symlinking {str(fp.resolve())} to {str(out_fp.resolve())}"
                 )
-                out_fp.symlink_to(fp)
+                out_fp.symlink_to(fp.resolve())
             continue
         elif pfx in FUNCTIONS:
             out_fp = output_dir / f"{pfx}.parquet"
@@ -278,7 +343,7 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
                 df = read_fn(fp)
                 logger.info(f"  Loaded raw {fp} in {datetime.now() - st}")
                 processed_df = fn(df)
-                write_lazyframe(processed_df, out_fp)
+                write_df(processed_df, out_fp)
                 logger.info(f"  Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - st}")
             else:
                 needed_pfx, needed_cols = need_df
@@ -294,10 +359,13 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
 
         df_to_load_fp, df_to_load_read_fn = get_supported_fp(input_dir, df_to_load_pfx)
 
+        if isinstance(df_to_load_fp, list):
+            df_to_load_fp = pick_exact_match(df_to_load_fp, input_dir=input_dir, pfx=df_to_load_pfx)
+
         st = datetime.now()
 
         logger.info(f"Loading {str(df_to_load_fp.resolve())} for manipulating other dataframes...")
-        if df_to_load_fp.suffix in [".csv.gz"]:
+        if df_to_load_fp.name.endswith(".csv.gz"):
             df = df_to_load_read_fn(df_to_load_fp, columns=cols)
         else:
             df = df_to_load_read_fn(df_to_load_fp)
@@ -315,11 +383,15 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
             fp_df = seen_fps[str(fp.resolve())](fp)
             logger.info(f"    Loaded in {datetime.now() - fp_st}")
             processed_df = fn(fp_df, df)
-            write_lazyframe(processed_df, out_fp)
+            write_df(processed_df, out_fp)
             logger.info(f"    Processed and wrote to {str(out_fp.resolve())} in {datetime.now() - fp_st}")
 
     for pfx, fn in ICD_DFS_TO_FIX:
         fp, read_fn = get_supported_fp(input_dir, pfx)
+
+        if isinstance(fp, list):
+            fp = pick_exact_match(fp, input_dir=input_dir, pfx=pfx)
+
         out_fp = output_dir / f"{pfx}.parquet"
 
         if out_fp.is_file():
@@ -335,9 +407,10 @@ def main(input_dir: Path, output_dir: Path, do_overwrite: bool | None = None, do
             read_fn(fp)
             .collect()
             .with_columns(
-                fn(pl.col("icd_version").cast(pl.String), pl.col("icd_code").cast(pl.String)).alias(
-                    "norm_icd_code"
-                )
+                fn(
+                    pl.col("icd_version").cast(pl.String),
+                    pl.col("icd_code").cast(pl.String),
+                ).alias("norm_icd_code")
             )
         )
         processed_df.write_parquet(out_fp, use_pyarrow=True)

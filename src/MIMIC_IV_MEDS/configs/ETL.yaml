@@ -1,45 +1,43 @@
 defaults:
-  - _extract
   - _self_
 
 description: |-
-  This pipeline extracts a dataset in longitudinal, sparse form from an input dataset meeting
-  select criteria and converts them to the MEDS format.
+  This pipeline extracts raw MEDS events in longitudinal, sparse form from an input dataset meeting select
+  criteria and converts them to the flattened, MEDS format.
+  It can be run in its entirety, with controllable levels of parallelism, or in stages.
 
-  This pipeline is for the ${etl_metadata.dataset_name} dataset version ${etl_metadata.dataset_version}.
-
-  Key variables for this pipeline are
-    - `input_dir=$PATH_TO_INPUT_DIR`
-    - `cohort_dir=$PATH_TO_OUTPUT_DIR`.
-    - `event_conversion_config_fp=$PATH_TO_EVENT_CONVERSION_CONFIG_FP`
-
-  See the MEDS-Transforms Extract documentation for configuration file details.
+  Arguments:
+    - `event_conversion_config_fp`: The path to the event conversion configuration file. This file defines
+      the events to extract from the various rows of the various input files encountered in the global input
+      directory.
+    - `input_dir`: The path to the directory containing the raw input files.
+    - `output_dir`: The path to the directory where the output cohort will be written. It will be written in
+      various subfolders of this dir depending on the stage, as intermediate stages cache their output during
+      computation for efficiency of re-running and distributing.
 
 # The event conversion configuration file is used throughout the pipeline to define the events to extract.
 event_conversion_config_fp: ${oc.env:EVENT_CONVERSION_CONFIG_FP}
 
 input_dir: ${oc.env:PRE_MEDS_DIR}
-cohort_dir: ${oc.env:MEDS_COHORT_DIR}
+output_dir: ${oc.env:MEDS_OUTPUT_DIR}
+shards_map_fp: "${output_dir}/metadata/.shards.json"
 
 etl_metadata:
   dataset_name: ${oc.env:DATASET_NAME}
   dataset_version: ${oc.env:DATASET_VERSION}
 
-stage_configs:
-  shard_events:
-    infer_schema_length: 999999999
-  split_and_shard_subjects:
-    n_subjects_per_shard: 1000
-
 stages:
-  - shard_events
-  - split_and_shard_subjects
-  - convert_to_sharded_events
+  - shard_events:
+      infer_schema_length: 999999999
+  - split_and_shard_subjects:
+      n_subjects_per_shard: 1000
+  - convert_to_subject_sharded
+  - convert_to_MEDS_events
   - merge_to_MEDS_cohort
   - extract_code_metadata
   - finalize_MEDS_metadata
   - finalize_MEDS_data
 
 parallelize:
-  n_workers: ${oc.env:N_WORKERS}
+  n_workers: ${oc.env:N_WORKERS,1}
   launcher: "joblib"

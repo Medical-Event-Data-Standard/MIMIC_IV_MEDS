@@ -5,7 +5,7 @@ root_output_dir: ???
 
 raw_input_dir: ${root_output_dir}/raw_input
 pre_MEDS_dir: ${root_output_dir}/pre_MEDS
-MEDS_cohort_dir: ${root_output_dir}/MEDS_cohort
+MEDS_output_dir: ${root_output_dir}/MEDS_output
 
 stage_runner_fp: null
 
