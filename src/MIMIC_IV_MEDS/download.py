@@ -1,12 +1,55 @@
 import hashlib
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 from omegaconf import DictConfig
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# Connect and per-chunk read timeouts (seconds). `requests` defaults to no
+# timeout, so a stalled TCP socket parks a worker in recv() indefinitely —
+# PhysioNet's edge silently drops chunked connections, which was hitting us
+# as a full pipeline hang (see #42). READ_TIMEOUT_S is the gap between bytes,
+# not total wall-clock: a slow-but-alive 25 KB/s stream is fine, only truly
+# stalled connections trip it.
+CONNECT_TIMEOUT_S = 10.0
+READ_TIMEOUT_S = 60.0
+DEFAULT_TIMEOUT = (CONNECT_TIMEOUT_S, READ_TIMEOUT_S)
+
+# 1 MiB streaming chunks instead of 8 KiB — 128x fewer write() syscalls on
+# large files (chartevents.csv.gz is ~25 GB uncompressed) with no downside.
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024
+
+
+def make_session_with_retries() -> requests.Session:
+    """Return a `requests.Session` with a retry adapter mounted for transient server errors.
+
+    PhysioNet returns 429/500/502/503/504 regularly under load; without retries a single transient failure
+    unwinds the whole crawl. The adapter handles connect-time failures and error-status retries before the
+    body starts streaming. urllib3's first retry happens immediately; subsequent retries sleep
+    `backoff_factor * (2 ** (attempt - 1))` seconds, so with our `backoff_factor=2.0` and `total=5` the
+    worst-case sequence is 0, 2, 4, 8, 16 s between attempts (capped by urllib3's default `backoff_max`).
+    `Retry-After` headers are respected when the server supplies them.
+    """
+    session = requests.Session()
+    retry = Retry(
+        total=5,
+        backoff_factor=2.0,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=frozenset(["GET", "HEAD"]),
+        respect_retry_after_header=True,
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
 
 _checksum_cache = {}
 
@@ -29,7 +72,7 @@ def get_checksum_mapping(base_url: str, session: requests.Session) -> dict:
     if base_url in _checksum_cache:
         return _checksum_cache[base_url]
     checksum_url = base_url + "SHA256SUMS.txt" if base_url.endswith("/") else base_url + "/SHA256SUMS.txt"
-    r = session.get(checksum_url)
+    r = session.get(checksum_url, timeout=DEFAULT_TIMEOUT)
     r.raise_for_status()
     mapping = {}
     for line in r.text.strip().splitlines():
@@ -61,6 +104,19 @@ class MockResponse:  # pragma: no cover
         if self.status_code != 200:
             raise requests.exceptions.HTTPError(self.status_code)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        # Mirror `requests.Response.__exit__`: close the response so the mock
+        # catches future regressions where production code starts relying on
+        # close being part of the context-manager contract.
+        self.close()
+        return False
+
+    def close(self):
+        pass
+
 
 class MockSession:  # pragma: no cover
     """A mock requests.Session objects for tests."""
@@ -77,7 +133,10 @@ class MockSession:  # pragma: no cover
         self.headers = {}
         self.auth = None
 
-    def get(self, url: str, stream: bool = False):
+    def close(self):
+        pass
+
+    def get(self, url: str, stream: bool = False, **kwargs):
         if self.expect_url is not None and url != self.expect_url:
             raise ValueError(f"Expected URL {self.expect_url}, got {url}")
         if isinstance(self.return_status, dict):
@@ -162,16 +221,21 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
             )
 
     try:
-        response = session.get(url, stream=True)
-        if response.status_code != 200:
-            logger.error(f"Failed to download {url} in streaming download_file get: {response.status_code}")
-        response.raise_for_status()
+        # Use the response as a context manager so a non-200 status (or any
+        # exception thrown by raise_for_status) reliably returns the streaming
+        # connection to the pool instead of leaking it.
+        with session.get(url, stream=True, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status_code != 200:
+                logger.error(
+                    f"Failed to download {url} in streaming download_file get: {response.status_code}"
+                )
+            response.raise_for_status()
+            with open(file_path, "wb") as file:
+                for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                    file.write(chunk)
     except Exception as e:
         raise ValueError(f"Failed to download {url}") from e
 
-    with open(file_path, "wb") as file:
-        for chunk in response.iter_content(chunk_size=8192):
-            file.write(chunk)
     logger.info(f"Downloaded: {file_path}")
 
 
@@ -222,7 +286,7 @@ def crawl_and_download(base_url: str, output_dir: Path, session: requests.Sessio
         return
 
     try:
-        response = session.get(base_url)
+        response = session.get(base_url, timeout=DEFAULT_TIMEOUT)
         if response.status_code != 200:
             logger.error(f"Failed to download {base_url} in initial get: {response.status_code}")
         response.raise_for_status()
@@ -251,7 +315,7 @@ def download_data(
     output_dir: Path,
     dataset_info: DictConfig,
     do_demo: bool = False,
-    session_factory: callable = requests.Session,
+    session_factory: Callable[[], requests.Session] = make_session_with_retries,
 ):
     """Downloads the data specified in dataset_info.dataset_urls to the output_dir.
 
@@ -343,17 +407,24 @@ def download_data(
 
     for url in urls:
         session = session_factory()
-
-        if isinstance(url, dict | DictConfig):
-            username = url.get("username", None)
-            password = url.get("password", None)
-            logger.info(f"Authenticating for {username}")
-            session.auth = (username, password)
-            session.headers.update({"User-Agent": "Wget/1.21.1 (linux-gnu)"})
-
-            url = url.url
-
         try:
-            crawl_and_download(url, output_dir, session)
-        except ValueError as e:
-            raise ValueError(f"Failed to download data from {url}") from e
+            if isinstance(url, dict | DictConfig):
+                username = url.get("username", None)
+                password = url.get("password", None)
+                logger.info(f"Authenticating for {username}")
+                session.auth = (username, password)
+                session.headers.update({"User-Agent": "Wget/1.21.1 (linux-gnu)"})
+
+                # `.get("url")` works uniformly for both `dict` and
+                # `DictConfig`; attribute access `url.url` would have raised
+                # on a plain dict even though the isinstance check admits one.
+                url = url.get("url")
+
+            try:
+                crawl_and_download(url, output_dir, session)
+            except ValueError as e:
+                raise ValueError(f"Failed to download data from {url}") from e
+        finally:
+            # Release the connection pool tied to this per-URL session so
+            # long runs don't hold extra sockets/fds open after each URL.
+            session.close()
