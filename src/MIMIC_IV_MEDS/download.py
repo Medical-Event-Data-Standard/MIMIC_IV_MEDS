@@ -7,6 +7,45 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 from omegaconf import DictConfig
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# Connect and per-chunk read timeouts (seconds). `requests` defaults to no
+# timeout, so a stalled TCP socket parks a worker in recv() indefinitely —
+# PhysioNet's edge silently drops chunked connections, which was hitting us
+# as a full pipeline hang (see #42). READ_TIMEOUT_S is the gap between bytes,
+# not total wall-clock: a slow-but-alive 25 KB/s stream is fine, only truly
+# stalled connections trip it.
+CONNECT_TIMEOUT_S = 10.0
+READ_TIMEOUT_S = 60.0
+DEFAULT_TIMEOUT = (CONNECT_TIMEOUT_S, READ_TIMEOUT_S)
+
+# 1 MiB streaming chunks instead of 8 KiB — 128x fewer write() syscalls on
+# large files (chartevents.csv.gz is ~25 GB uncompressed) with no downside.
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024
+
+
+def make_session_with_retries() -> requests.Session:
+    """Return a `requests.Session` with a retry adapter mounted for transient server errors.
+
+    PhysioNet returns 429/502/503/504 regularly under load; without retries a single transient failure unwinds
+    the whole crawl. The adapter handles connect-time failures and error-status retries before the body starts
+    streaming. Backoff is exponential (2, 4, 8, 16, 32 s) and `Retry-After` headers are respected.
+    """
+    session = requests.Session()
+    retry = Retry(
+        total=5,
+        backoff_factor=2.0,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=frozenset(["GET", "HEAD"]),
+        respect_retry_after_header=True,
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
 
 _checksum_cache = {}
 
@@ -29,7 +68,7 @@ def get_checksum_mapping(base_url: str, session: requests.Session) -> dict:
     if base_url in _checksum_cache:
         return _checksum_cache[base_url]
     checksum_url = base_url + "SHA256SUMS.txt" if base_url.endswith("/") else base_url + "/SHA256SUMS.txt"
-    r = session.get(checksum_url)
+    r = session.get(checksum_url, timeout=DEFAULT_TIMEOUT)
     r.raise_for_status()
     mapping = {}
     for line in r.text.strip().splitlines():
@@ -77,7 +116,7 @@ class MockSession:  # pragma: no cover
         self.headers = {}
         self.auth = None
 
-    def get(self, url: str, stream: bool = False):
+    def get(self, url: str, stream: bool = False, **kwargs):
         if self.expect_url is not None and url != self.expect_url:
             raise ValueError(f"Expected URL {self.expect_url}, got {url}")
         if isinstance(self.return_status, dict):
@@ -162,7 +201,7 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
             )
 
     try:
-        response = session.get(url, stream=True)
+        response = session.get(url, stream=True, timeout=DEFAULT_TIMEOUT)
         if response.status_code != 200:
             logger.error(f"Failed to download {url} in streaming download_file get: {response.status_code}")
         response.raise_for_status()
@@ -170,7 +209,7 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
         raise ValueError(f"Failed to download {url}") from e
 
     with open(file_path, "wb") as file:
-        for chunk in response.iter_content(chunk_size=8192):
+        for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
             file.write(chunk)
     logger.info(f"Downloaded: {file_path}")
 
@@ -222,7 +261,7 @@ def crawl_and_download(base_url: str, output_dir: Path, session: requests.Sessio
         return
 
     try:
-        response = session.get(base_url)
+        response = session.get(base_url, timeout=DEFAULT_TIMEOUT)
         if response.status_code != 200:
             logger.error(f"Failed to download {base_url} in initial get: {response.status_code}")
         response.raise_for_status()
@@ -251,7 +290,7 @@ def download_data(
     output_dir: Path,
     dataset_info: DictConfig,
     do_demo: bool = False,
-    session_factory: callable = requests.Session,
+    session_factory: callable = make_session_with_retries,
 ):
     """Downloads the data specified in dataset_info.dataset_urls to the output_dir.
 

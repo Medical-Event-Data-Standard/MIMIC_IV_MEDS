@@ -51,9 +51,9 @@ class TrackingMockSession(MockSession):
         super().__init__(*args, **kwargs)
         self.get_counts: dict[str, int] = {}
 
-    def get(self, url: str, stream: bool = False):
+    def get(self, url: str, stream: bool = False, **kwargs):
         self.get_counts[url] = self.get_counts.get(url, 0) + 1
-        return super().get(url, stream=stream)
+        return super().get(url, stream=stream, **kwargs)
 
 
 def test_skip_existing_download(caplog, dataset_config):
@@ -146,7 +146,7 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
     ]
 
     class SwitchMockSession(TrackingMockSession):
-        def get(self, url: str, stream: bool = False):
+        def get(self, url: str, stream: bool = False, **kwargs):
             self.get_counts[url] = self.get_counts.get(url, 0) + 1
             current = responses[0]
             if url in current:
