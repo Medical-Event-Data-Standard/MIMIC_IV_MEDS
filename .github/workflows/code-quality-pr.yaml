@@ -24,10 +24,7 @@ jobs:
 
       - name: Find modified files
         id: file_changes
-        # Pinned to SHA (and not a moving tag) for supply-chain safety: this
-        # action has been the target of a tag-hijack attack in the past, and
-        # GitHub tags are mutable. SHA = v47.0.6.
-        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        uses: tj-actions/changed-files@v47.0.6
 
       - name: List all changed files
         run: echo '${{ steps.file_changes.outputs.all_changed_files }}'
