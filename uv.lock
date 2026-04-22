@@ -514,24 +514,24 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "beautifulsoup4" },
-    { name = "hydra-core" },
-    { name = "hydra-joblib-launcher" },
-    { name = "hydra-submitit-launcher", marker = "extra == 'slurm-parallelism'" },
+    { name = "beautifulsoup4", specifier = "~=4.12" },
+    { name = "hydra-core", specifier = "~=1.3" },
+    { name = "hydra-joblib-launcher", specifier = "~=1.2" },
+    { name = "hydra-submitit-launcher", marker = "extra == 'slurm-parallelism'", specifier = "~=1.2" },
     { name = "meds-extract", specifier = "~=0.5" },
     { name = "meds-transforms", specifier = "~=0.6" },
-    { name = "polars", specifier = "~=1.30.0" },
-    { name = "requests" },
+    { name = "polars", specifier = "~=1.30" },
+    { name = "requests", specifier = "~=2.32" },
 ]
 provides-extras = ["slurm-parallelism"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pre-commit", specifier = "<4" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
+    { name = "pre-commit", specifier = "~=3.8" },
+    { name = "pytest", specifier = "~=9.0" },
+    { name = "pytest-cov", specifier = "~=7.1" },
     { name = "pytest-rerunfailures", specifier = "==16.1" },
-    { name = "ruff" },
+    { name = "ruff", specifier = ">=0.11,<1.0" },
     { name = "shfmt-py", specifier = "==3.12.0.2" },
 ]
 
