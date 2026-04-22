@@ -22,7 +22,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pre-commit<4", "ruff", "pytest", "pytest-cov"]
+# `shfmt-py` bundles the `shfmt` binary that the `mdformat-shfmt` pre-commit
+# hook shells out to; declaring it here (in addition to pinning it under the
+# mdformat hook's `additional_dependencies`) keeps local + CI behavior in lock
+# step instead of silently falling back to whatever `shfmt` is on the system.
+dev = ["pre-commit<4", "ruff", "pytest", "pytest-cov", "shfmt-py==3.12.0.2"]
 
 [tool.setuptools_scm]
 

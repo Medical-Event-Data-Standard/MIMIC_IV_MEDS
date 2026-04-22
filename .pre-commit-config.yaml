@@ -47,22 +47,26 @@ repos:
     hooks:
       - id: shellcheck
 
-  # md formatting
+  # md formatting. `additional_dependencies` (mdformat plugins) are pinned to
+  # exact versions to avoid surprise regressions when plugin patch releases ship;
+  # `shfmt-py` provides a pinned `shfmt` binary to `mdformat-shfmt` so the hook
+  # doesn't silently fall back to whatever system shfmt happens to be on PATH.
   - repo: https://github.com/executablebooks/mdformat
     rev: 0.7.22
     hooks:
       - id: mdformat
         args: ["--number"]
         additional_dependencies:
-          - mdformat-gfm
-          - mdformat-tables
-          - mdformat_frontmatter
-          - mdformat-black
-          - mdformat-config
-          - mdformat-shfmt
-          - mdformat-mkdocs
-          - mdformat-toc
-          - mdformat-gfm-alerts
+          - mdformat-gfm==1.0.0
+          - mdformat-tables==1.0.0
+          - mdformat-frontmatter==2.0.10
+          - mdformat-black==0.1.1
+          - mdformat-config==0.2.1
+          - mdformat-shfmt==0.2.0
+          - mdformat-mkdocs==5.1.4
+          - mdformat-toc==0.5.0
+          - mdformat-gfm-alerts==2.0.0
+          - shfmt-py==3.12.0.2
 
   # word spelling linter
   - repo: https://github.com/codespell-project/codespell
