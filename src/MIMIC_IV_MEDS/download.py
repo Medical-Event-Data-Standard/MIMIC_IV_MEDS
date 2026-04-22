@@ -107,6 +107,10 @@ class MockResponse:  # pragma: no cover
         return self
 
     def __exit__(self, exc_type, exc, tb):
+        # Mirror `requests.Response.__exit__`: close the response so the mock
+        # catches future regressions where production code starts relying on
+        # close being part of the context-manager contract.
+        self.close()
         return False
 
     def close(self):
@@ -127,6 +131,9 @@ class MockSession:  # pragma: no cover
         self.expect_url = expect_url
         self.headers = {}
         self.auth = None
+
+    def close(self):
+        pass
 
     def get(self, url: str, stream: bool = False, **kwargs):
         if self.expect_url is not None and url != self.expect_url:
@@ -399,17 +406,21 @@ def download_data(
 
     for url in urls:
         session = session_factory()
-
-        if isinstance(url, dict | DictConfig):
-            username = url.get("username", None)
-            password = url.get("password", None)
-            logger.info(f"Authenticating for {username}")
-            session.auth = (username, password)
-            session.headers.update({"User-Agent": "Wget/1.21.1 (linux-gnu)"})
-
-            url = url.url
-
         try:
-            crawl_and_download(url, output_dir, session)
-        except ValueError as e:
-            raise ValueError(f"Failed to download data from {url}") from e
+            if isinstance(url, dict | DictConfig):
+                username = url.get("username", None)
+                password = url.get("password", None)
+                logger.info(f"Authenticating for {username}")
+                session.auth = (username, password)
+                session.headers.update({"User-Agent": "Wget/1.21.1 (linux-gnu)"})
+
+                url = url.url
+
+            try:
+                crawl_and_download(url, output_dir, session)
+            except ValueError as e:
+                raise ValueError(f"Failed to download data from {url}") from e
+        finally:
+            # Release the connection pool tied to this per-URL session so
+            # long runs don't hold extra sockets/fds open after each URL.
+            session.close()
