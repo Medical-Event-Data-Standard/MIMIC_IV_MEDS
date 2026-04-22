@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -314,7 +315,7 @@ def download_data(
     output_dir: Path,
     dataset_info: DictConfig,
     do_demo: bool = False,
-    session_factory: callable = make_session_with_retries,
+    session_factory: Callable[[], requests.Session] = make_session_with_retries,
 ):
     """Downloads the data specified in dataset_info.dataset_urls to the output_dir.
 
@@ -414,7 +415,10 @@ def download_data(
                 session.auth = (username, password)
                 session.headers.update({"User-Agent": "Wget/1.21.1 (linux-gnu)"})
 
-                url = url.url
+                # `.get("url")` works uniformly for both `dict` and
+                # `DictConfig`; attribute access `url.url` would have raised
+                # on a plain dict even though the isinstance check admits one.
+                url = url.get("url")
 
             try:
                 crawl_and_download(url, output_dir, session)
