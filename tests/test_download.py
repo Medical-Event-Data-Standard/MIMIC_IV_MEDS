@@ -7,7 +7,7 @@ import pytest
 from omegaconf import DictConfig
 
 from MIMIC_IV_MEDS import download as download_module
-from MIMIC_IV_MEDS.download import MockResponse, MockSession, download_data
+from MIMIC_IV_MEDS.download import MockResponse, MockSession, download_data, make_session_with_retries
 
 
 @pytest.fixture(autouse=True)
@@ -184,3 +184,17 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
         assert demo_file.read_text() == correct_content
         redownloaded = any("Checksum mismatch for" in rec.message for rec in caplog.records)
         assert redownloaded, "Expected a checksum mismatch message prompting redownload."
+
+
+def test_make_session_with_retries_contract():
+    """Regression guard on the retry adapter config — catches silent changes to the retry policy."""
+    session = make_session_with_retries()
+    for prefix in ("http://", "https://"):
+        adapter = session.get_adapter(prefix + "example.com/")
+        retry = adapter.max_retries
+        assert retry.total == 5, f"total retries for {prefix}"
+        assert retry.backoff_factor == 2.0, f"backoff_factor for {prefix}"
+        assert set(retry.status_forcelist) == {429, 500, 502, 503, 504}, f"status_forcelist for {prefix}"
+        assert "GET" in retry.allowed_methods, f"GET in allowed_methods for {prefix}"
+        assert retry.respect_retry_after_header is True, f"respect_retry_after_header for {prefix}"
+        assert retry.raise_on_status is False, f"raise_on_status for {prefix}"

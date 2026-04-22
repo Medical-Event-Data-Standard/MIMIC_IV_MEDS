@@ -28,9 +28,12 @@ DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 def make_session_with_retries() -> requests.Session:
     """Return a `requests.Session` with a retry adapter mounted for transient server errors.
 
-    PhysioNet returns 429/502/503/504 regularly under load; without retries a single transient failure unwinds
-    the whole crawl. The adapter handles connect-time failures and error-status retries before the body starts
-    streaming. Backoff is exponential (2, 4, 8, 16, 32 s) and `Retry-After` headers are respected.
+    PhysioNet returns 429/500/502/503/504 regularly under load; without retries a single transient failure
+    unwinds the whole crawl. The adapter handles connect-time failures and error-status retries before the
+    body starts streaming. urllib3's first retry happens immediately; subsequent retries sleep
+    `backoff_factor * (2 ** (attempt - 1))` seconds, so with our `backoff_factor=2.0` and `total=5` the
+    worst-case sequence is 0, 2, 4, 8, 16 s between attempts (capped by urllib3's default `backoff_max`).
+    `Retry-After` headers are respected when the server supplies them.
     """
     session = requests.Session()
     retry = Retry(
@@ -99,6 +102,15 @@ class MockResponse:  # pragma: no cover
     def raise_for_status(self):
         if self.status_code != 200:
             raise requests.exceptions.HTTPError(self.status_code)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def close(self):
+        pass
 
 
 class MockSession:  # pragma: no cover
@@ -201,16 +213,21 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
             )
 
     try:
-        response = session.get(url, stream=True, timeout=DEFAULT_TIMEOUT)
-        if response.status_code != 200:
-            logger.error(f"Failed to download {url} in streaming download_file get: {response.status_code}")
-        response.raise_for_status()
+        # Use the response as a context manager so a non-200 status (or any
+        # exception thrown by raise_for_status) reliably returns the streaming
+        # connection to the pool instead of leaking it.
+        with session.get(url, stream=True, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status_code != 200:
+                logger.error(
+                    f"Failed to download {url} in streaming download_file get: {response.status_code}"
+                )
+            response.raise_for_status()
+            with open(file_path, "wb") as file:
+                for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                    file.write(chunk)
     except Exception as e:
         raise ValueError(f"Failed to download {url}") from e
 
-    with open(file_path, "wb") as file:
-        for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
-            file.write(chunk)
     logger.info(f"Downloaded: {file_path}")
 
 
