@@ -27,15 +27,29 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Run tests
+        # `--reruns`/`--only-rerun` (from pytest-rerunfailures) retries the
+        # e2e demo-download test when PhysioNet returns mid-stream connection
+        # errors (IncompleteRead / ChunkedEncodingError / ConnectionError).
+        # These are upstream transient failures, not real regressions, and
+        # blocking CI on them means no PR can land during a bad PhysioNet
+        # minute. The pattern is intentionally narrow: anything else fails
+        # hard on first occurrence.
         run: |
-          uv run pytest src/ tests/ -v --doctest-modules --cov=src --junitxml=junit.xml -s
+          uv run pytest src/ tests/ -v --doctest-modules \
+            --cov=src --cov-report=xml --cov-report=term \
+            --junitxml=junit.xml -s \
+            --reruns 3 --reruns-delay 20 \
+            --only-rerun "IncompleteRead|ChunkedEncodingError|ConnectionError|Connection broken"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4.0.1
+        uses: codecov/codecov-action@v5.5.4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: false
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
+        uses: codecov/test-results-action@v1.2.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
