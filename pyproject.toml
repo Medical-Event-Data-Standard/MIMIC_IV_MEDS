@@ -16,9 +16,18 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+# Each dep is pinned with a lower bound at the version we actively test against,
+# and an upper bound at the next known-or-expected breaking major. `meds-extract`
+# is capped below 0.6 because that release ships breaking syntax changes that
+# require a coordinated code migration (tracked in #40).
 dependencies = [
-   "polars~=1.30.0", "meds-transforms~=0.6", "meds-extract~=0.5", "requests", "beautifulsoup4",
-   "hydra-core", "hydra-joblib-launcher",
+    "polars~=1.30",
+    "meds-transforms~=0.6",
+    "meds-extract~=0.5",
+    "requests~=2.32",
+    "beautifulsoup4~=4.12",
+    "hydra-core~=1.3",
+    "hydra-joblib-launcher~=1.2",
 ]
 
 [dependency-groups]
@@ -31,10 +40,10 @@ dependencies = [
 # reset / IncompleteRead mid-stream) instead of turning a bad upstream minute
 # into a failed CI build.
 dev = [
-    "pre-commit<4",
-    "ruff",
-    "pytest",
-    "pytest-cov",
+    "pre-commit~=3.8",
+    "ruff>=0.11,<1.0",
+    "pytest~=9.0",
+    "pytest-cov~=7.1",
     "pytest-rerunfailures==16.1",
     "shfmt-py==3.12.0.2",
 ]
@@ -42,7 +51,7 @@ dev = [
 [tool.setuptools_scm]
 
 [project.optional-dependencies]
-slurm_parallelism = ["hydra-submitit-launcher"]
+slurm_parallelism = ["hydra-submitit-launcher~=1.2"]
 
 [project.scripts]
 MEDS_extract-MIMIC_IV = "MIMIC_IV_MEDS.__main__:main"
