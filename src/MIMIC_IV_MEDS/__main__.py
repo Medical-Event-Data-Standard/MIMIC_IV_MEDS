@@ -29,12 +29,22 @@ def main(cfg: DictConfig):
 
     # Step 0: Data downloading
     if cfg.do_download:
+        download_workers = int(cfg.get("download_workers", 1))
         if cfg.get("do_demo", False):
             logger.info("Downloading demo data.")
-            download_data(raw_input_dir, dataset_info, do_demo=True)
+            download_data(
+                raw_input_dir,
+                dataset_info,
+                do_demo=True,
+                download_workers=download_workers,
+            )
         else:
-            logger.info("Downloading data.")
-            download_data(raw_input_dir, dataset_info)
+            logger.info(f"Downloading data with {download_workers} parallel workers.")
+            download_data(
+                raw_input_dir,
+                dataset_info,
+                download_workers=download_workers,
+            )
     else:  # pragma: no cover
         logger.info("Skipping data download.")
 

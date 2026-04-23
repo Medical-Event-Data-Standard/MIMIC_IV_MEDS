@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -239,16 +240,77 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
     logger.info(f"Downloaded: {file_path}")
 
 
-def crawl_and_download(base_url: str, output_dir: Path, session: requests.Session):
-    """Recursively crawl and download files.
+def _enumerate_files(base_url: str, output_dir: Path, session: requests.Session) -> list[tuple[str, Path]]:
+    """Walk a (possibly recursive) HTML directory listing and return a flat list of files to download.
+
+    Each result is a `(file_url, output_subdir)` pair: the URL to fetch, and the subdirectory under
+    `output_dir` where the file should land. Subdirectories are created eagerly during the walk so
+    that subsequent parallel writes don't race on `mkdir`.
+
+    Separating enumeration from transfer lets callers fan out the actual downloads across a worker
+    pool — see `crawl_and_download`. The walk itself is sequential and only fetches small HTML
+    indexes, so it isn't a meaningful contributor to wall-clock time.
+    """
+    if not base_url.endswith("/"):
+        return [(base_url, output_dir)]
+
+    try:
+        response = session.get(base_url, timeout=DEFAULT_TIMEOUT)
+        if response.status_code != 200:
+            logger.error(f"Failed to download {base_url} in initial get: {response.status_code}")
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        raise ValueError(f"Failed to download data from {base_url}") from e
+
+    items: list[tuple[str, Path]] = []
+    soup = BeautifulSoup(response.text, "html.parser")
+    for link in soup.find_all("a", href=True):
+        href = link["href"]
+        full_url = urljoin(base_url, href)
+        if not full_url.startswith(base_url):
+            continue
+
+        if full_url.endswith("/"):  # directory
+            subdir = Path(output_dir) / full_url.replace(base_url, "").strip("/")
+            subdir.mkdir(parents=True, exist_ok=True)
+            items.extend(_enumerate_files(full_url, subdir, session))
+        else:
+            filepath = output_dir / full_url.replace(base_url, "")
+            subdir = filepath.parent
+            subdir.mkdir(parents=True, exist_ok=True)
+            items.append((full_url, subdir))
+    return items
+
+
+def crawl_and_download(
+    base_url: str,
+    output_dir: Path,
+    session: requests.Session,
+    *,
+    max_workers: int = 1,
+    session_factory: Callable[[], requests.Session] | None = None,
+):
+    """Recursively crawl and download files, optionally in parallel.
 
     Args:
         base_url: The base URL to crawl.
         output_dir: The directory to download the files to.
-        session: The requests session to use for downloading.
+        session: The requests session used for HTML enumeration. When `max_workers == 1`, this
+            session is also used for the file transfers; otherwise its `auth` and `headers` are
+            cloned onto each worker session created via `session_factory`.
+        max_workers: Number of parallel file downloads. Defaults to 1 (sequential — preserves
+            historical behavior). Values > 1 fan out the file transfers across a thread pool;
+            this is the lever that beats PhysioNet's ~50 KB/s per-connection cap, since they
+            do not appear to throttle aggregate per-IP throughput.
+        session_factory: Required when `max_workers > 1`. Called once per worker to mint a fresh
+            `requests.Session`. Each worker's session inherits `auth` and `headers` from the
+            enumerating `session` so authenticated downloads work transparently. Ignored when
+            `max_workers == 1`.
 
     Raises:
-        Various requests exceptions if downloads fail.
+        ValueError: If any download fails. With `max_workers > 1`, all downloads run to
+            completion before the failure is raised, so a single bad URL doesn't leave the
+            other workers half-finished.
 
     Examples:
         >>> import tempfile
@@ -281,34 +343,45 @@ def crawl_and_download(base_url: str, output_dir: Path, session: requests.Sessio
         ...     assert (tmpdir / "bar" / "qux.csv").read_text() == "10,11,12", "bar/qux.csv check"
         ...     assert (tmpdir / "bur" / "wor.csv").read_text() == "13,14,15", "bur/wor.csv check"
     """
-    if not base_url.endswith("/"):
-        download_file(base_url, output_dir, session)
+    files = _enumerate_files(base_url, output_dir, session)
+
+    if max_workers <= 1 or session_factory is None:
+        for file_url, subdir in files:
+            download_file(file_url, subdir, session)
         return
 
-    try:
-        response = session.get(base_url, timeout=DEFAULT_TIMEOUT)
-        if response.status_code != 200:
-            logger.error(f"Failed to download {base_url} in initial get: {response.status_code}")
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as e:
-        raise ValueError(f"Failed to download data from {base_url}") from e
+    # Snapshot auth + headers from the enumerating session so each worker can hit
+    # authenticated endpoints without us trying to share the master session across
+    # threads (which is officially supported by `requests` but routinely bites
+    # people in subtle ways — separate sessions per worker gives each its own
+    # connection pool and keeps the per-connection retry/timeout state isolated).
+    worker_auth = session.auth
+    worker_headers = dict(session.headers)
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    for link in soup.find_all("a", href=True):
-        href = link["href"]
-        full_url = urljoin(base_url, href)
-        if not full_url.startswith(base_url):
-            continue
+    def _download_one(item: tuple[str, Path]) -> None:
+        file_url, subdir = item
+        worker_session = session_factory()
+        worker_session.auth = worker_auth
+        worker_session.headers.update(worker_headers)
+        try:
+            download_file(file_url, subdir, worker_session)
+        finally:
+            worker_session.close()
 
-        if full_url.endswith("/"):  # It's a directory
-            subdir = Path(output_dir) / full_url.replace(base_url, "").strip("/")
-            subdir.mkdir(parents=True, exist_ok=True)
-            crawl_and_download(full_url, subdir, session)
-        else:
-            filepath = output_dir / full_url.replace(base_url, "")
-            subdir = filepath.parent
-            subdir.mkdir(parents=True, exist_ok=True)
-            download_file(full_url, subdir, session)
+    errors: list[tuple[str, BaseException]] = []
+    with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="download") as ex:
+        future_to_url = {ex.submit(_download_one, item): item[0] for item in files}
+        for fut in as_completed(future_to_url):
+            file_url = future_to_url[fut]
+            try:
+                fut.result()
+            except BaseException as e:
+                errors.append((file_url, e))
+                logger.error(f"Parallel download failed for {file_url}: {e}")
+
+    if errors:
+        first_url, first_err = errors[0]
+        raise ValueError(f"{len(errors)} download(s) failed (first: {first_url!r})") from first_err
 
 
 def download_data(
@@ -316,6 +389,7 @@ def download_data(
     dataset_info: DictConfig,
     do_demo: bool = False,
     session_factory: Callable[[], requests.Session] = make_session_with_retries,
+    download_workers: int = 1,
 ):
     """Downloads the data specified in dataset_info.dataset_urls to the output_dir.
 
@@ -324,6 +398,11 @@ def download_data(
         dataset_info: The dataset information containing the URLs to download.
         do_demo: If True, download the demo URLs instead of the main URLs.
         session_factory: A callable that returns a requests.Session object (for testing).
+        download_workers: Number of files to download in parallel within a single base URL.
+            Defaults to 1 (sequential). PhysioNet caps each connection at ~50 KB/s but does
+            not appear to per-IP throttle, so values of 4-8 typically yield a 4-8x throughput
+            increase. Higher values give diminishing returns and may trigger 429 responses
+            (which the retry adapter handles transparently).
 
     Raises:
         ValueError: If the command fails
@@ -421,7 +500,13 @@ def download_data(
                 url = url.get("url")
 
             try:
-                crawl_and_download(url, output_dir, session)
+                crawl_and_download(
+                    url,
+                    output_dir,
+                    session,
+                    max_workers=download_workers,
+                    session_factory=session_factory,
+                )
             except ValueError as e:
                 raise ValueError(f"Failed to download data from {url}") from e
         finally:

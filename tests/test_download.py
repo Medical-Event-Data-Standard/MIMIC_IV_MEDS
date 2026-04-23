@@ -186,6 +186,98 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
         assert redownloaded, "Expected a checksum mismatch message prompting redownload."
 
 
+def test_parallel_download_produces_same_output_as_sequential():
+    """End-to-end check that download_workers > 1 lands the same files with the same contents
+    as the single-worker path, including for an authenticated (dict-with-credentials) URL block
+    where each worker session must inherit auth + headers from the enumerating session."""
+    import threading
+
+    file_map = {
+        "a.csv": "alpha contents",
+        "b.csv": "bravo contents",
+        "c.csv": "charlie contents",
+        "d.csv": "delta contents",
+        "e.csv": "echo contents",
+    }
+    base = "http://example.com/files/dataset/v1/"
+    listing_html = "".join(f"<a href='{base}{name}'>{name}</a>" for name in file_map)
+    return_contents = {base: listing_html, **{f"{base}{n}": c for n, c in file_map.items()}}
+    return_status = dict.fromkeys(return_contents, 200)
+
+    # Per-worker session counter — verifies that more than one session was actually created.
+    sessions_created = 0
+    seen_auth: set[tuple | None] = set()
+    seen_ua: set[str] = set()
+    lock = threading.Lock()
+
+    class CountingMockSession(MockSession):
+        def __init__(self):
+            super().__init__(return_contents=return_contents, return_status=return_status)
+
+        def close(self):
+            with lock:
+                seen_auth.add(self.auth)
+                seen_ua.add(self.headers.get("User-Agent", ""))
+
+    def factory():
+        nonlocal sessions_created
+        with lock:
+            sessions_created += 1
+        return CountingMockSession()
+
+    cfg = DictConfig({"urls": {"dataset": [{"url": base, "username": "u", "password": "p"}]}})
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        download_data(
+            tmpdir_path,
+            cfg,
+            do_demo=False,
+            session_factory=factory,
+            download_workers=4,
+        )
+        for name, content in file_map.items():
+            written = (tmpdir_path / name).read_text()
+            assert written == content, f"{name}: expected {content!r}, got {written!r}"
+
+    # The enumerating session + at least one worker session — strictly > 1.
+    assert sessions_created > 1, (
+        f"factory was only called {sessions_created}x; parallelism path did not trigger"
+    )
+    # Worker sessions inherit auth/headers from the master session.
+    assert ("u", "p") in seen_auth, f"workers did not inherit auth tuple ({seen_auth})"
+    assert "Wget/1.21.1 (linux-gnu)" in seen_ua, f"workers did not inherit User-Agent ({seen_ua})"
+
+
+def test_parallel_download_aggregates_failures():
+    """When workers > 1, a single failed file should not silently skip the others, and the raised
+    error should reference the count of failures plus the first failing URL."""
+    base = "http://example.com/files/dataset/v1/"
+    good = {base + "good1.csv": "ok1", base + "good2.csv": "ok2"}
+    bad_url = base + "bad.csv"
+    listing_html = (
+        f"<a href='{base}good1.csv'>g1</a><a href='{base}good2.csv'>g2</a><a href='{bad_url}'>bad</a>"
+    )
+    contents = {base: listing_html, **good, bad_url: "ignored"}
+    statuses = {base: 200, base + "good1.csv": 200, base + "good2.csv": 200, bad_url: 503}
+
+    cfg = DictConfig({"urls": {"dataset": [base]}})
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(ValueError, match=r"Failed to download data from"):
+            download_data(
+                Path(tmpdir),
+                cfg,
+                do_demo=False,
+                session_factory=lambda: MockSession(return_contents=contents, return_status=statuses),
+                download_workers=3,
+            )
+        # Successful files are still on disk despite the bad one — that's the whole point of
+        # gathering errors after the pool drains rather than short-circuiting.
+        assert (Path(tmpdir) / "good1.csv").exists()
+        assert (Path(tmpdir) / "good2.csv").exists()
+
+
 def test_make_session_with_retries_contract():
     """Regression guard on the retry adapter config — catches silent changes to the retry policy."""
     session = make_session_with_retries()
