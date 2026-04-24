@@ -186,6 +186,214 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
         assert redownloaded, "Expected a checksum mismatch message prompting redownload."
 
 
+def test_parallel_download_produces_same_output_as_sequential():
+    """End-to-end check that download_workers > 1 lands the same files with the same content as the sequential
+    path, for an authenticated (dict-with-credentials) URL block where each worker session must inherit auth +
+    headers from the enumerating session.
+
+    The auth/UA assertion deliberately skips index 0 of the created-sessions list — that's the enumerating
+    (master) session, which `download_data` configures with auth + headers itself before calling
+    `crawl_and_download`. Including it would mean the test passes even if the workers never inherited
+    anything, defeating the point of the check.
+    """
+    import threading
+
+    file_map = {
+        "a.csv": "alpha contents",
+        "b.csv": "bravo contents",
+        "c.csv": "charlie contents",
+        "d.csv": "delta contents",
+        "e.csv": "echo contents",
+    }
+    base = "http://example.com/files/dataset/v1/"
+    listing_html = "".join(f"<a href='{base}{name}'>{name}</a>" for name in file_map)
+    return_contents = {base: listing_html, **{f"{base}{n}": c for n, c in file_map.items()}}
+    return_status = dict.fromkeys(return_contents, 200)
+
+    # Track every session the factory creates, in creation order. The first entry is the
+    # enumerating (master) session; subsequent entries are the worker sessions.
+    created_sessions: list[MockSession] = []
+    lock = threading.Lock()
+
+    class CountingMockSession(MockSession):
+        def __init__(self):
+            super().__init__(return_contents=return_contents, return_status=return_status)
+
+    def factory():
+        s = CountingMockSession()
+        with lock:
+            created_sessions.append(s)
+        return s
+
+    cfg = DictConfig({"urls": {"dataset": [{"url": base, "username": "u", "password": "p"}]}})
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        download_data(
+            tmpdir_path,
+            cfg,
+            do_demo=False,
+            session_factory=factory,
+            download_workers=4,
+        )
+        for name, content in file_map.items():
+            written = (tmpdir_path / name).read_text()
+            assert written == content, f"{name}: expected {content!r}, got {written!r}"
+
+    # Master + workers. With download_workers=4 the queue is pre-filled with 4 worker sessions,
+    # so we expect exactly 5 (1 master + 4 workers).
+    assert len(created_sessions) == 5, f"expected 1 master + 4 worker sessions, got {len(created_sessions)}"
+    # Workers (everything after the master at index 0) must each have inherited the auth tuple
+    # and User-Agent header from the master session. Asserting per-worker rather than via a
+    # set-membership check catches the case where one worker is correctly configured but
+    # others aren't — e.g. a thread-local-set-once-then-reused implementation that races.
+    for i, worker in enumerate(created_sessions[1:], start=1):
+        assert worker.auth == ("u", "p"), f"worker session #{i} missing auth, got {worker.auth!r}"
+        assert worker.headers.get("User-Agent") == "Wget/1.21.1 (linux-gnu)", (
+            f"worker session #{i} missing User-Agent, got {worker.headers!r}"
+        )
+
+
+def test_parallel_download_aggregates_failures():
+    """When workers > 1, a single failed file should not silently skip the others, and the raised error should
+    reference the count of failures plus the first failing URL."""
+    base = "http://example.com/files/dataset/v1/"
+    good = {base + "good1.csv": "ok1", base + "good2.csv": "ok2"}
+    bad_url = base + "bad.csv"
+    listing_html = (
+        f"<a href='{base}good1.csv'>g1</a><a href='{base}good2.csv'>g2</a><a href='{bad_url}'>bad</a>"
+    )
+    contents = {base: listing_html, **good, bad_url: "ignored"}
+    statuses = {base: 200, base + "good1.csv": 200, base + "good2.csv": 200, bad_url: 503}
+
+    cfg = DictConfig({"urls": {"dataset": [base]}})
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(ValueError, match=r"Failed to download data from"):
+            download_data(
+                Path(tmpdir),
+                cfg,
+                do_demo=False,
+                session_factory=lambda: MockSession(return_contents=contents, return_status=statuses),
+                download_workers=3,
+            )
+        # Successful files are still on disk despite the bad one — that's the whole point of
+        # gathering errors after the pool drains rather than short-circuiting.
+        assert (Path(tmpdir) / "good1.csv").exists()
+        assert (Path(tmpdir) / "good2.csv").exists()
+
+
+def test_parallel_requires_session_factory():
+    """`crawl_and_download(max_workers > 1, session_factory=None)` must raise — silently degrading to
+    sequential would mask config bugs (user requests parallelism, sees no speedup, blames PhysioNet)."""
+    from MIMIC_IV_MEDS.download import crawl_and_download
+
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        pytest.raises(ValueError, match=r"session_factory must be provided"),
+    ):
+        crawl_and_download(
+            "http://example.com/",
+            Path(tmpdir),
+            MockSession(),
+            max_workers=4,
+            session_factory=None,
+        )
+
+
+@pytest.mark.parametrize(
+    "bad_value",
+    [0, -3, "eight", True, [1, 2], 1.9, -2.5],
+    ids=["zero", "negative", "non-numeric-string", "bool-True", "list", "float-fractional", "float-negative"],
+)
+def test_download_data_rejects_bad_download_workers(bad_value, demo_only_config):
+    """`download_workers` must be a real positive int.
+
+    Typos / negatives / wrong-type values should fail loudly here instead of silently taking the sequential
+    path inside crawl_and_download. (`None` is intentionally accepted — the coercer treats it as the default
+    of 1 so that `download_workers: null` in YAML behaves like an unset key.)
+    """
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        pytest.raises(ValueError, match=r"must be a positive int"),
+    ):
+        download_data(
+            Path(tmpdir),
+            demo_only_config,
+            do_demo=True,
+            session_factory=lambda: MockSession(),
+            download_workers=bad_value,
+        )
+
+
+def test_session_factory_failure_during_pool_setup_closes_already_created_sessions():
+    """If `session_factory()` raises partway through pre-creating worker sessions, every session created
+    before the failure should be closed before `crawl_and_download` re-raises — otherwise we leak the
+    underlying sockets (and adapter connection pools)."""
+    import threading
+
+    from MIMIC_IV_MEDS.download import crawl_and_download
+
+    closed: list[int] = []
+    lock = threading.Lock()
+    creation_count = {"n": 0}
+
+    class TrackingMockSession(MockSession):
+        def __init__(self, sid: int):
+            super().__init__()
+            self.sid = sid
+
+        def close(self):
+            with lock:
+                closed.append(self.sid)
+
+    def factory():
+        with lock:
+            creation_count["n"] += 1
+            n = creation_count["n"]
+        # Pre-creation loop calls factory() max_workers times; fail on the 4th call so
+        # the first three sessions are orphaned in the no-cleanup version.
+        if n == 4:
+            raise RuntimeError("simulated factory failure")
+        return TrackingMockSession(n)
+
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        pytest.raises(RuntimeError, match="simulated factory failure"),
+    ):
+        crawl_and_download(
+            "http://example.com/",
+            Path(tmpdir),
+            MockSession(),  # enumerating session, not from factory
+            max_workers=8,
+            session_factory=factory,
+        )
+
+    # The first three sessions (sids 1, 2, 3) must have been closed before the raise.
+    assert sorted(closed) == [1, 2, 3], (
+        f"expected sessions 1,2,3 to be closed on factory-failure cleanup, got {closed}"
+    )
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        (1, 1),
+        (8, 8),
+        (None, 1),  # default
+        (8.0, 8),  # integer-valued float is fine
+        ("4", 4),  # numeric string OK (Hydra/OmegaConf coerces YAML strings)
+    ],
+    ids=["int-1", "int-8", "None-default", "float-int-valued", "string-numeric"],
+)
+def test_coerce_download_workers_accepts_valid(raw, expected):
+    """Positive cases for the shared coercer: ints, the None-becomes-default contract, and the
+    integer-valued float / numeric-string conveniences."""
+    from MIMIC_IV_MEDS.download import coerce_download_workers
+
+    assert coerce_download_workers(raw) == expected
+
+
 def test_make_session_with_retries_contract():
     """Regression guard on the retry adapter config — catches silent changes to the retry policy."""
     session = make_session_with_retries()
