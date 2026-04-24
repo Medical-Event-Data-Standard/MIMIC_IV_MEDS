@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import contextlib
 import hashlib
 import logging
 import os
 import queue
+import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -192,13 +195,29 @@ class MockSession:  # pragma: no cover
         return MockResponse(status_code=status, contents=contents)
 
 
-def download_file(url: str, output_dir: Path, session: requests.Session):
+def download_file(
+    url: str,
+    output_dir: Path,
+    session: requests.Session,
+    *,
+    in_flight: set[requests.Response] | None = None,
+    in_flight_lock: threading.Lock | None = None,
+):
     """Download a single file.
 
     Args:
         url: The URL to download.
         output_dir: The directory to download the file to.
         session: The requests session to use for downloading.
+        in_flight: Optional shared set — if provided, the active streaming `Response` is
+            registered on entry and discarded on exit (under `in_flight_lock`). This is
+            how `crawl_and_download` gives its KeyboardInterrupt handler a way to abort
+            ongoing downloads: `session.close()` alone doesn't interrupt an active
+            `iter_content` read (the connection is checked out of the pool), but closing
+            the specific `Response` does — it tears down the urllib3 stream and the read
+            surfaces a `ConnectionError` inside this function.
+        in_flight_lock: Required when `in_flight` is provided. Same lock must guard every
+            mutation of the set.
 
     Raises:
         Various requests exceptions if the download fails.
@@ -266,9 +285,21 @@ def download_file(url: str, output_dir: Path, session: requests.Session):
                     f"Failed to download {url} in streaming download_file get: {response.status_code}"
                 )
             response.raise_for_status()
-            with open(file_path, "wb") as file:
-                for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
-                    file.write(chunk)
+            # Register the active response so the parent's KeyboardInterrupt handler can
+            # close it and abort `iter_content` mid-stream. The set is only populated for
+            # parallel runs (sequential callers don't pass `in_flight`); the registry is
+            # discarded on exit regardless of how the with-block ends.
+            if in_flight is not None and in_flight_lock is not None:
+                with in_flight_lock:
+                    in_flight.add(response)
+            try:
+                with open(file_path, "wb") as file:
+                    for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                        file.write(chunk)
+            finally:
+                if in_flight is not None and in_flight_lock is not None:
+                    with in_flight_lock:
+                        in_flight.discard(response)
     except Exception as e:
         raise ValueError(f"Failed to download {url}") from e
 
@@ -364,6 +395,18 @@ def crawl_and_download(
             the raised error includes the count of failures plus the first failing URL, with the
             original exception attached as `__cause__`.
 
+    Interrupt behavior (`KeyboardInterrupt` / `SystemExit`): the parallel path cancels
+    queued downloads immediately but does **not** abort in-flight ones — closing an SSL
+    stream from the main thread while a worker is mid-`SSL_read` deadlocks OpenSSL's
+    per-socket lock (verified empirically). In-flight workers run to completion, then
+    the executor shuts down. The shipped CLI in `__main__.py` installs a SIGINT
+    handler that escalates to `os._exit(130)` on the second Ctrl+C, giving users a
+    fast-abort escape hatch when "wait for the ~12 GB labevents download to finish"
+    isn't acceptable. Library callers wanting the same behavior should install an
+    equivalent handler. The `in_flight` registry plumbed through `download_file` is
+    retained for that future use case (and for callers who want to expose a
+    different abort UX).
+
     Examples:
         >>> import tempfile
         >>> pages = {
@@ -447,23 +490,36 @@ def crawl_and_download(
                 s.close()
         raise
 
+    # Set of currently-streaming Response objects, populated by download_file via the
+    # `in_flight` kwarg. The KeyboardInterrupt path below closes each one, which actually
+    # aborts the in-progress iter_content read (closing only the Session/connection-pool
+    # does NOT — the active connection is checked out of the pool, not in it).
+    in_flight: set[requests.Response] = set()
+    in_flight_lock = threading.Lock()
+
     def _download_one(item: tuple[str, Path]) -> None:
         file_url, subdir = item
         worker_session = pool.get()
         try:
-            download_file(file_url, subdir, worker_session)
+            download_file(
+                file_url,
+                subdir,
+                worker_session,
+                in_flight=in_flight,
+                in_flight_lock=in_flight_lock,
+            )
         finally:
             pool.put(worker_session)
 
     errors: list[tuple[str, Exception]] = []
     ex = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="download")
-    # Decide what kind of executor shutdown to do based on whether we make it through the
-    # as_completed loop normally. The default `with ThreadPoolExecutor(...) as ex:` exit
-    # path calls shutdown(wait=True), which would block Ctrl+C until every in-flight
-    # download_file finishes — and PhysioNet downloads at ~50 KB/s can run for hours.
-    # On interrupt we instead cancel queued futures and skip the wait so the abort
-    # surfaces within at most one read-timeout window (READ_TIMEOUT_S=60s; in-flight
-    # iter_content reads can't be cancelled mid-chunk, but the TCP read will time out).
+    # On normal completion: shutdown(wait=True) — let workers finish cleanly.
+    # On interrupt: shutdown(wait=False, cancel_futures=True) AND force-close the
+    # in-flight Response objects. The cancel_futures alone only drops queued tasks;
+    # in-flight tasks would otherwise keep streaming until their files complete (~hours
+    # at PhysioNet's per-conn rate). Closing each Response surfaces the abort inside
+    # the worker as a ConnectionError, which download_file catches + reraises as
+    # ValueError; the worker thread then exits and the executor can shut down.
     shutdown_kwargs: dict = {"wait": True}
     try:
         future_to_url = {ex.submit(_download_one, item): item[0] for item in files}
@@ -478,7 +534,22 @@ def crawl_and_download(
                 errors.append((file_url, e))
                 logger.error(f"Parallel download failed for {file_url}: {e}")
     except (KeyboardInterrupt, SystemExit):
+        # Don't try to abort in-flight responses by closing them from the main thread:
+        # `Response.close()` on an SSL stream calls `SSL_shutdown` while a worker is
+        # still inside `SSL_read`, and OpenSSL deadlocks on the per-socket lock —
+        # tested empirically against PhysioNet, the close() call never returns. We
+        # instead just cancel queued futures (so unstarted downloads don't begin)
+        # and let interpreter shutdown's atexit hook for ThreadPoolExecutor join the
+        # in-flight workers as they finish naturally. The CLI installs a
+        # second-SIGINT `os._exit` handler so users have a fast-abort escape hatch
+        # — see `__main__.py`.
         shutdown_kwargs = {"wait": False, "cancel_futures": True}
+        with in_flight_lock:
+            n_in_flight = len(in_flight)
+        logger.warning(
+            f"INTERRUPT received: queued downloads cancelled. {n_in_flight} in-flight "
+            f"download(s) will continue until they complete; press Ctrl+C again to force-exit."
+        )
         raise
     finally:
         ex.shutdown(**shutdown_kwargs)

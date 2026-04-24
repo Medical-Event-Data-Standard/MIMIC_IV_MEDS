@@ -394,6 +394,97 @@ def test_coerce_download_workers_accepts_valid(raw, expected):
     assert coerce_download_workers(raw) == expected
 
 
+def test_in_flight_response_tracking_aborts_iter_content_on_close():
+    """Verifies the mechanism that `crawl_and_download`'s KeyboardInterrupt handler relies on:
+
+    1. `download_file(in_flight=set, in_flight_lock=lock)` registers its active Response in the set on
+       entry, discards on exit (under the lock).
+    2. Closing that Response from outside the worker actually aborts the in-flight `iter_content` read
+       (`Session.close()` alone wouldn't, since active connections are checked out of the pool).
+
+    Tested directly rather than via a real KeyboardInterrupt because `_thread.interrupt_main()` doesn't
+    reliably interrupt `as_completed`'s C-level condition-variable wait under all Python builds; the
+    mechanism (1+2) is what actually has to be correct for the integrated SIGINT path to work, and this
+    test pins it without the signal-delivery flakiness.
+    """
+    import threading
+    import time
+
+    from MIMIC_IV_MEDS.download import download_file
+
+    iter_started = threading.Event()
+    in_flight: set = set()
+    in_flight_lock = threading.Lock()
+
+    class BlockingResponse(MockResponse):
+        def __init__(self):
+            super().__init__(status_code=200, contents="payload")
+            self._unblock = threading.Event()
+
+        def iter_content(self, chunk_size):
+            iter_started.set()
+            # Block until close() flips the event. If the close-from-outside path is broken,
+            # the 5 s timeout fires and we surface a clear failure below.
+            if not self._unblock.wait(timeout=5):
+                raise AssertionError("iter_content was never unblocked — close() didn't fire")
+            raise ConnectionError("stream aborted by close")
+
+        def close(self):
+            self._unblock.set()
+
+    captured: list[BlockingResponse] = []
+
+    class BlockingSession(MockSession):
+        def get(self, url, stream=False, **kwargs):
+            r = BlockingResponse()
+            captured.append(r)
+            return r
+
+    session = BlockingSession()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+
+        def run_one_download():
+            # download_file raises ValueError on close-induced ConnectionError; we don't care
+            # about the exception here, only that the worker exits.
+            import contextlib as _c
+
+            with _c.suppress(ValueError):
+                download_file(
+                    "http://example.com/files/x/v1/foo.csv",
+                    tmpdir_path,
+                    session,
+                    in_flight=in_flight,
+                    in_flight_lock=in_flight_lock,
+                )
+
+        worker = threading.Thread(target=run_one_download)
+        worker.start()
+
+        # Wait for the worker to be inside iter_content with its response registered.
+        assert iter_started.wait(timeout=2), "worker never reached iter_content"
+
+        # Mechanism's first half: response IS registered while iter_content blocks.
+        with in_flight_lock:
+            in_flight_snapshot = list(in_flight)
+        assert len(in_flight_snapshot) == 1, (
+            f"expected 1 response in_flight while iter_content blocks, got {len(in_flight_snapshot)}"
+        )
+        assert in_flight_snapshot[0] is captured[0], "in_flight contains a different Response"
+
+        # Mechanism's second half: closing it from outside actually aborts the read.
+        t0 = time.monotonic()
+        captured[0].close()
+        worker.join(timeout=2)
+        elapsed = time.monotonic() - t0
+        assert not worker.is_alive(), f"worker didn't exit within 2s of close (waited {elapsed:.2f}s)"
+
+        # And the registry is cleaned up on exit.
+        with in_flight_lock:
+            assert len(in_flight) == 0, f"expected in_flight cleared on exit, still has {len(in_flight)}"
+
+
 def test_make_session_with_retries_contract():
     """Regression guard on the retry adapter config — catches silent changes to the retry policy."""
     session = make_session_with_retries()
