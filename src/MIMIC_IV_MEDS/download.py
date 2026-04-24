@@ -39,18 +39,24 @@ def coerce_download_workers(raw: object, *, default: int = 1) -> int:
     `None` → `default` (so `download_workers: null` in YAML behaves like an unset key).
     `bool` is rejected explicitly because `int(True) == 1` would silently take the
     sequential path even though `download_workers: true` in YAML is almost certainly a
-    config typo.
+    config typo. Fractional floats (e.g. `1.9`) are also rejected rather than truncated
+    by `int()` — same reasoning, silent truncation hides typos.
     """
     if raw is None:
         return default
     if isinstance(raw, bool):
         raise ValueError(f"download_workers must be a positive int, got {raw!r} (bool)")
-    try:
+    if isinstance(raw, float):
+        if not raw.is_integer():
+            raise ValueError(f"download_workers must be a positive int, got {raw!r} ({type(raw).__name__})")
         value = int(raw)
-    except (TypeError, ValueError) as e:
-        raise ValueError(
-            f"download_workers must be a positive int, got {raw!r} ({type(raw).__name__})"
-        ) from e
+    else:
+        try:
+            value = int(raw)
+        except (TypeError, ValueError) as e:
+            raise ValueError(
+                f"download_workers must be a positive int, got {raw!r} ({type(raw).__name__})"
+            ) from e
     if value < 1:
         raise ValueError(f"download_workers must be a positive int, got {value}")
     return value
@@ -389,6 +395,13 @@ def crawl_and_download(
         ...     assert (tmpdir / "bar" / "qux.csv").read_text() == "10,11,12", "bar/qux.csv check"
         ...     assert (tmpdir / "bur" / "wor.csv").read_text() == "13,14,15", "bur/wor.csv check"
     """
+    # Same coercer the CLI/library API use, so direct callers of crawl_and_download
+    # get identical validation: rejects bool, fractional float, non-numeric, anything < 1.
+    # Without this, max_workers=0 / max_workers=True / max_workers=-3 would silently
+    # take the sequential branch below — exactly the kind of "I asked for parallelism
+    # and got none" footgun that all this validation is meant to catch.
+    max_workers = coerce_download_workers(max_workers)
+
     if max_workers > 1 and session_factory is None:
         # Per docstring contract — silently degrading to sequential when the caller
         # asked for parallelism would mask config bugs (user sets download_workers=8
@@ -573,10 +586,11 @@ def download_data(
         ValueError: Failed to download data from http://example.com/demo.csv: Failed to download http://example.com/demo.csv
     """
 
-    # Validate up front via the same coercer the CLI uses, so the error message shape is
-    # identical across entry points and a misconfigured `download_workers` (None, bool,
-    # negative, non-numeric) fails loudly here rather than silently degrading inside
-    # crawl_and_download or producing a confusing log line.
+    # Coerce + validate up front via the same helper the CLI uses, so the error message
+    # shape is identical across entry points. `None` is accepted here and treated as the
+    # default (1) — matching the YAML-null contract — but genuinely invalid values
+    # (bool, fractional float, negative, non-numeric) fail loudly here rather than
+    # silently degrading inside crawl_and_download or producing a confusing log line.
     download_workers = coerce_download_workers(download_workers)
 
     if do_demo:

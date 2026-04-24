@@ -303,8 +303,8 @@ def test_parallel_requires_session_factory():
 
 @pytest.mark.parametrize(
     "bad_value",
-    [0, -3, "eight", True, [1, 2]],
-    ids=["zero", "negative", "non-numeric-string", "bool-True", "list"],
+    [0, -3, "eight", True, [1, 2], 1.9, -2.5],
+    ids=["zero", "negative", "non-numeric-string", "bool-True", "list", "float-fractional", "float-negative"],
 )
 def test_download_data_rejects_bad_download_workers(bad_value, demo_only_config):
     """`download_workers` must be a real positive int.
@@ -373,6 +373,25 @@ def test_session_factory_failure_during_pool_setup_closes_already_created_sessio
     assert sorted(closed) == [1, 2, 3], (
         f"expected sessions 1,2,3 to be closed on factory-failure cleanup, got {closed}"
     )
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        (1, 1),
+        (8, 8),
+        (None, 1),  # default
+        (8.0, 8),  # integer-valued float is fine
+        ("4", 4),  # numeric string OK (Hydra/OmegaConf coerces YAML strings)
+    ],
+    ids=["int-1", "int-8", "None-default", "float-int-valued", "string-numeric"],
+)
+def test_coerce_download_workers_accepts_valid(raw, expected):
+    """Positive cases for the shared coercer: ints, the None-becomes-default contract, and the
+    integer-valued float / numeric-string conveniences."""
+    from MIMIC_IV_MEDS.download import coerce_download_workers
+
+    assert coerce_download_workers(raw) == expected
 
 
 def test_make_session_with_retries_contract():
