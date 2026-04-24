@@ -14,6 +14,13 @@ do_overwrite: False
 do_copy: False
 do_demo: False
 
+# Number of parallel HTTPS connections used during the raw download stage.
+# PhysioNet rate-limits each TCP connection to ~50 KB/s but does not throttle
+# aggregate per-IP throughput, so 8 workers gives roughly 8x faster download
+# (~400 KB/s) without tripping their 429 backoff. Set to 1 to restore strictly
+# sequential behavior.
+download_workers: 8
+
 log_dir: ${root_output_dir}/.logs
 
 # Hydra

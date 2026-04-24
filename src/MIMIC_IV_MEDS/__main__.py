@@ -10,7 +10,7 @@ from omegaconf import DictConfig
 from . import ETL_CFG, EVENT_CFG, HAS_PRE_MEDS, MAIN_CFG, dataset_info
 from . import __version__ as PKG_VERSION
 from .commands import run_command
-from .download import download_data
+from .download import coerce_download_workers, download_data
 
 if HAS_PRE_MEDS:
     from .pre_MEDS import main as pre_MEDS_transform
@@ -27,14 +27,61 @@ def main(cfg: DictConfig):
     MEDS_output_dir = Path(cfg.MEDS_output_dir)
     stage_runner_fp = cfg.get("stage_runner_fp", None)
 
+    # Install a SIGINT handler that hard-exits on the SECOND Ctrl+C. The first one runs
+    # Python's default handler (raises KeyboardInterrupt in the main thread, which our
+    # parallel-download code path tries to catch and handle gracefully). But a graceful
+    # shutdown of in-flight HTTPS streams is not actually achievable in pure Python:
+    # `requests.Response.close()` doesn't reliably abort a worker thread mid-`iter_content`
+    # over an SSL socket, and `ThreadPoolExecutor.shutdown(wait=False, cancel_futures=True)`
+    # doesn't cancel in-flight tasks — only queued ones. So a single SIGINT can take
+    # arbitrarily long to actually terminate (~minutes per worker for multi-MB chunks,
+    # hours for multi-GB files at PhysioNet's per-conn cap). The second SIGINT means
+    # "really, terminate now" — `os._exit(130)` skips the rest of interpreter shutdown
+    # (including the ThreadPoolExecutor atexit hook that joins worker threads).
+    import signal as _signal
+    import sys as _sys
+
+    _sigint_count = {"n": 0}
+
+    def _sigint_handler(signum, frame):
+        _sigint_count["n"] += 1
+        if _sigint_count["n"] == 1:
+            _sys.stderr.write("\n[SIGINT] Aborting download. Press Ctrl+C again to force-exit.\n")
+            _sys.stderr.flush()
+            # Fall through to Python's default int-handler which raises KeyboardInterrupt
+            _signal.default_int_handler(signum, frame)
+        else:
+            _sys.stderr.write("\n[SIGINT] Force-exiting (worker threads abandoned).\n")
+            _sys.stderr.flush()
+            os._exit(130)
+
+    _signal.signal(_signal.SIGINT, _sigint_handler)
+
     # Step 0: Data downloading
     if cfg.do_download:
-        if cfg.get("do_demo", False):
-            logger.info("Downloading demo data.")
-            download_data(raw_input_dir, dataset_info, do_demo=True)
+        # Single shared coercer keeps the CLI and library API in lockstep on what counts
+        # as a valid `download_workers` value and on how invalid input is reported.
+        download_workers = coerce_download_workers(cfg.get("download_workers", 1))
+        # Don't lie about parallelism in the log — workers=1 is sequential.
+        if download_workers == 1:
+            workers_blurb = "sequentially (1 worker)"
         else:
-            logger.info("Downloading data.")
-            download_data(raw_input_dir, dataset_info)
+            workers_blurb = f"with {download_workers} parallel workers"
+        if cfg.get("do_demo", False):
+            logger.info(f"Downloading demo data {workers_blurb}.")
+            download_data(
+                raw_input_dir,
+                dataset_info,
+                do_demo=True,
+                download_workers=download_workers,
+            )
+        else:
+            logger.info(f"Downloading data {workers_blurb}.")
+            download_data(
+                raw_input_dir,
+                dataset_info,
+                download_workers=download_workers,
+            )
     else:  # pragma: no cover
         logger.info("Skipping data download.")
 
