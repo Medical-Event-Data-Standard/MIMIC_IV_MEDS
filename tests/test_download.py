@@ -301,6 +301,35 @@ def test_parallel_requires_session_factory():
         )
 
 
+@pytest.mark.parametrize(
+    "bad_value, match",
+    [
+        (None, r"must be a positive int"),
+        (0, r"must be >= 1"),
+        (-3, r"must be >= 1"),
+        ("eight", r"must be a positive int"),
+        (True, r"must be a positive int"),  # bool is an int subclass; explicitly reject
+    ],
+)
+def test_download_data_rejects_bad_download_workers(bad_value, match, demo_only_config):
+    """`download_workers` must be a real positive int.
+
+    Typos / nulls / negatives should fail loudly here instead of silently taking the sequential path inside
+    crawl_and_download.
+    """
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        pytest.raises(ValueError, match=match),
+    ):
+        download_data(
+            Path(tmpdir),
+            demo_only_config,
+            do_demo=True,
+            session_factory=lambda: MockSession(),
+            download_workers=bad_value,
+        )
+
+
 def test_make_session_with_retries_contract():
     """Regression guard on the retry adapter config — catches silent changes to the retry policy."""
     session = make_session_with_retries()

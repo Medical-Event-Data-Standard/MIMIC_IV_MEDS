@@ -29,7 +29,19 @@ def main(cfg: DictConfig):
 
     # Step 0: Data downloading
     if cfg.do_download:
-        download_workers = int(cfg.get("download_workers", 1))
+        # Treat an absent or null config value as the default of 1; reject anything that
+        # can't be coerced to a positive integer with a clear error so config typos don't
+        # surface later as a confusing log line ("Downloading data with -1 parallel workers"
+        # would otherwise just silently take the sequential path inside download_data).
+        raw_workers = cfg.get("download_workers", 1)
+        if raw_workers is None:
+            raw_workers = 1
+        try:
+            download_workers = int(raw_workers)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"download_workers must be an integer, got {raw_workers!r}") from e
+        if download_workers < 1:
+            raise ValueError(f"download_workers must be >= 1, got {download_workers}")
         if cfg.get("do_demo", False):
             logger.info("Downloading demo data.")
             download_data(

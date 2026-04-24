@@ -299,10 +299,15 @@ def crawl_and_download(
         session: The requests session used for HTML enumeration. When `max_workers == 1`, this
             session is also used for the file transfers; otherwise its `auth` and `headers` are
             cloned onto each worker session created via `session_factory`.
-        max_workers: Number of parallel file downloads. Defaults to 1 (sequential — preserves
-            historical behavior). Values > 1 fan out the file transfers across a thread pool;
-            this is the lever that beats PhysioNet's ~50 KB/s per-connection cap, since they
-            do not appear to throttle aggregate per-IP throughput.
+        max_workers: Number of parallel file downloads. Defaults to 1 (sequential).
+            Values > 1 fan out the file transfers across a thread pool; this is the lever
+            that beats PhysioNet's ~50 KB/s per-connection cap, since they do not appear
+            to throttle aggregate per-IP throughput. Note that even at `max_workers == 1`
+            the implementation now fully enumerates the directory tree before downloading
+            any files (rather than the prior interleaved crawl+download). For typical
+            PhysioNet-shaped datasets (tens of files, two-deep tree) this is sub-second
+            and a few KB of memory; the unified path keeps sequential and parallel modes
+            from drifting apart over time.
         session_factory: Required when `max_workers > 1` (raises `ValueError` if missing).
             Called exactly `max_workers` times up-front to mint per-worker `requests.Session`s,
             which are then checked out / returned via a queue across files (so each worker pays
@@ -501,6 +506,17 @@ def download_data(
             ...
         ValueError: Failed to download data from http://example.com/demo.csv: Failed to download http://example.com/demo.csv
     """
+
+    # Validate up front so a misconfigured `download_workers` (e.g. None, negative, a
+    # typo'd string) fails loudly here rather than silently degrading to sequential
+    # inside crawl_and_download or producing a confusing log line.
+    if not isinstance(download_workers, int) or isinstance(download_workers, bool):
+        raise ValueError(
+            f"download_workers must be a positive int, got {download_workers!r} "
+            f"({type(download_workers).__name__})"
+        )
+    if download_workers < 1:
+        raise ValueError(f"download_workers must be >= 1, got {download_workers}")
 
     if do_demo:
         urls = dataset_info.urls.get("demo", [])
