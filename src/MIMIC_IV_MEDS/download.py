@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import queue
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -302,15 +303,19 @@ def crawl_and_download(
             historical behavior). Values > 1 fan out the file transfers across a thread pool;
             this is the lever that beats PhysioNet's ~50 KB/s per-connection cap, since they
             do not appear to throttle aggregate per-IP throughput.
-        session_factory: Required when `max_workers > 1`. Called once per worker to mint a fresh
-            `requests.Session`. Each worker's session inherits `auth` and `headers` from the
-            enumerating `session` so authenticated downloads work transparently. Ignored when
-            `max_workers == 1`.
+        session_factory: Required when `max_workers > 1` (raises `ValueError` if missing).
+            Called exactly `max_workers` times up-front to mint per-worker `requests.Session`s,
+            which are then checked out / returned via a queue across files (so each worker pays
+            the TCP/TLS handshake once, not per file). Each worker's session inherits `auth`
+            and `headers` from the enumerating `session` so authenticated downloads work
+            transparently. Ignored when `max_workers == 1`.
 
     Raises:
-        ValueError: If any download fails. With `max_workers > 1`, all downloads run to
-            completion before the failure is raised, so a single bad URL doesn't leave the
-            other workers half-finished.
+        ValueError: If `max_workers > 1` is requested without a `session_factory`, or if any
+            download fails. With `max_workers > 1`, all downloads run to completion before the
+            failure is raised, so a single bad URL doesn't leave the other workers half-finished;
+            the raised error includes the count of failures plus the first failing URL, with the
+            original exception attached as `__cause__`.
 
     Examples:
         >>> import tempfile
@@ -343,41 +348,63 @@ def crawl_and_download(
         ...     assert (tmpdir / "bar" / "qux.csv").read_text() == "10,11,12", "bar/qux.csv check"
         ...     assert (tmpdir / "bur" / "wor.csv").read_text() == "13,14,15", "bur/wor.csv check"
     """
+    if max_workers > 1 and session_factory is None:
+        # Per docstring contract — silently degrading to sequential when the caller
+        # asked for parallelism would mask config bugs (user sets download_workers=8
+        # in main.yaml, sees no speedup, blames PhysioNet).
+        raise ValueError("session_factory must be provided when max_workers > 1")
+
     files = _enumerate_files(base_url, output_dir, session)
 
-    if max_workers <= 1 or session_factory is None:
+    if max_workers <= 1:
         for file_url, subdir in files:
             download_file(file_url, subdir, session)
         return
 
-    # Snapshot auth + headers from the enumerating session so each worker can hit
-    # authenticated endpoints without us trying to share the master session across
-    # threads (which is officially supported by `requests` but routinely bites
-    # people in subtle ways — separate sessions per worker gives each its own
-    # connection pool and keeps the per-connection retry/timeout state isolated).
+    # Pre-create exactly max_workers sessions, hand them out via a queue so each one
+    # is reused across many files instead of being torn down per-file. Each new session
+    # would otherwise pay a fresh TCP + TLS handshake (and cold-start the urllib3
+    # connection pool); on a 33-file MIMIC-IV download with workers=8, that's 33 handshakes
+    # vs the 8 we get here. Auth + headers are cloned from the enumerating session so
+    # authenticated endpoints work transparently.
     worker_auth = session.auth
     worker_headers = dict(session.headers)
+    pool: queue.Queue[requests.Session] = queue.Queue()
+    for _ in range(max_workers):
+        s = session_factory()
+        s.auth = worker_auth
+        s.headers.update(worker_headers)
+        pool.put(s)
 
     def _download_one(item: tuple[str, Path]) -> None:
         file_url, subdir = item
-        worker_session = session_factory()
-        worker_session.auth = worker_auth
-        worker_session.headers.update(worker_headers)
+        worker_session = pool.get()
         try:
             download_file(file_url, subdir, worker_session)
         finally:
-            worker_session.close()
+            pool.put(worker_session)
 
-    errors: list[tuple[str, BaseException]] = []
-    with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="download") as ex:
-        future_to_url = {ex.submit(_download_one, item): item[0] for item in files}
-        for fut in as_completed(future_to_url):
-            file_url = future_to_url[fut]
+    errors: list[tuple[str, Exception]] = []
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="download") as ex:
+            future_to_url = {ex.submit(_download_one, item): item[0] for item in files}
+            for fut in as_completed(future_to_url):
+                file_url = future_to_url[fut]
+                try:
+                    fut.result()
+                # Catch Exception (not BaseException) so KeyboardInterrupt / SystemExit
+                # propagate immediately — we want Ctrl+C to abort the run, not be
+                # silently aggregated into the errors list.
+                except Exception as e:
+                    errors.append((file_url, e))
+                    logger.error(f"Parallel download failed for {file_url}: {e}")
+    finally:
+        # Drain the pool and release every session, regardless of how the executor exited.
+        while True:
             try:
-                fut.result()
-            except BaseException as e:
-                errors.append((file_url, e))
-                logger.error(f"Parallel download failed for {file_url}: {e}")
+                pool.get_nowait().close()
+            except queue.Empty:
+                break
 
     if errors:
         first_url, first_err = errors[0]
@@ -472,7 +499,7 @@ def download_data(
         ...     download_data(tmpdir, cfg, do_demo=True, session_factory=lambda: real_session)
         Traceback (most recent call last):
             ...
-        ValueError: Failed to download data from http://example.com/demo.csv
+        ValueError: Failed to download data from http://example.com/demo.csv: Failed to download http://example.com/demo.csv
     """
 
     if do_demo:
@@ -508,7 +535,11 @@ def download_data(
                     session_factory=session_factory,
                 )
             except ValueError as e:
-                raise ValueError(f"Failed to download data from {url}") from e
+                # Preserve the aggregated message from crawl_and_download (e.g. "10
+                # download(s) failed (first: 'chartevents.csv.gz')") in the surface
+                # error rather than burying it in `__cause__`. `__cause__` is still
+                # set for traceback walkers that want the full chain.
+                raise ValueError(f"Failed to download data from {url}: {e}") from e
         finally:
             # Release the connection pool tied to this per-URL session so
             # long runs don't hold extra sockets/fds open after each URL.

@@ -189,7 +189,13 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
 def test_parallel_download_produces_same_output_as_sequential():
     """End-to-end check that download_workers > 1 lands the same files with the same contents as the single-
     worker path, including for an authenticated (dict-with-credentials) URL block where each worker session
-    must inherit auth + headers from the enumerating session."""
+    must inherit auth + headers from the enumerating session.
+
+    The auth/UA assertion deliberately skips index 0 of the created-sessions list — that's the
+    enumerating (master) session, which `download_data` configures with auth + headers itself
+    before calling `crawl_and_download`. Including it would mean the test passes even if the
+    workers never inherited anything, defeating the point of the check.
+    """
     import threading
 
     file_map = {
@@ -204,26 +210,20 @@ def test_parallel_download_produces_same_output_as_sequential():
     return_contents = {base: listing_html, **{f"{base}{n}": c for n, c in file_map.items()}}
     return_status = dict.fromkeys(return_contents, 200)
 
-    # Per-worker session counter — verifies that more than one session was actually created.
-    sessions_created = 0
-    seen_auth: set[tuple | None] = set()
-    seen_ua: set[str] = set()
+    # Track every session the factory creates, in creation order. The first entry is the
+    # enumerating (master) session; subsequent entries are the worker sessions.
+    created_sessions: list[MockSession] = []
     lock = threading.Lock()
 
     class CountingMockSession(MockSession):
         def __init__(self):
             super().__init__(return_contents=return_contents, return_status=return_status)
 
-        def close(self):
-            with lock:
-                seen_auth.add(self.auth)
-                seen_ua.add(self.headers.get("User-Agent", ""))
-
     def factory():
-        nonlocal sessions_created
+        s = CountingMockSession()
         with lock:
-            sessions_created += 1
-        return CountingMockSession()
+            created_sessions.append(s)
+        return s
 
     cfg = DictConfig({"urls": {"dataset": [{"url": base, "username": "u", "password": "p"}]}})
 
@@ -240,13 +240,18 @@ def test_parallel_download_produces_same_output_as_sequential():
             written = (tmpdir_path / name).read_text()
             assert written == content, f"{name}: expected {content!r}, got {written!r}"
 
-    # The enumerating session + at least one worker session — strictly > 1.
-    assert sessions_created > 1, (
-        f"factory was only called {sessions_created}x; parallelism path did not trigger"
-    )
-    # Worker sessions inherit auth/headers from the master session.
-    assert ("u", "p") in seen_auth, f"workers did not inherit auth tuple ({seen_auth})"
-    assert "Wget/1.21.1 (linux-gnu)" in seen_ua, f"workers did not inherit User-Agent ({seen_ua})"
+    # Master + workers. With download_workers=4 the queue is pre-filled with 4 worker sessions,
+    # so we expect exactly 5 (1 master + 4 workers).
+    assert len(created_sessions) == 5, f"expected 1 master + 4 worker sessions, got {len(created_sessions)}"
+    # Workers (everything after the master at index 0) must each have inherited the auth tuple
+    # and User-Agent header from the master session. Asserting per-worker rather than via a
+    # set-membership check catches the case where one worker is correctly configured but
+    # others aren't — e.g. a thread-local-set-once-then-reused implementation that races.
+    for i, worker in enumerate(created_sessions[1:], start=1):
+        assert worker.auth == ("u", "p"), f"worker session #{i} missing auth, got {worker.auth!r}"
+        assert worker.headers.get("User-Agent") == "Wget/1.21.1 (linux-gnu)", (
+            f"worker session #{i} missing User-Agent, got {worker.headers!r}"
+        )
 
 
 def test_parallel_download_aggregates_failures():
@@ -276,6 +281,24 @@ def test_parallel_download_aggregates_failures():
         # gathering errors after the pool drains rather than short-circuiting.
         assert (Path(tmpdir) / "good1.csv").exists()
         assert (Path(tmpdir) / "good2.csv").exists()
+
+
+def test_parallel_requires_session_factory():
+    """`crawl_and_download(max_workers > 1, session_factory=None)` must raise — silently degrading to
+    sequential would mask config bugs (user requests parallelism, sees no speedup, blames PhysioNet)."""
+    from MIMIC_IV_MEDS.download import crawl_and_download
+
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        pytest.raises(ValueError, match=r"session_factory must be provided"),
+    ):
+        crawl_and_download(
+            "http://example.com/",
+            Path(tmpdir),
+            MockSession(),
+            max_workers=4,
+            session_factory=None,
+        )
 
 
 def test_make_session_with_retries_contract():
