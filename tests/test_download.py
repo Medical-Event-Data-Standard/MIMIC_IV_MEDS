@@ -330,6 +330,55 @@ def test_download_data_rejects_bad_download_workers(bad_value, match, demo_only_
         )
 
 
+def test_session_factory_failure_during_pool_setup_closes_already_created_sessions():
+    """If `session_factory()` raises partway through pre-creating worker sessions, every session created
+    before the failure should be closed before `crawl_and_download` re-raises — otherwise we leak the
+    underlying sockets (and adapter connection pools)."""
+    import threading
+
+    from MIMIC_IV_MEDS.download import crawl_and_download
+
+    closed: list[int] = []
+    lock = threading.Lock()
+    creation_count = {"n": 0}
+
+    class TrackingMockSession(MockSession):
+        def __init__(self, sid: int):
+            super().__init__()
+            self.sid = sid
+
+        def close(self):
+            with lock:
+                closed.append(self.sid)
+
+    def factory():
+        with lock:
+            creation_count["n"] += 1
+            n = creation_count["n"]
+        # Pre-creation loop calls factory() max_workers times; fail on the 4th call so
+        # the first three sessions are orphaned in the no-cleanup version.
+        if n == 4:
+            raise RuntimeError("simulated factory failure")
+        return TrackingMockSession(n)
+
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        pytest.raises(RuntimeError, match="simulated factory failure"),
+    ):
+        crawl_and_download(
+            "http://example.com/",
+            Path(tmpdir),
+            MockSession(),  # enumerating session, not from factory
+            max_workers=8,
+            session_factory=factory,
+        )
+
+    # The first three sessions (sids 1, 2, 3) must have been closed before the raise.
+    assert sorted(closed) == [1, 2, 3], (
+        f"expected sessions 1,2,3 to be closed on factory-failure cleanup, got {closed}"
+    )
+
+
 def test_make_session_with_retries_contract():
     """Regression guard on the retry adapter config — catches silent changes to the retry policy."""
     session = make_session_with_retries()

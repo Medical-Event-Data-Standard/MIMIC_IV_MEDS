@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import logging
 import os
@@ -379,11 +380,28 @@ def crawl_and_download(
     worker_auth = session.auth
     worker_headers = dict(session.headers)
     pool: queue.Queue[requests.Session] = queue.Queue()
-    for _ in range(max_workers):
-        s = session_factory()
-        s.auth = worker_auth
-        s.headers.update(worker_headers)
-        pool.put(s)
+    # Track every session we create so the cleanup in the outer finally can close them
+    # all unconditionally. Closing only the queue's contents would miss two cases:
+    #   (a) `session_factory()` raises partway through pre-creation, leaving earlier
+    #       sessions orphaned (no caller would ever see them);
+    #   (b) on the Ctrl+C / SystemExit path, in-flight workers may still be holding
+    #       checked-out sessions when the parent's finally runs — those wouldn't be
+    #       in the queue at drain time.
+    all_sessions: list[requests.Session] = []
+    try:
+        for _ in range(max_workers):
+            s = session_factory()
+            all_sessions.append(s)
+            s.auth = worker_auth
+            s.headers.update(worker_headers)
+            pool.put(s)
+    except Exception:
+        # Best-effort cleanup of the partially-built pool; the original error is what
+        # the caller should see, so swallow any close() failures here.
+        for s in all_sessions:
+            with contextlib.suppress(Exception):
+                s.close()
+        raise
 
     def _download_one(item: tuple[str, Path]) -> None:
         file_url, subdir = item
@@ -420,12 +438,13 @@ def crawl_and_download(
         raise
     finally:
         ex.shutdown(**shutdown_kwargs)
-        # Drain the pool and release every session, regardless of how the executor exited.
-        while True:
-            try:
-                pool.get_nowait().close()
-            except queue.Empty:
-                break
+        # Close every session we created, not just those currently in the queue. On the
+        # interrupt path, a worker thread mid-`iter_content` may not have returned its
+        # session to the queue yet; closing via `all_sessions` covers it (and is also
+        # safe to call repeatedly — Session.close is idempotent).
+        for s in all_sessions:
+            with contextlib.suppress(Exception):
+                s.close()
 
     if errors:
         first_url, first_err = errors[0]

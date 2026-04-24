@@ -48,8 +48,13 @@ def main(cfg: DictConfig):
             raise ValueError(f"download_workers must be an integer, got {raw_workers!r}") from e
         if download_workers < 1:
             raise ValueError(f"download_workers must be >= 1, got {download_workers}")
+        # Don't lie about parallelism in the log — workers=1 is sequential.
+        if download_workers == 1:
+            workers_blurb = "sequentially (1 worker)"
+        else:
+            workers_blurb = f"with {download_workers} parallel workers"
         if cfg.get("do_demo", False):
-            logger.info("Downloading demo data.")
+            logger.info(f"Downloading demo data {workers_blurb}.")
             download_data(
                 raw_input_dir,
                 dataset_info,
@@ -57,7 +62,7 @@ def main(cfg: DictConfig):
                 download_workers=download_workers,
             )
         else:
-            logger.info(f"Downloading data with {download_workers} parallel workers.")
+            logger.info(f"Downloading data {workers_blurb}.")
             download_data(
                 raw_input_dir,
                 dataset_info,
