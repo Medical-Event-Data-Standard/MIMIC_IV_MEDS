@@ -260,7 +260,11 @@ def _enumerate_files(base_url: str, output_dir: Path, session: requests.Session)
         if response.status_code != 200:
             logger.error(f"Failed to download {base_url} in initial get: {response.status_code}")
         response.raise_for_status()
-    except requests.exceptions.HTTPError as e:
+    # Catch the full RequestException tree (HTTPError, ConnectionError, Timeout, ...)
+    # rather than just HTTPError. The retry adapter has already given up by this point,
+    # so any of these is a real failure and should surface as a ValueError so callers
+    # don't have to catch two unrelated exception families.
+    except requests.exceptions.RequestException as e:
         raise ValueError(f"Failed to download data from {base_url}") from e
 
     items: list[tuple[str, Path]] = []
@@ -390,20 +394,32 @@ def crawl_and_download(
             pool.put(worker_session)
 
     errors: list[tuple[str, Exception]] = []
+    ex = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="download")
+    # Decide what kind of executor shutdown to do based on whether we make it through the
+    # as_completed loop normally. The default `with ThreadPoolExecutor(...) as ex:` exit
+    # path calls shutdown(wait=True), which would block Ctrl+C until every in-flight
+    # download_file finishes — and PhysioNet downloads at ~50 KB/s can run for hours.
+    # On interrupt we instead cancel queued futures and skip the wait so the abort
+    # surfaces within at most one read-timeout window (READ_TIMEOUT_S=60s; in-flight
+    # iter_content reads can't be cancelled mid-chunk, but the TCP read will time out).
+    shutdown_kwargs: dict = {"wait": True}
     try:
-        with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="download") as ex:
-            future_to_url = {ex.submit(_download_one, item): item[0] for item in files}
-            for fut in as_completed(future_to_url):
-                file_url = future_to_url[fut]
-                try:
-                    fut.result()
-                # Catch Exception (not BaseException) so KeyboardInterrupt / SystemExit
-                # propagate immediately — we want Ctrl+C to abort the run, not be
-                # silently aggregated into the errors list.
-                except Exception as e:
-                    errors.append((file_url, e))
-                    logger.error(f"Parallel download failed for {file_url}: {e}")
+        future_to_url = {ex.submit(_download_one, item): item[0] for item in files}
+        for fut in as_completed(future_to_url):
+            file_url = future_to_url[fut]
+            try:
+                fut.result()
+            # Catch Exception (not BaseException) so KeyboardInterrupt / SystemExit
+            # are not aggregated as ordinary download failures — they propagate to
+            # the outer except and trigger the fast-shutdown path below.
+            except Exception as e:
+                errors.append((file_url, e))
+                logger.error(f"Parallel download failed for {file_url}: {e}")
+    except (KeyboardInterrupt, SystemExit):
+        shutdown_kwargs = {"wait": False, "cancel_futures": True}
+        raise
     finally:
+        ex.shutdown(**shutdown_kwargs)
         # Drain the pool and release every session, regardless of how the executor exited.
         while True:
             try:

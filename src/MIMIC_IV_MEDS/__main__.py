@@ -36,6 +36,12 @@ def main(cfg: DictConfig):
         raw_workers = cfg.get("download_workers", 1)
         if raw_workers is None:
             raw_workers = 1
+        # Reject bool explicitly before int() — `int(True) == 1` would silently take the
+        # sequential path, but `download_workers: true` in YAML is almost certainly a
+        # config typo (or an attempt to express "yes parallelize" without picking a count).
+        # Rejecting here keeps the error consistent with download_data's same guard.
+        if isinstance(raw_workers, bool):
+            raise ValueError(f"download_workers must be an integer, got {raw_workers!r} (bool)")
         try:
             download_workers = int(raw_workers)
         except (TypeError, ValueError) as e:
