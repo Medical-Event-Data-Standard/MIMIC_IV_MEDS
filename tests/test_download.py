@@ -187,14 +187,14 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
 
 
 def test_parallel_download_produces_same_output_as_sequential():
-    """End-to-end check that download_workers > 1 lands the same files with the same contents as the single-
-    worker path, including for an authenticated (dict-with-credentials) URL block where each worker session
-    must inherit auth + headers from the enumerating session.
+    """End-to-end check that download_workers > 1 lands the same files with the same content as the sequential
+    path, for an authenticated (dict-with-credentials) URL block where each worker session must inherit auth +
+    headers from the enumerating session.
 
-    The auth/UA assertion deliberately skips index 0 of the created-sessions list — that's the
-    enumerating (master) session, which `download_data` configures with auth + headers itself
-    before calling `crawl_and_download`. Including it would mean the test passes even if the
-    workers never inherited anything, defeating the point of the check.
+    The auth/UA assertion deliberately skips index 0 of the created-sessions list — that's the enumerating
+    (master) session, which `download_data` configures with auth + headers itself before calling
+    `crawl_and_download`. Including it would mean the test passes even if the workers never inherited
+    anything, defeating the point of the check.
     """
     import threading
 
@@ -302,24 +302,20 @@ def test_parallel_requires_session_factory():
 
 
 @pytest.mark.parametrize(
-    "bad_value, match",
-    [
-        (None, r"must be a positive int"),
-        (0, r"must be >= 1"),
-        (-3, r"must be >= 1"),
-        ("eight", r"must be a positive int"),
-        (True, r"must be a positive int"),  # bool is an int subclass; explicitly reject
-    ],
+    "bad_value",
+    [0, -3, "eight", True, [1, 2]],
+    ids=["zero", "negative", "non-numeric-string", "bool-True", "list"],
 )
-def test_download_data_rejects_bad_download_workers(bad_value, match, demo_only_config):
+def test_download_data_rejects_bad_download_workers(bad_value, demo_only_config):
     """`download_workers` must be a real positive int.
 
-    Typos / nulls / negatives should fail loudly here instead of silently taking the sequential path inside
-    crawl_and_download.
+    Typos / negatives / wrong-type values should fail loudly here instead of silently taking the sequential
+    path inside crawl_and_download. (`None` is intentionally accepted — the coercer treats it as the default
+    of 1 so that `download_workers: null` in YAML behaves like an unset key.)
     """
     with (
         tempfile.TemporaryDirectory() as tmpdir,
-        pytest.raises(ValueError, match=match),
+        pytest.raises(ValueError, match=r"must be a positive int"),
     ):
         download_data(
             Path(tmpdir),

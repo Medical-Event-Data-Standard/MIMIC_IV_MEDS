@@ -10,7 +10,7 @@ from omegaconf import DictConfig
 from . import ETL_CFG, EVENT_CFG, HAS_PRE_MEDS, MAIN_CFG, dataset_info
 from . import __version__ as PKG_VERSION
 from .commands import run_command
-from .download import download_data
+from .download import coerce_download_workers, download_data
 
 if HAS_PRE_MEDS:
     from .pre_MEDS import main as pre_MEDS_transform
@@ -29,25 +29,9 @@ def main(cfg: DictConfig):
 
     # Step 0: Data downloading
     if cfg.do_download:
-        # Treat an absent or null config value as the default of 1; reject anything that
-        # can't be coerced to a positive integer with a clear error so config typos don't
-        # surface later as a confusing log line ("Downloading data with -1 parallel workers"
-        # would otherwise just silently take the sequential path inside download_data).
-        raw_workers = cfg.get("download_workers", 1)
-        if raw_workers is None:
-            raw_workers = 1
-        # Reject bool explicitly before int() — `int(True) == 1` would silently take the
-        # sequential path, but `download_workers: true` in YAML is almost certainly a
-        # config typo (or an attempt to express "yes parallelize" without picking a count).
-        # Rejecting here keeps the error consistent with download_data's same guard.
-        if isinstance(raw_workers, bool):
-            raise ValueError(f"download_workers must be an integer, got {raw_workers!r} (bool)")
-        try:
-            download_workers = int(raw_workers)
-        except (TypeError, ValueError) as e:
-            raise ValueError(f"download_workers must be an integer, got {raw_workers!r}") from e
-        if download_workers < 1:
-            raise ValueError(f"download_workers must be >= 1, got {download_workers}")
+        # Single shared coercer keeps the CLI and library API in lockstep on what counts
+        # as a valid `download_workers` value and on how invalid input is reported.
+        download_workers = coerce_download_workers(cfg.get("download_workers", 1))
         # Don't lie about parallelism in the log — workers=1 is sequential.
         if download_workers == 1:
             workers_blurb = "sequentially (1 worker)"

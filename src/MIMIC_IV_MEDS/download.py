@@ -29,6 +29,33 @@ DEFAULT_TIMEOUT = (CONNECT_TIMEOUT_S, READ_TIMEOUT_S)
 DOWNLOAD_CHUNK_SIZE = 1024 * 1024
 
 
+def coerce_download_workers(raw: object, *, default: int = 1) -> int:
+    """Coerce + validate a raw `download_workers` config value.
+
+    Used by both the CLI (`__main__.py`, where the value comes from Hydra and may be
+    `None`) and the library API (`download_data`, where it's a kwarg). Centralized so
+    the two layers raise identical error messages.
+
+    `None` → `default` (so `download_workers: null` in YAML behaves like an unset key).
+    `bool` is rejected explicitly because `int(True) == 1` would silently take the
+    sequential path even though `download_workers: true` in YAML is almost certainly a
+    config typo.
+    """
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        raise ValueError(f"download_workers must be a positive int, got {raw!r} (bool)")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError) as e:
+        raise ValueError(
+            f"download_workers must be a positive int, got {raw!r} ({type(raw).__name__})"
+        ) from e
+    if value < 1:
+        raise ValueError(f"download_workers must be a positive int, got {value}")
+    return value
+
+
 def make_session_with_retries() -> requests.Session:
     """Return a `requests.Session` with a retry adapter mounted for transient server errors.
 
@@ -257,10 +284,14 @@ def _enumerate_files(base_url: str, output_dir: Path, session: requests.Session)
         return [(base_url, output_dir)]
 
     try:
-        response = session.get(base_url, timeout=DEFAULT_TIMEOUT)
-        if response.status_code != 200:
-            logger.error(f"Failed to download {base_url} in initial get: {response.status_code}")
-        response.raise_for_status()
+        # Use the response as a context manager so its connection is reliably released
+        # back to the urllib3 pool — including in the raise_for_status() failure path,
+        # where without the with-block the response would only release on GC.
+        with session.get(base_url, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status_code != 200:
+                logger.error(f"Failed to download {base_url} in initial get: {response.status_code}")
+            response.raise_for_status()
+            body = response.text
     # Catch the full RequestException tree (HTTPError, ConnectionError, Timeout, ...)
     # rather than just HTTPError. The retry adapter has already given up by this point,
     # so any of these is a real failure and should surface as a ValueError so callers
@@ -269,7 +300,7 @@ def _enumerate_files(base_url: str, output_dir: Path, session: requests.Session)
         raise ValueError(f"Failed to download data from {base_url}") from e
 
     items: list[tuple[str, Path]] = []
-    soup = BeautifulSoup(response.text, "html.parser")
+    soup = BeautifulSoup(body, "html.parser")
     for link in soup.find_all("a", href=True):
         href = link["href"]
         full_url = urljoin(base_url, href)
@@ -542,16 +573,11 @@ def download_data(
         ValueError: Failed to download data from http://example.com/demo.csv: Failed to download http://example.com/demo.csv
     """
 
-    # Validate up front so a misconfigured `download_workers` (e.g. None, negative, a
-    # typo'd string) fails loudly here rather than silently degrading to sequential
-    # inside crawl_and_download or producing a confusing log line.
-    if not isinstance(download_workers, int) or isinstance(download_workers, bool):
-        raise ValueError(
-            f"download_workers must be a positive int, got {download_workers!r} "
-            f"({type(download_workers).__name__})"
-        )
-    if download_workers < 1:
-        raise ValueError(f"download_workers must be >= 1, got {download_workers}")
+    # Validate up front via the same coercer the CLI uses, so the error message shape is
+    # identical across entry points and a misconfigured `download_workers` (None, bool,
+    # negative, non-numeric) fails loudly here rather than silently degrading inside
+    # crawl_and_download or producing a confusing log line.
+    download_workers = coerce_download_workers(download_workers)
 
     if do_demo:
         urls = dataset_info.urls.get("demo", [])
