@@ -187,9 +187,9 @@ def test_redownload_on_checksum_mismatch(caplog, demo_only_config):
 
 
 def test_parallel_download_produces_same_output_as_sequential():
-    """End-to-end check that download_workers > 1 lands the same files with the same contents
-    as the single-worker path, including for an authenticated (dict-with-credentials) URL block
-    where each worker session must inherit auth + headers from the enumerating session."""
+    """End-to-end check that download_workers > 1 lands the same files with the same contents as the single-
+    worker path, including for an authenticated (dict-with-credentials) URL block where each worker session
+    must inherit auth + headers from the enumerating session."""
     import threading
 
     file_map = {
@@ -250,8 +250,8 @@ def test_parallel_download_produces_same_output_as_sequential():
 
 
 def test_parallel_download_aggregates_failures():
-    """When workers > 1, a single failed file should not silently skip the others, and the raised
-    error should reference the count of failures plus the first failing URL."""
+    """When workers > 1, a single failed file should not silently skip the others, and the raised error should
+    reference the count of failures plus the first failing URL."""
     base = "http://example.com/files/dataset/v1/"
     good = {base + "good1.csv": "ok1", base + "good2.csv": "ok2"}
     bad_url = base + "bad.csv"
