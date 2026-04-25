@@ -19,11 +19,14 @@ classifiers = [
 # Each dep is pinned with a lower bound at the version we actively test against,
 # and an upper bound at the next known-or-expected breaking major. `meds-extract`
 # is capped below 0.6 because that release ships breaking syntax changes that
-# require a coordinated code migration (tracked in #40).
+# require a coordinated code migration (tracked in #40). The `~=0.5.0` form is
+# explicit about that: `~=0.5` would be `>=0.5,<1.0` per PEP 440, which lets
+# resolvers pick 0.6.x and silently break the MEDS extraction stage at runtime
+# with a parser error against the shipped `event_configs.yaml` (see #53).
 dependencies = [
     "polars~=1.30",
     "meds-transforms~=0.6",
-    "meds-extract~=0.5",
+    "meds-extract~=0.5.0",
     "requests~=2.32",
     "beautifulsoup4~=4.12",
     "hydra-core~=1.3",
