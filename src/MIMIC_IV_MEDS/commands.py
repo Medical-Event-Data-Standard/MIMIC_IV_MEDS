@@ -1,8 +1,62 @@
 import logging
 import os
+import shutil
 import subprocess
+import sys
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_console_script(name: str) -> str:
+    """Locate a console script that pip / uv installed alongside the running Python.
+
+    `subprocess.run([name, ...])` does a `PATH` lookup. When the user runs the bundled
+    `MEDS_extract-MIMIC_IV` directly via its venv path (without first activating the
+    venv), the venv's `bin/` is not on `PATH`, and `subprocess` raises
+    `FileNotFoundError` even though the script is installed in the same venv as the
+    Python interpreter that's calling it. Looking next to `sys.executable` first
+    sidesteps the PATH coupling — that's where pip / uv guarantee console scripts land.
+
+    Args:
+        name: The console script's basename (e.g. ``"MEDS_transform-pipeline"``).
+
+    Returns:
+        Absolute path to the executable.
+
+    Raises:
+        FileNotFoundError: If the script is neither next to `sys.executable` nor on PATH.
+
+    Examples:
+        Found next to `sys.executable` — works without an activated venv:
+
+        >>> import sys
+        >>> resolve_console_script(Path(sys.executable).name)  # the python itself
+        ... # doctest: +ELLIPSIS
+        '...'
+
+        Falls back to PATH for tools installed elsewhere (e.g. via `apt`):
+
+        >>> resolve_console_script("ls")  # doctest: +ELLIPSIS
+        '/.../ls'
+
+        Missing scripts raise with a useful message that names the lookup it tried:
+
+        >>> resolve_console_script("definitely-not-a-real-script-xyz")
+        Traceback (most recent call last):
+            ...
+        FileNotFoundError: 'definitely-not-a-real-script-xyz' not found next to ... or on PATH...
+    """
+    candidate = Path(sys.executable).parent / name
+    if candidate.is_file():
+        return str(candidate)
+    found = shutil.which(name)
+    if found:
+        return found
+    raise FileNotFoundError(
+        f"{name!r} not found next to {sys.executable} or on PATH. "
+        f"Reinstall the package that provides it in this environment."
+    )
 
 
 def run_command(
