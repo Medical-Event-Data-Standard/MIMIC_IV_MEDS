@@ -13,6 +13,12 @@ from MEDS_transforms.dataframe import write_df
 
 logger = logging.getLogger(__name__)
 
+# Files above this threshold (in bytes) are auto-converted from CSV to parquet
+# using polars streaming to avoid OOM during CSV loading in downstream stages.
+# This is particularly important for modules like chartevents (~3.3 GB) and
+# labevents (~2.4 GB) which can exceed available memory with eager CSV loading.
+LARGE_CSV_SIZE_THRESHOLD = 500_000_000
+
 
 def add_dot(code: pl.Expr, position: int) -> pl.Expr:
     """Adds a dot to the code expression at the specified position.
@@ -318,6 +324,23 @@ def main(
         out_fp.parent.mkdir(parents=True, exist_ok=True)
 
         if pfx not in FUNCTIONS and pfx not in [p for p, _ in ICD_DFS_TO_FIX]:
+            file_size = fp.stat().st_size
+            large_csv = (
+                (fp.suffix == ".csv" or fp.name.endswith(".csv.gz"))
+                and file_size > LARGE_CSV_SIZE_THRESHOLD
+            )
+            if large_csv:
+                out_fp = output_dir / f"{pfx}.parquet"
+                if out_fp.is_file():
+                    print(f"Done with {pfx}. Continuing")
+                    continue
+                logger.info(
+                    f"Converting large CSV {pfx} ({file_size / 1e6:.0f} MB) to parquet via streaming..."
+                )
+                st = datetime.now()
+                pl.scan_csv(fp, infer_schema_length=100000).sink_parquet(out_fp)
+                logger.info(f"  Converted to parquet in {datetime.now() - st}")
+                continue
             if do_copy:
                 logger.info(f"No function needed for {pfx}: Copying {fp.resolve()!s} to {out_fp.resolve()!s}")
                 shutil.copy(fp, out_fp)

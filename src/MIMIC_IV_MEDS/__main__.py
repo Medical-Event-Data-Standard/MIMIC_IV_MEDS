@@ -85,6 +85,17 @@ def main(cfg: DictConfig):
     else:  # pragma: no cover
         logger.info("Skipping data download.")
 
+    # Always fetch concept-map metadata CSVs — they're small (~100 KB each),
+    # hosted on GitHub (no PhysioNet auth required), and unconditionally
+    # needed by the extract_code_metadata stage regardless of do_download.
+    from .download import download_file, make_session_with_retries
+
+    for url in dataset_info.urls.get("common", []):
+        try:
+            download_file(url, raw_input_dir, make_session_with_retries())
+        except Exception as e:
+            logger.warning(f"Failed to download metadata file {url}: {e}")
+
     # Step 1: Pre-MEDS Data Wrangling
     if HAS_PRE_MEDS:
         pre_MEDS_transform(
