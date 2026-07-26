@@ -17,21 +17,26 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 # Each dep is pinned with a lower bound at the version we actively test against,
-# and an upper bound at the next known-or-expected breaking major. `meds-extract`
-# is capped below 0.6 because that release ships breaking syntax changes that
-# require a coordinated code migration (tracked in #40). The `~=0.5.0` form is
-# explicit about that: `~=0.5` would be `>=0.5,<1.0` per PEP 440, which lets
-# resolvers pick 0.6.x and silently break the MEDS extraction stage at runtime
-# with a parser error against the shipped `event_configs.yaml` (see #53).
+# and an upper bound at the next known-or-expected breaking major.
+#
+# INTERIM (0.7 migration, see #58): MEDS-Extract 0.7.0 is not released yet, so
+# `meds-extract` resolves from the upstream `dev` branch via [tool.uv.sources]
+# below. Git builds of that branch self-identify as `0.6.2.devN` (the 0.6.2 tag
+# is not an ancestor of dev), so the specifier here must admit dev pre-releases;
+# switch to `meds-extract>=0.7.0,<0.8` and drop the git source once 0.7.0 is on
+# PyPI. `meds-transforms>=0.6.7` is the floor MEDS-Extract 0.7 requires.
 dependencies = [
     "polars~=1.30",
-    "meds-transforms~=0.6",
-    "meds-extract~=0.5.0",
+    "meds-transforms>=0.6.7,<0.7",
+    "meds-extract>=0.6.2.dev0,<0.8",
     "requests~=2.32",
     "beautifulsoup4~=4.12",
     "hydra-core~=1.3",
     "hydra-joblib-launcher~=1.2",
 ]
+
+[tool.uv.sources]
+meds-extract = { git = "https://github.com/mmcdermott/MEDS_extract", branch = "dev" }
 
 [dependency-groups]
 # `shfmt-py` bundles the `shfmt` binary that the `mdformat-shfmt` pre-commit

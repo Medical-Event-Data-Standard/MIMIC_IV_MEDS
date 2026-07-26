@@ -2,81 +2,67 @@ subject_id_col: subject_id
 hosp/admissions:
   ed_registration:
     code: ED_REGISTRATION
-    time: col(edregtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
+    time: '$edregtime::"%Y-%m-%d %H:%M:%S"'
   ed_out:
     code: ED_OUT
-    time: col(edouttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
+    time: '$edouttime::"%Y-%m-%d %H:%M:%S"'
   admission:
-    code:
-      - HOSPITAL_ADMISSION
-      - col(admission_type)
-      - col(admission_location)
-    time: col(admittime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    insurance: insurance
-    language: language
-    marital_status: marital_status
-    race: race
-    hadm_id: hadm_id
+    code: 'f"HOSPITAL_ADMISSION//{$admission_type}//{$admission_location}"'
+    time: '$admittime::"%Y-%m-%d %H:%M:%S"'
+    insurance: $insurance
+    language: $language
+    marital_status: $marital_status
+    race: $race
+    hadm_id: $hadm_id
   discharge:
-    code:
-      - HOSPITAL_DISCHARGE
-      - col(discharge_location)
-    time: col(dischtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
+    code: 'f"HOSPITAL_DISCHARGE//{$discharge_location}"'
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
   # We omit the death event here as it is joined to the data in the subjects table in the pre-MEDS step.
 
 hosp/diagnoses_icd:
+  join:
+    input_prefix: hosp/admissions
+    left_on: hadm_id
+    right_on: hadm_id
+    columns_from_right:
+      - dischtime
   diagnosis:
-    code:
-      - DIAGNOSIS
-      - ICD
-      - col(icd_version)
-      - col(icd_code)
-    hadm_id: hadm_id
-    time: col(hadm_discharge_time)
-    time_format: "%Y-%m-%d %H:%M:%S"
+    code: 'f"DIAGNOSIS//ICD//{$icd_version}//{$icd_code}"'
+    hadm_id: $hadm_id
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
       hosp/d_icd_diagnoses:
         description: "long_title"
         parent_codes: "ICD{icd_version}CM/{norm_icd_code}" # Single strings are templates of columns.
 
 hosp/drgcodes:
+  join:
+    input_prefix: hosp/admissions
+    left_on: hadm_id
+    right_on: hadm_id
+    columns_from_right:
+      - dischtime
   drg:
-    code:
-      - DRG
-      - col(drg_type)
-      - col(drg_code)
-      - col(description)
-    hadm_id: hadm_id
-    time: col(hadm_discharge_time)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    drg_severity: drg_severity
-    drg_mortality: drg_mortality
+    code: 'f"DRG//{$drg_type}//{$drg_code}//{$description}"'
+    hadm_id: $hadm_id
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    drg_severity: $drg_severity
+    drg_mortality: $drg_mortality
 
 hosp/emar:
   medication:
-    code:
-      - MEDICATION
-      - col(medication)
-      - col(event_txt)
-    time: col(charttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    emar_id: emar_id
-    emar_seq: emar_seq
+    code: 'f"MEDICATION//{$medication}//{$event_txt}"'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    emar_id: $emar_id
+    emar_seq: $emar_seq
 
 hosp/hcpcsevents:
   hcpcs:
-    code:
-      - HCPCS
-      - col(short_description)
-    hadm_id: hadm_id
-    time: col(chartdate)
-    time_format: "%Y-%m-%d"
+    code: 'f"HCPCS//{$short_description}"'
+    hadm_id: $hadm_id
+    time: '$chartdate::"%Y-%m-%d"'
     _metadata:
       # These are not all CPT codes, unfortunately
       hosp/d_hcpcs:
@@ -85,31 +71,22 @@ hosp/hcpcsevents:
 
 hosp/labevents:
   lab_specimen_collected:
-    code:
-      - LAB
-      - SPECIMEN_COLLECTED
-      - col(itemid)
-    hadm_id: hadm_id
-    time: col(charttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    priority: priority
+    code: 'f"LAB//SPECIMEN_COLLECTED//{$itemid}"'
+    hadm_id: $hadm_id
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    priority: $priority
     _metadata:
       d_labitems_to_loinc:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
   lab_result:
-    code:
-      - LAB
-      - RESULT
-      - col(itemid)
-      - col(valueuom)
-    hadm_id: hadm_id
-    time: col(storetime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    numeric_value: valuenum
-    text_value: value
-    priority: priority
+    code: 'f"LAB//RESULT//{$itemid}//{$valueuom}"'
+    hadm_id: $hadm_id
+    time: '$storetime::"%Y-%m-%d %H:%M:%S"'
+    numeric_value: $valuenum
+    text_value: $value
+    priority: $priority
     _metadata:
       d_labitems_to_loinc:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
@@ -119,63 +96,50 @@ hosp/labevents:
 
 hosp/omr:
   omr:
-    code: col(result_name)
-    text_value: col(result_value)
-    time: col(chartdate)
-    time_format: "%Y-%m-%d"
+    code: $result_name
+    text_value: $result_value
+    time: '$chartdate::"%Y-%m-%d"'
 
 hosp/patients:
+  transforms:
+    year_of_birth: '($anchor_year - $anchor_age)::str'
   gender:
-    code:
-      - GENDER
-      - col(gender)
+    code: 'f"GENDER//{$gender}"'
     time: null
   dob:
     code: MEDS_BIRTH # This is the MEDS official code for birth.
-    time: col(year_of_birth)
-    time_format: "%Y"
+    time: '$year_of_birth::year'
   death:
     code: MEDS_DEATH # This is the MEDS official code for death.
-    time: col(dod)
-    time_format:
-      - "%Y-%m-%d %H:%M:%S"
-      - "%Y-%m-%d"
+    time: '$dod::"%Y-%m-%d %H:%M:%S"'
 
 hosp/pharmacy:
   medication_start:
-    code:
-      - MEDICATION
-      - START
-      - col(medication)
-    time: col(starttime)
-    route: route
-    frequency: frequency
-    doses_per_24_hrs: doses_per_24_hrs
-    poe_id: poe_id
-    time_format:
-      - "%Y-%m-%d %H:%M:%S"
-      - "%Y-%m-%d"
+    code: 'f"MEDICATION//START//{$medication}"'
+    # Time formats are normalized to %Y-%m-%d %H:%M:%S in pre-MEDS because the raw data
+    # contains a mix of datetime and date-only formats, and dftly does not yet support
+    # fallback format parsing (mmcdermott/dftly#46, mmcdermott/dftly#47).
+    time: '$starttime::"%Y-%m-%d %H:%M:%S"'
+    route: $route
+    frequency: $frequency
+    doses_per_24_hrs: $doses_per_24_hrs
+    poe_id: $poe_id
   medication_stop:
-    code:
-      - MEDICATION
-      - STOP
-      - col(medication)
-    time: col(stoptime)
-    poe_id: poe_id
-    time_format:
-      - "%Y-%m-%d %H:%M:%S"
-      - "%Y-%m-%d"
+    code: 'f"MEDICATION//STOP//{$medication}"'
+    time: '$stoptime::"%Y-%m-%d %H:%M:%S"'
+    poe_id: $poe_id
 
 hosp/procedures_icd:
+  join:
+    input_prefix: hosp/admissions
+    left_on: hadm_id
+    right_on: hadm_id
+    columns_from_right:
+      - dischtime
   procedure:
-    code:
-      - PROCEDURE
-      - ICD
-      - col(icd_version)
-      - col(icd_code)
-    hadm_id: hadm_id
-    time: col(hadm_discharge_time)
-    time_format: "%Y-%m-%d %H:%M:%S"
+    code: 'f"PROCEDURE//ICD//{$icd_version}//{$icd_code}"'
+    hadm_id: $hadm_id
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
       hosp/d_icd_procedures:
         description: "long_title"
@@ -185,44 +149,30 @@ hosp/procedures_icd:
 
 hosp/transfers:
   transfer:
-    code:
-      - TRANSFER_TO
-      - col(eventtype)
-      - col(careunit)
-    time: col(intime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
+    code: 'f"TRANSFER_TO//{$eventtype}//{$careunit}"'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
 
 icu/icustays:
   icu_admission:
-    code:
-      - ICU_ADMISSION
-      - col(first_careunit)
-    time: col(intime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: 'f"ICU_ADMISSION//{$first_careunit}"'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
   icu_discharge:
-    code:
-      - ICU_DISCHARGE
-      - col(last_careunit)
-    time: col(outtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: 'f"ICU_DISCHARGE//{$last_careunit}"'
+    time: '$outtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
 
 icu/chartevents:
   event:
-    code:
-      - LAB
-      - col(itemid)
-      - col(valueuom)
-    time: col(charttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    numeric_value: valuenum
-    text_value: value
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: 'f"LAB//{$itemid}//{$valueuom}"'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    numeric_value: $valuenum
+    text_value: $value
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
     _metadata:
       # TODO: make this work even with missing valueuom
       #meas_chartevents_main:
@@ -238,14 +188,10 @@ icu/chartevents:
 
 icu/procedureevents:
   start:
-    code:
-      - PROCEDURE
-      - START
-      - col(itemid)
-    time: col(starttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: 'f"PROCEDURE//START//{$itemid}"'
+    time: '$starttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
     _metadata:
       proc_datetimeevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
@@ -256,14 +202,10 @@ icu/procedureevents:
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
   end:
-    code:
-      - PROCEDURE
-      - END
-      - col(itemid)
-    time: col(endtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: 'f"PROCEDURE//END//{$itemid}"'
+    time: '$endtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
     _metadata:
       proc_datetimeevents:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
@@ -276,61 +218,48 @@ icu/procedureevents:
 
 icu/inputevents:
   input_start:
-    code:
-      - INFUSION_START
-      - col(itemid)
-    time: col(starttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
-    order_id: orderid
-    link_order_id: linkorderid
-    numeric_value: rate
-    unit: rateuom
-    ordercategorydescription: ordercategorydescription
+    code: 'f"INFUSION_START//{$itemid}"'
+    time: '$starttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
+    order_id: $orderid
+    link_order_id: $linkorderid
+    numeric_value: $rate
+    unit: $rateuom
+    ordercategorydescription: $ordercategorydescription
     _metadata:
       inputevents_to_rxnorm:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
   input_end:
-    code:
-      - INFUSION_END
-      - col(itemid)
-    time: col(endtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
-    order_id: orderid
-    link_order_id: linkorderid
-    numeric_value: amount
-    ordercategorydescription: ordercategorydescription
-    statusdescription: statusdescription
-    unit: amountuom
+    code: 'f"INFUSION_END//{$itemid}"'
+    time: '$endtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
+    order_id: $orderid
+    link_order_id: $linkorderid
+    numeric_value: $amount
+    ordercategorydescription: $ordercategorydescription
+    statusdescription: $statusdescription
+    unit: $amountuom
     _metadata:
       inputevents_to_rxnorm:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated
         itemid: "itemid (omop_source_code)"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
   subject_weight:
-    code:
-      - SUBJECT_WEIGHT_AT_INFUSION
-      - KG
-    time: col(starttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    numeric_value: patientweight
+    code: '"SUBJECT_WEIGHT_AT_INFUSION//KG"'
+    time: '$starttime::"%Y-%m-%d %H:%M:%S"'
+    numeric_value: $patientweight
 
 icu/outputevents:
   output:
-    code:
-      - SUBJECT_FLUID_OUTPUT
-      - col(itemid)
-      - col(valueuom)
-    time: col(charttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
-    numeric_value: value
+    code: 'f"SUBJECT_FLUID_OUTPUT//{$itemid}//{$valueuom}"'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
+    numeric_value: $value
     _metadata:
       outputevents_to_loinc:
         description: ["omop_concept_name", "label"] # List of strings are columns to be collated

@@ -1,4 +1,21 @@
-"""Performs pre-MEDS data wrangling for MIMIC-IV."""
+"""Performs pre-MEDS data wrangling for MIMIC-IV.
+
+After the migration to MEDS-extract v0.6.0, the remaining pre-MEDS transformations are:
+
+1. ICD code dot normalization for metadata tables (d_icd_diagnoses, d_icd_procedures).
+   These require conditional string manipulation that cannot be expressed in dftly.
+
+2. Death time fix for hosp/patients — joining deathtime from admissions requires
+   group_by().min() aggregation before joining, which the MEDS-extract join feature
+   does not support. Tracked upstream: mmcdermott/MEDS_extract#65, mmcdermott/dftly#45.
+
+3. Time format normalization for hosp/pharmacy — the raw data contains a mix of
+   ``%Y-%m-%d %H:%M:%S`` and ``%Y-%m-%d`` formats. dftly does not yet support
+   fallback format parsing. Tracked upstream: mmcdermott/dftly#46, mmcdermott/dftly#47.
+
+The discharge-time joins (diagnoses_icd, procedures_icd, drgcodes) and DOB computation
+are now handled declaratively via the event config's ``join`` and ``transforms`` blocks.
+"""
 
 import logging
 import shutil
@@ -164,36 +181,85 @@ def add_icd_procedure_dot(icd_version: pl.Expr, icd_code: pl.Expr) -> pl.Expr:
     return pl.when(icd_version == "9").then(icd9_code).otherwise(icd10_code)
 
 
-def add_discharge_time_by_hadm_id(
-    df: pl.LazyFrame,
-    discharge_time_df: pl.LazyFrame,
-    out_column_name: str = "hadm_discharge_time",
-) -> pl.LazyFrame:
-    """Joins the two dataframes by ``"hadm_id"`` and adds the discharge time to the original dataframe."""
-
-    discharge_time_df = discharge_time_df.select("hadm_id", pl.col("dischtime").alias(out_column_name))
-    return df.join(discharge_time_df, on="hadm_id", how="left")
-
-
 def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -> pl.LazyFrame:
-    """Fixes the static data by adding the death time to the static data and fixes the DOB nonsense.
+    """Fixes the static data by merging the most precise death time into the patients table.
+
+    Joins the earliest ``deathtime`` per subject from admissions, then coalesces it with the
+    existing ``dod`` column. All original columns are preserved so that downstream
+    ``transforms`` blocks in the event config (e.g., ``year_of_birth = $anchor_year - $anchor_age``)
+    can reference them.
+
+    This aggregated join (group_by + min) cannot be expressed in the MEDS-extract join config,
+    which only supports flat left joins. Tracked upstream: mmcdermott/MEDS_extract#65.
 
     Args:
         raw_static_df: The raw static data.
-        death_times_df: The death times data.
+        death_times_df: The death times data (from admissions).
 
     Returns:
-        The fixed static data.
+        The static data with the best available death time and all original columns preserved.
     """
 
     death_times_df = death_times_df.group_by("subject_id").agg(pl.col("deathtime").min())
 
-    return raw_static_df.join(death_times_df, on="subject_id", how="left").select(
-        "subject_id",
-        pl.coalesce(pl.col("deathtime"), pl.col("dod")).alias("dod"),
-        (pl.col("anchor_year") - pl.col("anchor_age")).cast(str).alias("year_of_birth"),
-        "gender",
+    return (
+        raw_static_df.join(death_times_df, on="subject_id", how="left")
+        .with_columns(
+            # Coalesce deathtime (precise) and dod (date-only), normalizing to a consistent
+            # datetime string format so downstream dftly expressions need only one format.
+            pl.coalesce(
+                pl.col("deathtime").str.to_datetime("%Y-%m-%d %H:%M:%S", strict=False),
+                pl.col("dod").str.to_datetime("%Y-%m-%d", strict=False),
+            )
+            .dt.strftime("%Y-%m-%d %H:%M:%S")
+            .alias("dod")
+        )
+        .drop("deathtime")
     )
+
+
+def normalize_time_formats(df: pl.LazyFrame) -> pl.LazyFrame:
+    """Normalizes mixed-format datetime columns to a consistent ``%Y-%m-%d %H:%M:%S`` format.
+
+    Some MIMIC-IV tables (e.g., ``hosp/pharmacy``) contain time columns with a mix of
+    ``%Y-%m-%d %H:%M:%S`` and ``%Y-%m-%d`` formats. dftly does not yet support fallback format
+    parsing (mmcdermott/dftly#46) and conditional strptime fails due to strict evaluation
+    (mmcdermott/dftly#47), so we normalize here.
+    """
+
+    time_cols = ["starttime", "stoptime"]
+    exprs = []
+    schema = df.collect_schema()
+    for col_name in time_cols:
+        if col_name in schema:
+            exprs.append(
+                pl.coalesce(
+                    pl.col(col_name).str.to_datetime("%Y-%m-%d %H:%M:%S", strict=False),
+                    pl.col(col_name).str.to_datetime("%Y-%m-%d", strict=False),
+                )
+                .dt.strftime("%Y-%m-%d %H:%M:%S")
+                .alias(col_name)
+            )
+    if exprs:
+        return df.with_columns(exprs)
+    return df
+
+
+FUNCTIONS = {
+    "hosp/patients": (
+        fix_static_data,
+        ("hosp/admissions", ["subject_id", "deathtime"]),
+    ),
+    "hosp/pharmacy": (
+        normalize_time_formats,
+        None,
+    ),
+}
+
+ICD_DFS_TO_FIX = [
+    ("hosp/d_icd_diagnoses", add_icd_diagnosis_dot),
+    ("hosp/d_icd_procedures", add_icd_procedure_dot),
+]
 
 
 def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv", ".parquet")) -> Path:
@@ -236,31 +302,6 @@ def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv"
         f"Ambiguous prefix {pfx}: {fps}. "
         f"No exact match among {[str((input_dir / f'{pfx}{s}').resolve()) for s in suffixes]}"
     )
-
-
-FUNCTIONS = {
-    "hosp/diagnoses_icd": (
-        add_discharge_time_by_hadm_id,
-        ("hosp/admissions", ["hadm_id", "dischtime"]),
-    ),
-    "hosp/procedures_icd": (
-        add_discharge_time_by_hadm_id,
-        ("hosp/admissions", ["hadm_id", "dischtime"]),
-    ),
-    "hosp/drgcodes": (
-        add_discharge_time_by_hadm_id,
-        ("hosp/admissions", ["hadm_id", "dischtime"]),
-    ),
-    "hosp/patients": (
-        fix_static_data,
-        ("hosp/admissions", ["subject_id", "deathtime"]),
-    ),
-}
-
-ICD_DFS_TO_FIX = [
-    ("hosp/d_icd_diagnoses", add_icd_diagnosis_dot),
-    ("hosp/d_icd_procedures", add_icd_procedure_dot),
-]
 
 
 def main(
