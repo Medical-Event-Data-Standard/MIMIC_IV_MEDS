@@ -9,7 +9,7 @@ from omegaconf import DictConfig
 
 from . import ETL_CFG, EVENT_CFG, HAS_PRE_MEDS, MAIN_CFG, dataset_info
 from . import __version__ as PKG_VERSION
-from .commands import run_command
+from .commands import resolve_console_script, run_command
 from .download import coerce_download_workers, download_data
 
 if HAS_PRE_MEDS:
@@ -104,7 +104,11 @@ def main(cfg: DictConfig):
         "PRE_MEDS_DIR": str(pre_MEDS_dir.resolve()),
     }
 
-    command_parts = ["MEDS_transform-pipeline", str(ETL_CFG.resolve())]
+    # Resolve via the venv's bin/ next to sys.executable rather than relying on PATH —
+    # users who invoke `./venvs/.../MEDS_extract-MIMIC_IV` without first activating the
+    # venv would otherwise hit FileNotFoundError on this subprocess even though the
+    # script is installed in the same environment as the python interpreter calling it.
+    command_parts = [resolve_console_script("MEDS_transform-pipeline"), str(ETL_CFG.resolve())]
 
     if stage_runner_fp:
         command_parts.append(f"--stage_runner_fp={stage_runner_fp}")
