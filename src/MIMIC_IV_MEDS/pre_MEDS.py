@@ -1,34 +1,61 @@
 """Performs pre-MEDS data wrangling for MIMIC-IV.
 
-After the migration to MEDS-extract v0.6.0, the remaining pre-MEDS transformations are:
+After the migration to MEDS-Extract 0.7 (see #58), the remaining pre-MEDS transformations are:
 
 1. ICD code dot normalization for metadata tables (d_icd_diagnoses, d_icd_procedures).
-   These require conditional string manipulation that cannot be expressed in dftly.
+   The transformation itself is now expressible in dftly (>= 0.4), but these columns are
+   consumed via ``_metadata`` blocks, whose values are still parsed by the MEDS-transforms
+   DSL rather than dftly. Tracked upstream: mmcdermott/MEDS_extract#146.
 
-2. Death time fix for hosp/patients — joining deathtime from admissions requires
-   group_by().min() aggregation before joining, which the MEDS-extract join feature
-   does not support. Tracked upstream: mmcdermott/MEDS_extract#65, mmcdermott/dftly#45.
+2. Death time join for hosp/patients — joining the earliest ``deathtime`` per subject from
+   admissions requires a group_by().min() aggregation before joining, which the MEDS-extract
+   join config does not yet support. Tracked upstream: mmcdermott/MEDS_extract#65 (fix in
+   flight in mmcdermott/MEDS_extract#98). Only the aggregated join lives here; the
+   deathtime-vs-dod coalescing and format parsing happen declaratively in the event config
+   via non-strict casts (dftly >= 0.1.3).
 
-3. Time format normalization for hosp/pharmacy — the raw data contains a mix of
-   ``%Y-%m-%d %H:%M:%S`` and ``%Y-%m-%d`` formats. dftly does not yet support
-   fallback format parsing. Tracked upstream: mmcdermott/dftly#46, mmcdermott/dftly#47.
-
-The discharge-time joins (diagnoses_icd, procedures_icd, drgcodes) and DOB computation
-are now handled declaratively via the event config's ``join`` and ``transforms`` blocks.
+The discharge-time joins (diagnoses_icd, procedures_icd, drgcodes), DOB computation, and
+mixed-format time parsing (pharmacy, death times) are all handled declaratively via the
+event config's ``_table`` and ``coalesce(...::?"fmt")`` features.
 """
 
 import logging
 import shutil
 from datetime import datetime
-from functools import partial
 from pathlib import Path
 
 import polars as pl
-from MEDS_extract.extract_code_metadata.utils import get_supported_fp
-from MEDS_extract.shard_events.shard_events import get_shard_prefix
+from MEDS_extract.io import resolve_source_files, scan_source
 from MEDS_transforms.dataframe import write_df
 
 logger = logging.getLogger(__name__)
+
+# Passed to csv-family scans; ``scan_source`` drops it for parquet inputs.
+CSV_INFER_SCHEMA_LENGTH = 100000
+
+
+def get_shard_prefix(base_path: Path, fp: Path) -> str:
+    """Extracts the relative path of ``fp`` under ``base_path``, without data-format suffixes.
+
+    This mirrors the helper MEDS-Extract shipped through 0.6.x (removed in 0.7).
+
+    Args:
+        base_path: The root directory ``fp`` lives under.
+        fp: The file path to extract the prefix from.
+
+    Returns:
+        The relative path of the file under the base path, minus all suffixes.
+
+    Examples:
+        >>> get_shard_prefix(Path("/data"), Path("/data/hosp/admissions.csv.gz"))
+        'hosp/admissions'
+        >>> get_shard_prefix(Path("/data"), Path("/data/demo_subject_id.csv"))
+        'demo_subject_id'
+    """
+    relative_path = fp.relative_to(base_path)
+    relative_parent = relative_path.parent
+    file_name = relative_path.name.split(".")[0]
+    return str(relative_parent / file_name)
 
 
 def add_dot(code: pl.Expr, position: int) -> pl.Expr:
@@ -182,67 +209,30 @@ def add_icd_procedure_dot(icd_version: pl.Expr, icd_code: pl.Expr) -> pl.Expr:
 
 
 def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -> pl.LazyFrame:
-    """Fixes the static data by merging the most precise death time into the patients table.
+    """Joins the earliest per-subject ``deathtime`` from admissions into the patients table.
 
-    Joins the earliest ``deathtime`` per subject from admissions, then coalesces it with the
-    existing ``dod`` column. All original columns are preserved so that downstream
-    ``transforms`` blocks in the event config (e.g., ``year_of_birth = $anchor_year - $anchor_age``)
-    can reference them.
+    Only the aggregated join happens here — the event config coalesces the joined
+    ``deathtime`` (full datetime) with the raw date-only ``dod`` declaratively via
+    non-strict casts, so no parsing or normalization is needed in Python. All original
+    columns are preserved so downstream ``_table.cols`` expressions (e.g.,
+    ``year_of_birth = $anchor_year - $anchor_age``) can reference them.
 
-    This aggregated join (group_by + min) cannot be expressed in the MEDS-extract join config,
-    which only supports flat left joins. Tracked upstream: mmcdermott/MEDS_extract#65.
+    This aggregated join (group_by + min) cannot be expressed in the MEDS-extract join
+    config, which only supports flat left joins. Tracked upstream:
+    mmcdermott/MEDS_extract#65 (fix in flight in mmcdermott/MEDS_extract#98).
 
     Args:
         raw_static_df: The raw static data.
         death_times_df: The death times data (from admissions).
 
     Returns:
-        The static data with the best available death time and all original columns preserved.
+        The static data with the earliest per-subject ``deathtime`` joined on, and all
+        original columns (including raw ``dod``) preserved.
     """
 
     death_times_df = death_times_df.group_by("subject_id").agg(pl.col("deathtime").min())
 
-    return (
-        raw_static_df.join(death_times_df, on="subject_id", how="left")
-        .with_columns(
-            # Coalesce deathtime (precise) and dod (date-only), normalizing to a consistent
-            # datetime string format so downstream dftly expressions need only one format.
-            pl.coalesce(
-                pl.col("deathtime").str.to_datetime("%Y-%m-%d %H:%M:%S", strict=False),
-                pl.col("dod").str.to_datetime("%Y-%m-%d", strict=False),
-            )
-            .dt.strftime("%Y-%m-%d %H:%M:%S")
-            .alias("dod")
-        )
-        .drop("deathtime")
-    )
-
-
-def normalize_time_formats(df: pl.LazyFrame) -> pl.LazyFrame:
-    """Normalizes mixed-format datetime columns to a consistent ``%Y-%m-%d %H:%M:%S`` format.
-
-    Some MIMIC-IV tables (e.g., ``hosp/pharmacy``) contain time columns with a mix of
-    ``%Y-%m-%d %H:%M:%S`` and ``%Y-%m-%d`` formats. dftly does not yet support fallback format
-    parsing (mmcdermott/dftly#46) and conditional strptime fails due to strict evaluation
-    (mmcdermott/dftly#47), so we normalize here.
-    """
-
-    time_cols = ["starttime", "stoptime"]
-    exprs = []
-    schema = df.collect_schema()
-    for col_name in time_cols:
-        if col_name in schema:
-            exprs.append(
-                pl.coalesce(
-                    pl.col(col_name).str.to_datetime("%Y-%m-%d %H:%M:%S", strict=False),
-                    pl.col(col_name).str.to_datetime("%Y-%m-%d", strict=False),
-                )
-                .dt.strftime("%Y-%m-%d %H:%M:%S")
-                .alias(col_name)
-            )
-    if exprs:
-        return df.with_columns(exprs)
-    return df
+    return raw_static_df.join(death_times_df, on="subject_id", how="left")
 
 
 FUNCTIONS = {
@@ -250,58 +240,12 @@ FUNCTIONS = {
         fix_static_data,
         ("hosp/admissions", ["subject_id", "deathtime"]),
     ),
-    "hosp/pharmacy": (
-        normalize_time_formats,
-        None,
-    ),
 }
 
 ICD_DFS_TO_FIX = [
     ("hosp/d_icd_diagnoses", add_icd_diagnosis_dot),
     ("hosp/d_icd_procedures", add_icd_procedure_dot),
 ]
-
-
-def pick_exact_match(fps, input_dir: Path, pfx: str, suffixes=(".csv.gz", ".csv", ".parquet")) -> Path:
-    """Resolve an exact file match from a list of candidate paths for a given prefix.
-
-    When ``get_supported_fp`` returns multiple candidates (a list) instead of a single
-    ``Path``, this function selects the one that exactly matches ``input_dir / pfx`` with
-    one of the allowed suffixes, in priority order.
-
-    Args:
-        fps: List of candidate file paths returned by ``get_supported_fp``.
-        input_dir: The root input directory in which to look for the file.
-        pfx: The relative path prefix (without extension) of the target file,
-            e.g. ``"hosp/admissions"``.
-        suffixes: Ordered tuple of file extensions to try. The first suffix whose
-            resolved path matches a candidate is returned. Defaults to
-            ``(".csv.gz", ".csv", ".parquet")``.
-
-    Returns:
-        The first candidate path whose resolved path matches ``input_dir / pfx<suffix>``
-        for some suffix in ``suffixes``.
-
-    Raises:
-        FileNotFoundError: If none of the candidates match any of the allowed suffixes
-            under ``input_dir / pfx``.
-
-    Example:
-        >>> fps = [Path("/data/hosp/admissions.csv.gz"), Path("/data/hosp/admissions.parquet")]
-        >>> pick_exact_match(fps, Path("/data"), "hosp/admissions")
-        PosixPath('/data/hosp/admissions.csv.gz')
-    """
-    # Try exact match for allowed suffixes, in priority order
-    for suf in suffixes:
-        exact = input_dir / f"{pfx}{suf}"
-        for cand in fps:
-            if Path(cand).resolve() == exact.resolve():
-                return Path(cand)
-
-    raise FileNotFoundError(
-        f"Ambiguous prefix {pfx}: {fps}. "
-        f"No exact match among {[str((input_dir / f'{pfx}{s}').resolve()) for s in suffixes]}"
-    )
 
 
 def main(
@@ -329,46 +273,27 @@ def main(
     all_fps += list(input_dir.rglob("*.*"))
 
     dfs_to_load = {}
-    seen_fps = {}
+    seen_pfxs = set()
+    icd_pfxs = {pfx for pfx, _ in ICD_DFS_TO_FIX}
 
     for in_fp in all_fps:
         pfx = get_shard_prefix(input_dir, in_fp)
 
+        if pfx in seen_pfxs:
+            continue
+
         try:
-            fp, read_fn = get_supported_fp(input_dir, pfx)
-        except FileNotFoundError:
-            logger.info(f"Skipping {pfx} @ {in_fp.resolve()!s} as no compatible dataframe file was found.")
+            fps = resolve_source_files(input_dir, pfx)
+        except (FileNotFoundError, ValueError) as e:
+            logger.info(f"Skipping {pfx} @ {in_fp.resolve()!s}: {e}")
             continue
 
-        if isinstance(fp, list):
-            fp = pick_exact_match(fp, input_dir=input_dir, pfx=pfx)
-        if fp.suffix == ".csv" or fp.name.endswith(".csv.gz"):
-            read_fn = partial(read_fn, infer_schema_length=100000)
+        seen_pfxs.add(pfx)
 
-        if str(fp.resolve()) in seen_fps:
-            continue
-        else:
-            seen_fps[str(fp.resolve())] = read_fn
+        if pfx in icd_pfxs:
+            continue  # Processed in the dedicated ICD normalization loop below.
 
-        out_fp = output_dir / fp.relative_to(input_dir)
-
-        if out_fp.is_file():
-            print(f"Done with {pfx}. Continuing")
-            continue
-
-        out_fp.parent.mkdir(parents=True, exist_ok=True)
-
-        if pfx not in FUNCTIONS and pfx not in [p for p, _ in ICD_DFS_TO_FIX]:
-            if do_copy:
-                logger.info(f"No function needed for {pfx}: Copying {fp.resolve()!s} to {out_fp.resolve()!s}")
-                shutil.copy(fp, out_fp)
-            else:
-                logger.info(
-                    f"No function needed for {pfx}: Symlinking {fp.resolve()!s} to {out_fp.resolve()!s}"
-                )
-                out_fp.symlink_to(fp.resolve())
-            continue
-        elif pfx in FUNCTIONS:
+        if pfx in FUNCTIONS:
             out_fp = output_dir / f"{pfx}.parquet"
             if out_fp.is_file():
                 print(f"Done with {pfx}. Continuing")
@@ -378,57 +303,64 @@ def main(
             if not need_df:
                 st = datetime.now()
                 logger.info(f"Processing {pfx}...")
-                df = read_fn(fp)
-                logger.info(f"  Loaded raw {fp} in {datetime.now() - st}")
+                df = scan_source(fps, infer_schema_length=CSV_INFER_SCHEMA_LENGTH)
                 processed_df = fn(df)
+                out_fp.parent.mkdir(parents=True, exist_ok=True)
                 write_df(processed_df, out_fp)
                 logger.info(f"  Processed and wrote to {out_fp.resolve()!s} in {datetime.now() - st}")
             else:
                 needed_pfx, needed_cols = need_df
                 if needed_pfx not in dfs_to_load:
-                    dfs_to_load[needed_pfx] = {"fps": set(), "cols": set()}
+                    dfs_to_load[needed_pfx] = {"pfxs": set(), "cols": set()}
 
-                dfs_to_load[needed_pfx]["fps"].add(fp)
+                dfs_to_load[needed_pfx]["pfxs"].add(pfx)
                 dfs_to_load[needed_pfx]["cols"].update(needed_cols)
+            continue
 
-    for df_to_load_pfx, fps_and_cols in dfs_to_load.items():
-        fps = fps_and_cols["fps"]
-        cols = list(fps_and_cols["cols"])
+        # Passthrough: symlink or copy each source file unchanged.
+        for fp in fps:
+            out_fp = output_dir / fp.relative_to(input_dir)
 
-        df_to_load_fp, df_to_load_read_fn = get_supported_fp(input_dir, df_to_load_pfx)
+            if out_fp.is_file():
+                print(f"Done with {pfx}. Continuing")
+                continue
 
-        if isinstance(df_to_load_fp, list):
-            df_to_load_fp = pick_exact_match(df_to_load_fp, input_dir=input_dir, pfx=df_to_load_pfx)
+            out_fp.parent.mkdir(parents=True, exist_ok=True)
+
+            if do_copy:
+                logger.info(f"No function needed for {pfx}: Copying {fp.resolve()!s} to {out_fp.resolve()!s}")
+                shutil.copy(fp, out_fp)
+            else:
+                logger.info(
+                    f"No function needed for {pfx}: Symlinking {fp.resolve()!s} to {out_fp.resolve()!s}"
+                )
+                out_fp.symlink_to(fp.resolve())
+
+    for df_to_load_pfx, deps in dfs_to_load.items():
+        load_fps = resolve_source_files(input_dir, df_to_load_pfx)
 
         st = datetime.now()
-
-        logger.info(f"Loading {df_to_load_fp.resolve()!s} for manipulating other dataframes...")
-        if df_to_load_fp.name.endswith(".csv.gz"):
-            df = df_to_load_read_fn(df_to_load_fp, columns=cols)
-        else:
-            df = df_to_load_read_fn(df_to_load_fp)
+        logger.info(f"Loading {df_to_load_pfx} for manipulating other dataframes...")
+        cols = sorted(deps["cols"])
+        df = scan_source(load_fps, infer_schema_length=CSV_INFER_SCHEMA_LENGTH).select(cols)
         logger.info(f"  Loaded in {datetime.now() - st}")
 
-        for fp in fps:
-            pfx = get_shard_prefix(input_dir, fp)
+        for pfx in deps["pfxs"]:
             out_fp = output_dir / f"{pfx}.parquet"
 
             logger.info(f"  Processing dependent df @ {pfx}...")
             fn, _ = FUNCTIONS[pfx]
 
             fp_st = datetime.now()
-            logger.info(f"    Loading {fp.resolve()!s}...")
-            fp_df = seen_fps[str(fp.resolve())](fp)
-            logger.info(f"    Loaded in {datetime.now() - fp_st}")
+            fps = resolve_source_files(input_dir, pfx)
+            fp_df = scan_source(fps, infer_schema_length=CSV_INFER_SCHEMA_LENGTH)
             processed_df = fn(fp_df, df)
+            out_fp.parent.mkdir(parents=True, exist_ok=True)
             write_df(processed_df, out_fp)
             logger.info(f"    Processed and wrote to {out_fp.resolve()!s} in {datetime.now() - fp_st}")
 
     for pfx, fn in ICD_DFS_TO_FIX:
-        fp, read_fn = get_supported_fp(input_dir, pfx)
-
-        if isinstance(fp, list):
-            fp = pick_exact_match(fp, input_dir=input_dir, pfx=pfx)
+        fps = resolve_source_files(input_dir, pfx)
 
         out_fp = output_dir / f"{pfx}.parquet"
 
@@ -436,13 +368,16 @@ def main(
             print(f"Done with {pfx}. Continuing")
             continue
 
-        if fp.suffix != ".parquet":
-            read_fn = partial(read_fn, infer_schema=False)
+        # ICD codes must never be schema-inferred (e.g., "0389" would parse as an int and
+        # lose its leading zero), so csv-family inputs are read with inference disabled.
+        # ``infer_schema`` is a csv-only kwarg, hence the conditional.
+        is_csv = fps[0].name.endswith((".csv", ".csv.gz"))
+        scan_kwargs = {"infer_schema": False} if is_csv else {}
 
         st = datetime.now()
         logger.info(f"Processing {pfx}...")
         processed_df = (
-            read_fn(fp)
+            scan_source(fps, **scan_kwargs)
             .collect()
             .with_columns(
                 fn(
@@ -451,6 +386,7 @@ def main(
                 ).alias("norm_icd_code")
             )
         )
+        out_fp.parent.mkdir(parents=True, exist_ok=True)
         processed_df.write_parquet(out_fp, use_pyarrow=True)
         logger.info(f"  Processed and wrote to {out_fp.resolve()!s} in {datetime.now() - st}")
 
