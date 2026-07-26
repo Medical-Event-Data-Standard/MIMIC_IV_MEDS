@@ -115,12 +115,14 @@ hosp/patients:
     time: "$year_of_birth::year"
   death:
     code: MEDS_DEATH # This is the MEDS official code for death.
-    # `deathtime` is the earliest per-subject admissions.deathtime, joined in pre-MEDS
-    # (the group_by().min() aggregation is not yet expressible in the event config;
-    # mmcdermott/MEDS_extract#65, fix in flight in mmcdermott/MEDS_extract#98). It is a
-    # full datetime where present; `dod` is the raw date-only fallback. The `::?` casts
-    # are non-strict (null on format mismatch) so the two formats coalesce cleanly.
-    time: coalesce($deathtime::?"%Y-%m-%d %H:%M:%S", $dod::?"%Y-%m-%d")
+    # `dod` is normalized in pre-MEDS: the earliest per-subject admissions.deathtime
+    # (aggregated join — not expressible in config; mmcdermott/MEDS_extract#65, fix in
+    # flight in #98) coalesced with the raw date-only dod. The coalesce itself must also
+    # stay in pre-MEDS for now: a cross-column `coalesce($deathtime::?.., $dod::?..)`
+    # time expression silently drops rows where only one column is set, because event
+    # extraction pre-filters on ALL time-source columns being non-null
+    # (mmcdermott/MEDS_extract#149).
+    time: '$dod::"%Y-%m-%d %H:%M:%S"'
 
 hosp/pharmacy:
   medication_start:

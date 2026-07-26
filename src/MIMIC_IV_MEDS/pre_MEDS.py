@@ -209,30 +209,47 @@ def add_icd_procedure_dot(icd_version: pl.Expr, icd_code: pl.Expr) -> pl.Expr:
 
 
 def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -> pl.LazyFrame:
-    """Joins the earliest per-subject ``deathtime`` from admissions into the patients table.
+    """Fixes the static data by merging the most precise death time into the patients table.
 
-    Only the aggregated join happens here — the event config coalesces the joined
-    ``deathtime`` (full datetime) with the raw date-only ``dod`` declaratively via
-    non-strict casts, so no parsing or normalization is needed in Python. All original
+    Joins the earliest ``deathtime`` per subject from admissions, then coalesces it with the
+    existing ``dod`` column into a single normalized datetime string. All other original
     columns are preserved so downstream ``_table.cols`` expressions (e.g.,
     ``year_of_birth = $anchor_year - $anchor_age``) can reference them.
 
-    This aggregated join (group_by + min) cannot be expressed in the MEDS-extract join
-    config, which only supports flat left joins. Tracked upstream:
-    mmcdermott/MEDS_extract#65 (fix in flight in mmcdermott/MEDS_extract#98).
+    Two parts of this cannot move into the event config yet:
+
+    - The aggregated join (group_by + min) is not expressible in the MEDS-extract join
+      config, which only supports flat left joins. Tracked upstream:
+      mmcdermott/MEDS_extract#65 (fix in flight in mmcdermott/MEDS_extract#98).
+    - The deathtime-vs-dod coalesce *could* be written declaratively as
+      ``coalesce($deathtime::?"...", $dod::?"...")``, but MEDS-extract's event extraction
+      pre-filters rows requiring ALL time-source columns to be non-null, which silently
+      drops rows where only one of the two columns is set. Tracked upstream:
+      mmcdermott/MEDS_extract#149. Until that is fixed, we normalize to one column here.
 
     Args:
         raw_static_df: The raw static data.
         death_times_df: The death times data (from admissions).
 
     Returns:
-        The static data with the earliest per-subject ``deathtime`` joined on, and all
-        original columns (including raw ``dod``) preserved.
+        The static data with the best available death time in ``dod`` (normalized to
+        ``%Y-%m-%d %H:%M:%S``) and all other original columns preserved.
     """
 
     death_times_df = death_times_df.group_by("subject_id").agg(pl.col("deathtime").min())
 
-    return raw_static_df.join(death_times_df, on="subject_id", how="left")
+    return (
+        raw_static_df.join(death_times_df, on="subject_id", how="left")
+        .with_columns(
+            pl.coalesce(
+                pl.col("deathtime").str.to_datetime("%Y-%m-%d %H:%M:%S", strict=False),
+                pl.col("dod").str.to_datetime("%Y-%m-%d", strict=False),
+            )
+            .dt.strftime("%Y-%m-%d %H:%M:%S")
+            .alias("dod")
+        )
+        .drop("deathtime")
+    )
 
 
 FUNCTIONS = {
