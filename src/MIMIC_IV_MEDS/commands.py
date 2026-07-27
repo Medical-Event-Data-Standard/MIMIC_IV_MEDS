@@ -102,3 +102,57 @@ def run_command(
         logger.error(f"Command failed with return code {command_out.returncode}.")
         logger.error(f"Command stderr:\n{stderr}")
         raise ValueError(f"Command failed with return code {command_out.returncode}.")
+
+
+def coerce_download_workers(raw: object, *, default: int = 1) -> int:
+    """Coerce + validate a raw `download_workers` config value.
+
+    The value comes from Hydra and may be `None` (`download_workers: null` in YAML
+    behaves like an unset key, yielding `default`). `bool` is rejected explicitly
+    because `int(True) == 1` would silently take the sequential path even though
+    `download_workers: true` in YAML is almost certainly a config typo. Fractional
+    floats (e.g. `1.9`) are also rejected rather than truncated by `int()` — same
+    reasoning, silent truncation hides typos.
+
+    Examples:
+        >>> coerce_download_workers(None)
+        1
+        >>> coerce_download_workers(8)
+        8
+        >>> coerce_download_workers(2.0)
+        2
+        >>> coerce_download_workers(True)
+        Traceback (most recent call last):
+            ...
+        ValueError: download_workers must be a positive int, got True (bool)
+        >>> coerce_download_workers(1.9)
+        Traceback (most recent call last):
+            ...
+        ValueError: download_workers must be a positive int, got 1.9 (float)
+        >>> coerce_download_workers("many")
+        Traceback (most recent call last):
+            ...
+        ValueError: download_workers must be a positive int, got 'many' (str)
+        >>> coerce_download_workers(0)
+        Traceback (most recent call last):
+            ...
+        ValueError: download_workers must be a positive int, got 0
+    """
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        raise ValueError(f"download_workers must be a positive int, got {raw!r} (bool)")
+    if isinstance(raw, float):
+        if not raw.is_integer():
+            raise ValueError(f"download_workers must be a positive int, got {raw!r} ({type(raw).__name__})")
+        value = int(raw)
+    else:
+        try:
+            value = int(raw)
+        except (TypeError, ValueError) as e:
+            raise ValueError(
+                f"download_workers must be a positive int, got {raw!r} ({type(raw).__name__})"
+            ) from e
+    if value < 1:
+        raise ValueError(f"download_workers must be a positive int, got {value}")
+    return value

@@ -275,3 +275,60 @@ icu/outputevents:
         itemid: "itemid (omop_source_code)"
         valueuom: "unitname"
         parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+
+# Where the raw data lives. This block is consumed by `meds-extract-download` (invoked
+# by the `MEDS_extract-MIMIC_IV` runner) and is a reserved key stripped before event
+# conversion, so the credential interpolations never need to be set to run the pipeline
+# and never land in logs or the config copy written to the output tree.
+#
+# - The `,null` defaults on the credentials work around mmcdermott/MEDS_extract#151
+#   (the download CLI resolves every bucket's interpolations before `key=` selection).
+#   Null credentials mean anonymous access, which is all the open-access demo needs;
+#   set DATASET_DOWNLOAD_USERNAME / DATASET_DOWNLOAD_PASSWORD for the credentialed
+#   `dataset` bucket.
+# - The concept-map entries pin `sha256` because GitHub raw publishes no checksum
+#   manifest: without a recorded hash, an existing file cannot be verified on re-runs
+#   and the downloader (correctly) refuses to skip it. The `v2.4.0` tag is immutable,
+#   so these hashes are stable.
+sources:
+  dataset:
+    - type: physionet
+      base_url: https://physionet.org/files/mimiciv/3.1
+      username: ${oc.env:DATASET_DOWNLOAD_USERNAME,null}
+      password: ${oc.env:DATASET_DOWNLOAD_PASSWORD,null}
+  demo:
+    - type: physionet
+      base_url: https://physionet.org/files/mimic-iv-demo/2.2
+  common:
+    - type: http
+      urls:
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/d_labitems_to_loinc.csv
+          rel_path: d_labitems_to_loinc.csv
+          sha256: f7ef583bb2669cbf8f450e1b629dd83161c1d3f2f3ebe6abd2ff8111570e86b8
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/inputevents_to_rxnorm.csv
+          rel_path: inputevents_to_rxnorm.csv
+          sha256: ead9fd462f1165e2615f4ec99edb759ab4b8c6333f8949731fada68066181f16
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/lab_itemid_to_loinc.csv
+          rel_path: lab_itemid_to_loinc.csv
+          sha256: 2e4994fa858b55cae48286728fb6ba8dde019716080e34759fbde3d604d8ce64
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_main.csv
+          rel_path: meas_chartevents_main.csv
+          sha256: a7a262cac30daeb18c63e124540c6a82acb6ad796af4f0ce3f2480b975fc3f28
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_value.csv
+          rel_path: meas_chartevents_value.csv
+          sha256: 51cd79cf9d220eef94236df8d475b270670b908e82d7c078254492474b144f30
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/numerics-summary.csv
+          rel_path: numerics-summary.csv
+          sha256: f663f9e418d417306b55dd0e9c47e8780f1c64547d212aad0e0d908abc977fea
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/outputevents_to_loinc.csv
+          rel_path: outputevents_to_loinc.csv
+          sha256: e46a7b0e1ef4debcbd283d0c0fa8a698e761b36bd710eb69be3f1a1eed7ec103
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_datetimeevents.csv
+          rel_path: proc_datetimeevents.csv
+          sha256: ee4592ddabd7f8995943c3ac18df883034e5f9960a954e738db9f0c02e9a824e
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_itemid.csv
+          rel_path: proc_itemid.csv
+          sha256: b77460531714501b0008f94574580dbf33724cee3de0f45186d149fe05cf04d0
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/waveforms-summary.csv
+          rel_path: waveforms-summary.csv
+          sha256: 289e8357ff474fe6485634d176051f30161ffb52f2bb9933f1a8c482ee9f6024
