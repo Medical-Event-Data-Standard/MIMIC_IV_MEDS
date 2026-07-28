@@ -3,40 +3,63 @@
 These tests are offline: constructing sources and validating explicit-URL manifests
 does no network I/O (PhysioNet manifests are fetched lazily, on first ``.files``
 access), so they exercise exactly what must hold before any download starts.
+
+The download CLI resolves interpolations per *selected* bucket (plus ``common``), not
+across the whole ``sources:`` subtree (mmcdermott/MEDS_extract#151, fixed upstream) —
+the helpers here mirror that behavior.
 """
 
 from omegaconf import OmegaConf
+from omegaconf.errors import InterpolationResolutionError
 
 from MIMIC_IV_MEDS import EVENT_CFG
 
 
-def _resolved_sources_spec() -> dict:
-    """Mirror the download CLI: resolve interpolations on only the ``sources:`` subtree."""
+def _bucket_spec(*keys: str) -> dict:
+    """Resolve interpolations for only the selected buckets, mirroring the CLI."""
     raw = OmegaConf.load(EVENT_CFG)
-    return {"sources": OmegaConf.to_container(raw.sources, resolve=True)}
+    return {"sources": {k: OmegaConf.to_container(raw.sources[k], resolve=True) for k in keys}}
 
 
-def test_sources_construct_without_credentials(monkeypatch):
-    """Every bucket must construct with no credential env vars set.
-
-    The ``,null`` interpolation defaults exist so that demo (and CI) runs never need
-    PhysioNet credentials in the environment — the download CLI resolves every bucket's
-    interpolations before ``key=`` selection (mmcdermott/MEDS_extract#151), so a bare
-    ``${oc.env:...}`` in the ``dataset`` bucket would break ``key=demo`` runs too.
-    """
+def test_demo_constructs_without_credentials(monkeypatch):
+    """The demo (and common) buckets must construct with no credential env vars set — demo and CI runs never
+    need PhysioNet credentials."""
     from MEDS_extract.download import HTTPSource, PhysioNetSource, sources_from_spec
 
     monkeypatch.delenv("DATASET_DOWNLOAD_USERNAME", raising=False)
     monkeypatch.delenv("DATASET_DOWNLOAD_PASSWORD", raising=False)
 
-    spec = _resolved_sources_spec()
-    for key in ("demo", "dataset"):
-        sources = sources_from_spec(spec, key=key)
-        try:
-            assert [type(s) for s in sources] == [PhysioNetSource, HTTPSource], key
-        finally:
-            for s in sources:
-                s.close()
+    sources = sources_from_spec(_bucket_spec("demo", "common"), key="demo")
+    try:
+        assert [type(s) for s in sources] == [PhysioNetSource, HTTPSource]
+    finally:
+        for s in sources:
+            s.close()
+
+
+def test_dataset_requires_credentials(monkeypatch):
+    """The credentialed dataset bucket fails fast (clear missing-env-var error) without credentials, and
+    constructs once they are set — the intended UX for both cases."""
+    from MEDS_extract.download import HTTPSource, PhysioNetSource, sources_from_spec
+
+    monkeypatch.delenv("DATASET_DOWNLOAD_USERNAME", raising=False)
+    monkeypatch.delenv("DATASET_DOWNLOAD_PASSWORD", raising=False)
+
+    try:
+        _bucket_spec("dataset")
+    except InterpolationResolutionError as e:
+        assert "DATASET_DOWNLOAD_USERNAME" in str(e)
+    else:
+        raise AssertionError("resolving the dataset bucket without credentials should fail")
+
+    monkeypatch.setenv("DATASET_DOWNLOAD_USERNAME", "someone")
+    monkeypatch.setenv("DATASET_DOWNLOAD_PASSWORD", "hunter2")
+    sources = sources_from_spec(_bucket_spec("dataset", "common"), key="dataset")
+    try:
+        assert [type(s) for s in sources] == [PhysioNetSource, HTTPSource]
+    finally:
+        for s in sources:
+            s.close()
 
 
 def test_common_bucket_is_fully_checksum_pinned():
@@ -47,8 +70,7 @@ def test_common_bucket_is_fully_checksum_pinned():
     (``do_download=True`` over an existing ``raw_input_dir``) fail with
     ``FileExistsError``. The ``v2.4.0`` tag is immutable, so pinned hashes are stable.
     """
-    spec = _resolved_sources_spec()
-    (common_entry,) = spec["sources"]["common"]
+    (common_entry,) = _bucket_spec("common")["sources"]["common"]
     assert common_entry["type"] == "http"
     urls = common_entry["urls"]
     assert len(urls) == 10

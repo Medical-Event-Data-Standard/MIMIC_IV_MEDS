@@ -23,7 +23,8 @@ hosp/admissions:
     code: f"HOSPITAL_DISCHARGE//{$discharge_location ?? 'UNK'}"
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
-  # We omit the death event here as it is joined to the data in the subjects table in the pre-MEDS step.
+  # We omit the death event here: `deathtime` is joined into hosp/patients via that
+  # table's aggregated `_table.join`, and the death event is emitted there.
 
 hosp/diagnoses_icd:
   _table:
@@ -107,6 +108,14 @@ hosp/patients:
   _table:
     cols:
       year_of_birth: "($anchor_year - $anchor_age)::str"
+    join:
+      # Earliest per-subject in-hospital death time, via an aggregated join
+      # (mmcdermott/MEDS_extract#65 / #98, on the 0.7 line). `min` over the fixed-width
+      # "%Y-%m-%d %H:%M:%S" strings is chronological. This replaces the last
+      # data-joining step MIMIC needed in pre-MEDS.
+      hosp/admissions:
+        key: subject_id
+        cols: { deathtime: min }
   gender:
     code: 'f"GENDER//{$gender}"'
     time: null
@@ -115,14 +124,11 @@ hosp/patients:
     time: "$year_of_birth::year"
   death:
     code: MEDS_DEATH # This is the MEDS official code for death.
-    # `dod` is normalized in pre-MEDS: the earliest per-subject admissions.deathtime
-    # (aggregated join — not expressible in config; mmcdermott/MEDS_extract#65, fix in
-    # flight in #98) coalesced with the raw date-only dod. The coalesce itself must also
-    # stay in pre-MEDS for now: a cross-column `coalesce($deathtime::?.., $dod::?..)`
-    # time expression silently drops rows where only one column is set, because event
-    # extraction pre-filters on ALL time-source columns being non-null
-    # (mmcdermott/MEDS_extract#149).
-    time: '$dod::"%Y-%m-%d %H:%M:%S"'
+    # `deathtime` (precise, in-hospital, joined above) takes precedence over the raw
+    # date-only `dod`. The `::?` casts are lenient (null on format mismatch) so the two
+    # formats coalesce cleanly; rows where both are null (living subjects) are dropped
+    # by the extraction's computed-time filter.
+    time: coalesce($deathtime::?"%Y-%m-%d %H:%M:%S", $dod::?"%Y-%m-%d")
 
 hosp/pharmacy:
   medication_start:
@@ -281,11 +287,10 @@ icu/outputevents:
 # conversion, so the credential interpolations never need to be set to run the pipeline
 # and never land in logs or the config copy written to the output tree.
 #
-# - The `,null` defaults on the credentials work around mmcdermott/MEDS_extract#151
-#   (the download CLI resolves every bucket's interpolations before `key=` selection).
-#   Null credentials mean anonymous access, which is all the open-access demo needs;
-#   set DATASET_DOWNLOAD_USERNAME / DATASET_DOWNLOAD_PASSWORD for the credentialed
-#   `dataset` bucket.
+# - The download CLI resolves interpolations only for the selected bucket (plus
+#   `common`), so demo/CI runs never need the credential env vars below; a
+#   `key=dataset` run without them fails up front with a clear missing-env-var error
+#   (mmcdermott/MEDS_extract#151, fixed upstream).
 # - The concept-map entries pin `sha256` because GitHub raw publishes no checksum
 #   manifest: without a recorded hash, an existing file cannot be verified on re-runs
 #   and the downloader (correctly) refuses to skip it. The `v2.4.0` tag is immutable,
@@ -294,8 +299,8 @@ sources:
   dataset:
     - type: physionet
       base_url: https://physionet.org/files/mimiciv/3.1
-      username: ${oc.env:DATASET_DOWNLOAD_USERNAME,null}
-      password: ${oc.env:DATASET_DOWNLOAD_PASSWORD,null}
+      username: ${oc.env:DATASET_DOWNLOAD_USERNAME}
+      password: ${oc.env:DATASET_DOWNLOAD_PASSWORD}
   demo:
     - type: physionet
       base_url: https://physionet.org/files/mimic-iv-demo/2.2

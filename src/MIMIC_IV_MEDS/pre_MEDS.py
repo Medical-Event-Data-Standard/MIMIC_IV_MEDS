@@ -1,22 +1,16 @@
 """Performs pre-MEDS data wrangling for MIMIC-IV.
 
-After the migration to MEDS-Extract 0.7 (see #58), the remaining pre-MEDS transformations are:
+After the migration to MEDS-Extract 0.7 (see #58), a single pre-MEDS transformation
+remains: ICD code dot normalization for the metadata tables (d_icd_diagnoses,
+d_icd_procedures). The transformation itself is expressible in dftly (>= 0.4), but
+these columns are consumed via ``_metadata`` blocks, whose values are still parsed by
+the MEDS-transforms DSL rather than dftly. Tracked upstream:
+mmcdermott/MEDS_extract#146 — once that lands, this module can be deleted outright
+(``__main__`` already skips the stage when ``pre_MEDS.py`` is absent).
 
-1. ICD code dot normalization for metadata tables (d_icd_diagnoses, d_icd_procedures).
-   The transformation itself is now expressible in dftly (>= 0.4), but these columns are
-   consumed via ``_metadata`` blocks, whose values are still parsed by the MEDS-transforms
-   DSL rather than dftly. Tracked upstream: mmcdermott/MEDS_extract#146.
-
-2. Death time join for hosp/patients — joining the earliest ``deathtime`` per subject from
-   admissions requires a group_by().min() aggregation before joining, which the MEDS-extract
-   join config does not yet support. Tracked upstream: mmcdermott/MEDS_extract#65 (fix in
-   flight in mmcdermott/MEDS_extract#98). Only the aggregated join lives here; the
-   deathtime-vs-dod coalescing and format parsing happen declaratively in the event config
-   via non-strict casts (dftly >= 0.1.3).
-
-The discharge-time joins (diagnoses_icd, procedures_icd, drgcodes), DOB computation, and
-mixed-format time parsing (pharmacy, death times) are all handled declaratively via the
-event config's ``_table`` and ``coalesce(...::?"fmt")`` features.
+Everything else is declarative in the event config: the discharge-time joins and the
+aggregated death-time join (``_table.join``), DOB computation (``_table.cols``), and
+mixed-format time parsing (``coalesce(...::?"fmt")``).
 """
 
 import logging
@@ -26,12 +20,8 @@ from pathlib import Path
 
 import polars as pl
 from MEDS_extract.io import resolve_source_files, scan_source
-from MEDS_transforms.dataframe import write_df
 
 logger = logging.getLogger(__name__)
-
-# Passed to csv-family scans; ``scan_source`` drops it for parquet inputs.
-CSV_INFER_SCHEMA_LENGTH = 100000
 
 
 def get_shard_prefix(base_path: Path, fp: Path) -> str:
@@ -208,57 +198,6 @@ def add_icd_procedure_dot(icd_version: pl.Expr, icd_code: pl.Expr) -> pl.Expr:
     return pl.when(icd_version == "9").then(icd9_code).otherwise(icd10_code)
 
 
-def fix_static_data(raw_static_df: pl.LazyFrame, death_times_df: pl.LazyFrame) -> pl.LazyFrame:
-    """Fixes the static data by merging the most precise death time into the patients table.
-
-    Joins the earliest ``deathtime`` per subject from admissions, then coalesces it with the
-    existing ``dod`` column into a single normalized datetime string. All other original
-    columns are preserved so downstream ``_table.cols`` expressions (e.g.,
-    ``year_of_birth = $anchor_year - $anchor_age``) can reference them.
-
-    Two parts of this cannot move into the event config yet:
-
-    - The aggregated join (group_by + min) is not expressible in the MEDS-extract join
-      config, which only supports flat left joins. Tracked upstream:
-      mmcdermott/MEDS_extract#65 (fix in flight in mmcdermott/MEDS_extract#98).
-    - The deathtime-vs-dod coalesce *could* be written declaratively as
-      ``coalesce($deathtime::?"...", $dod::?"...")``, but MEDS-extract's event extraction
-      pre-filters rows requiring ALL time-source columns to be non-null, which silently
-      drops rows where only one of the two columns is set. Tracked upstream:
-      mmcdermott/MEDS_extract#149. Until that is fixed, we normalize to one column here.
-
-    Args:
-        raw_static_df: The raw static data.
-        death_times_df: The death times data (from admissions).
-
-    Returns:
-        The static data with the best available death time in ``dod`` (normalized to
-        ``%Y-%m-%d %H:%M:%S``) and all other original columns preserved.
-    """
-
-    death_times_df = death_times_df.group_by("subject_id").agg(pl.col("deathtime").min())
-
-    return (
-        raw_static_df.join(death_times_df, on="subject_id", how="left")
-        .with_columns(
-            pl.coalesce(
-                pl.col("deathtime").str.to_datetime("%Y-%m-%d %H:%M:%S", strict=False),
-                pl.col("dod").str.to_datetime("%Y-%m-%d", strict=False),
-            )
-            .dt.strftime("%Y-%m-%d %H:%M:%S")
-            .alias("dod")
-        )
-        .drop("deathtime")
-    )
-
-
-FUNCTIONS = {
-    "hosp/patients": (
-        fix_static_data,
-        ("hosp/admissions", ["subject_id", "deathtime"]),
-    ),
-}
-
 ICD_DFS_TO_FIX = [
     ("hosp/d_icd_diagnoses", add_icd_diagnosis_dot),
     ("hosp/d_icd_procedures", add_icd_procedure_dot),
@@ -289,7 +228,6 @@ def main(
     all_fps = list(input_dir.rglob("*/*.*"))
     all_fps += list(input_dir.rglob("*.*"))
 
-    dfs_to_load = {}
     seen_pfxs = set()
     icd_pfxs = {pfx for pfx, _ in ICD_DFS_TO_FIX}
 
@@ -310,30 +248,6 @@ def main(
         if pfx in icd_pfxs:
             continue  # Processed in the dedicated ICD normalization loop below.
 
-        if pfx in FUNCTIONS:
-            out_fp = output_dir / f"{pfx}.parquet"
-            if out_fp.is_file():
-                print(f"Done with {pfx}. Continuing")
-                continue
-
-            fn, need_df = FUNCTIONS[pfx]
-            if not need_df:
-                st = datetime.now()
-                logger.info(f"Processing {pfx}...")
-                df = scan_source(fps, infer_schema_length=CSV_INFER_SCHEMA_LENGTH)
-                processed_df = fn(df)
-                out_fp.parent.mkdir(parents=True, exist_ok=True)
-                write_df(processed_df, out_fp)
-                logger.info(f"  Processed and wrote to {out_fp.resolve()!s} in {datetime.now() - st}")
-            else:
-                needed_pfx, needed_cols = need_df
-                if needed_pfx not in dfs_to_load:
-                    dfs_to_load[needed_pfx] = {"pfxs": set(), "cols": set()}
-
-                dfs_to_load[needed_pfx]["pfxs"].add(pfx)
-                dfs_to_load[needed_pfx]["cols"].update(needed_cols)
-            continue
-
         # Passthrough: symlink or copy each source file unchanged.
         for fp in fps:
             out_fp = output_dir / fp.relative_to(input_dir)
@@ -352,29 +266,6 @@ def main(
                     f"No function needed for {pfx}: Symlinking {fp.resolve()!s} to {out_fp.resolve()!s}"
                 )
                 out_fp.symlink_to(fp.resolve())
-
-    for df_to_load_pfx, deps in dfs_to_load.items():
-        load_fps = resolve_source_files(input_dir, df_to_load_pfx)
-
-        st = datetime.now()
-        logger.info(f"Loading {df_to_load_pfx} for manipulating other dataframes...")
-        cols = sorted(deps["cols"])
-        df = scan_source(load_fps, infer_schema_length=CSV_INFER_SCHEMA_LENGTH).select(cols)
-        logger.info(f"  Loaded in {datetime.now() - st}")
-
-        for pfx in deps["pfxs"]:
-            out_fp = output_dir / f"{pfx}.parquet"
-
-            logger.info(f"  Processing dependent df @ {pfx}...")
-            fn, _ = FUNCTIONS[pfx]
-
-            fp_st = datetime.now()
-            fps = resolve_source_files(input_dir, pfx)
-            fp_df = scan_source(fps, infer_schema_length=CSV_INFER_SCHEMA_LENGTH)
-            processed_df = fn(fp_df, df)
-            out_fp.parent.mkdir(parents=True, exist_ok=True)
-            write_df(processed_df, out_fp)
-            logger.info(f"    Processed and wrote to {out_fp.resolve()!s} in {datetime.now() - fp_st}")
 
     for pfx, fn in ICD_DFS_TO_FIX:
         fps = resolve_source_files(input_dir, pfx)
