@@ -24,17 +24,19 @@ MEDS_extract-MIMIC_IV root_output_dir=$ROOT_OUTPUT_DIR
 When you run this, the program will:
 
 1. Download the needed raw MIMIC files for the currently supported version into
-    `$ROOT_OUTPUT_DIR/raw_input`.
-2. Perform initial, pre-MEDS processing on the raw MIMIC files, saving the results in
-    `$ROOT_OUTPUT_DIR/pre_MEDS`.
-3. Construct the final MEDS cohort, and save it to `$ROOT_OUTPUT_DIR/MEDS_cohort`.
+    `$ROOT_OUTPUT_DIR/raw_input` (via MEDS-Extract's download layer; files that already
+    exist and verify against their checksums are skipped).
+2. Construct the final MEDS cohort directly from the raw files — all transformations,
+    joins, and metadata extraction are declared in
+    `src/MIMIC_IV_MEDS/configs/event_configs.yaml` — and save it to
+    `$ROOT_OUTPUT_DIR/MEDS_output`.
 
 You can also specify the target directories more directly, with
 
 ```bash
 export DATASET_DOWNLOAD_USERNAME=$PHYSIONET_USERNAME
 export DATASET_DOWNLOAD_PASSWORD=$PHYSIONET_PASSWORD
-MEDS_extract-MIMIC_IV raw_input_dir=$RAW_INPUT_DIR pre_MEDS_dir=$PRE_MEDS_DIR MEDS_cohort_dir=$MEDS_COHORT_DIR
+MEDS_extract-MIMIC_IV raw_input_dir=$RAW_INPUT_DIR MEDS_output_dir=$MEDS_OUTPUT_DIR
 ```
 
 ## Examples and More Info:

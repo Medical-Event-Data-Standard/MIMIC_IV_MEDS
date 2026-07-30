@@ -37,9 +37,23 @@ hosp/diagnoses_icd:
     hadm_id: $hadm_id
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
+      # A dftly program over the raw metadata table: `icd_version`/`icd_code` name-match
+      # the code's components (join keys); `parent_codes` inlines the ICD dot
+      # normalization that previously required pre-MEDS Python (ICD-9 E-codes dot after
+      # position 4, other ICD-9 after 3, ICD-10 after 3; codes at or under the position
+      # are left undotted).
       hosp/d_icd_diagnoses:
-        description: "long_title"
-        parent_codes: "ICD{icd_version}CM/{norm_icd_code}" # Single strings are templates of columns.
+        icd_version: $icd_version
+        icd_code: $icd_code
+        description: $long_title
+        parent_codes: >-
+          f"ICD{$icd_version}CM/{$icd_code[0:4]}.{$icd_code[4:]}"
+          if $icd_version == "9" and $icd_code[0:1] == "E" and len_chars($icd_code) > 4
+          else f"ICD{$icd_version}CM/{$icd_code}"
+          if $icd_version == "9" and $icd_code[0:1] == "E"
+          else f"ICD{$icd_version}CM/{$icd_code[0:3]}.{$icd_code[3:]}"
+          if len_chars($icd_code) > 3
+          else f"ICD{$icd_version}CM/{$icd_code}"
 
 hosp/drgcodes:
   _table:
@@ -70,8 +84,9 @@ hosp/hcpcsevents:
     _metadata:
       # These are not all CPT codes, unfortunately
       hosp/d_hcpcs:
-        description: "long_description"
-        possibly_cpt_code: "code"
+        short_description: $short_description
+        description: $long_description
+        possibly_cpt_code: $code
 
 hosp/labevents:
   lab_specimen_collected:
@@ -81,9 +96,12 @@ hosp/labevents:
     priority: $priority
     _metadata:
       d_labitems_to_loinc:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        # The join key is sourced from the differently-named raw column via the dftly
+        # dict form (the string grammar's `$name` cannot express names with spaces).
+        itemid:
+          column: itemid (omop_source_code)
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   lab_result:
     code: f"LAB//RESULT//{$itemid}//{$valueuom ?? 'UNK'}"
     hadm_id: $hadm_id
@@ -93,10 +111,11 @@ hosp/labevents:
     priority: $priority
     _metadata:
       d_labitems_to_loinc:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-        valueuom: "valueuom"
+        itemid:
+          column: itemid (omop_source_code)
+        valueuom: $valueuom
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 hosp/omr:
   omr:
@@ -156,11 +175,20 @@ hosp/procedures_icd:
     hadm_id: $hadm_id
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
+      # ICD-9 procedure codes take a dot after position 2 (when longer); ICD-10-PCS
+      # codes are never dotted. Versions other than 9/10 yield a null parent (the
+      # conditional has no final else), matching the old matcher-list semantics.
       hosp/d_icd_procedures:
-        description: "long_title"
-        parent_codes: # List of objects are string labels mapping to filters to be evaluated.
-          - "ICD{icd_version}Proc/{norm_icd_code}": { icd_version: "9" }
-          - "ICD{icd_version}PCS/{norm_icd_code}": { icd_version: "10" }
+        icd_version: $icd_version
+        icd_code: $icd_code
+        description: $long_title
+        parent_codes: >-
+          f"ICD9Proc/{$icd_code[0:2]}.{$icd_code[2:]}"
+          if $icd_version == "9" and len_chars($icd_code) > 2
+          else f"ICD9Proc/{$icd_code}"
+          if $icd_version == "9"
+          else f"ICD10PCS/{$icd_code}"
+          if $icd_version == "10"
 
 hosp/transfers:
   transfer:
@@ -191,15 +219,17 @@ icu/chartevents:
     _metadata:
       # TODO: make this work even with missing valueuom
       #meas_chartevents_main:
-      #  description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-      #  itemid: "itemid (omop_source_code)"
-      #  parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+      #  itemid:
+      #    column: itemid (omop_source_code)
+      #  description: coalesce($omop_concept_name, $label)
+      #  parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
       # TODO: I don't know if this is necessary...
       d_labitems_to_loinc:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-        valueuom: "valueuom"
+        itemid:
+          column: itemid (omop_source_code)
+        valueuom: $valueuom
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 icu/procedureevents:
   start:
@@ -209,13 +239,15 @@ icu/procedureevents:
     icustay_id: $stay_id
     _metadata:
       proc_datetimeevents:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
       proc_itemid:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   end:
     code: 'f"PROCEDURE//END//{$itemid}"'
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
@@ -223,13 +255,15 @@ icu/procedureevents:
     icustay_id: $stay_id
     _metadata:
       proc_datetimeevents:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
       proc_itemid:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 icu/inputevents:
   input_start:
@@ -244,9 +278,10 @@ icu/inputevents:
     ordercategorydescription: $ordercategorydescription
     _metadata:
       inputevents_to_rxnorm:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   input_end:
     code: 'f"INFUSION_END//{$itemid}"'
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
@@ -260,9 +295,10 @@ icu/inputevents:
     unit: $amountuom
     _metadata:
       inputevents_to_rxnorm:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   subject_weight:
     code: '"SUBJECT_WEIGHT_AT_INFUSION//KG"'
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
@@ -277,10 +313,11 @@ icu/outputevents:
     numeric_value: $value
     _metadata:
       outputevents_to_loinc:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        valueuom: "unitname"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        valueuom: $unitname
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 # Where the raw data lives. This block is consumed by `meds-extract-download` (invoked
 # by the `MEDS_extract-MIMIC_IV` runner) and is a reserved key stripped before event
