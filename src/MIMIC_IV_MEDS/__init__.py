@@ -1,36 +1,15 @@
-from importlib.metadata import PackageNotFoundError, version
-from importlib.resources import files
+"""The MIMIC-IV MEDS ETL — a configuration package, not a library.
 
-from omegaconf import OmegaConf
+This distribution ships no code. Its entire content is
+``MIMIC_IV_MEDS/configs/event_configs.yaml``, a MESSY (MEDS-Extract Specification Syntax
+YAML) document declaring where the raw MIMIC-IV data comes from and how every event is
+extracted from it. ``pyproject.toml`` registers that file with MEDS-Extract's
+``MEDS_extract.pipelines`` entry-point group under the name ``MIMIC-IV``, so the ETL runs
+as::
 
-__package_name__ = "MIMIC_IV_MEDS"
-try:
-    __version__ = version(__package_name__)
-except PackageNotFoundError:  # pragma: no cover
-    __version__ = "unknown"
+    meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
 
-MAIN_CFG = files(__package_name__).joinpath("configs/main.yaml")
-EVENT_CFG = files(__package_name__).joinpath("configs/event_configs.yaml")
-ETL_CFG = files(__package_name__).joinpath("configs/ETL.yaml")
-PRE_MEDS_PY = files(__package_name__).joinpath("pre_MEDS.py")
-PRE_MEDS_CFG = files(__package_name__).joinpath("configs/pre_MEDS.yaml")
-DATASET_CFG = files(__package_name__).joinpath("dataset.yaml")
-
-dataset_info = OmegaConf.load(DATASET_CFG)
-
-HAS_PRE_MEDS = PRE_MEDS_PY.exists()
-
-event_config = OmegaConf.load(EVENT_CFG)
-
-__all__ = [
-    "DATASET_CFG",
-    "ETL_CFG",
-    "EVENT_CFG",
-    "HAS_PRE_MEDS",
-    "MAIN_CFG",
-    "PRE_MEDS_CFG",
-    "__package_name__",
-    "__version__",
-    "dataset_info",
-    "event_config",
-]
+The package (and :mod:`MIMIC_IV_MEDS.configs`) exists so that the YAML is addressable as
+package data — ``importlib.resources.files("MIMIC_IV_MEDS.configs")`` — from an installed
+wheel. Nothing here is importable API; deliberately, there is nothing to import.
+"""

@@ -27,28 +27,29 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Run tests
+        # `src/` is not passed to pytest and there is no coverage measurement:
+        # this package ships no Python, only `configs/event_configs.yaml`.
+        #
         # `--reruns`/`--only-rerun` (from pytest-rerunfailures) retries the
         # e2e demo-download test when PhysioNet returns transient network
         # errors. These are upstream failures, not real regressions, and
         # blocking CI on them means no PR can land during a bad PhysioNet
         # minute. The pattern is intentionally scoped to network-shaped
         # failures: anything else fails hard on first occurrence.
-        # ConnectTimeout/ReadTimeout/MaxRetryError cover requests/urllib3
-        # timeout paths (surfaced as ConnectTimeoutError, not ConnectionError),
-        # and `[Cc]onnection broken` matches urllib3's lowercase message.
+        #
+        # The download layer is httpx (MEDS-Extract's `[download]` extra), so
+        # the httpx exception names lead: RemoteProtocolError is a connection
+        # dropped mid-response, ReadError/ConnectError are its transport
+        # errors (note `ConnectionError` does not match `ConnectError`), and
+        # ConnectTimeout/ReadTimeout/PoolTimeout are its timeout family. The
+        # requests/urllib3 names are kept because the same shapes surface
+        # through other dependencies' HTTP stacks.
         run: |
-          uv run pytest src/ tests/ -v --doctest-modules \
-            --cov=src --cov-report=xml --cov-report=term \
+          uv run pytest tests/ -v \
             --junitxml=junit.xml -s \
             --reruns 3 --reruns-delay 20 \
-            --only-rerun "IncompleteRead|ChunkedEncodingError|ConnectionError|ConnectTimeout|ReadTimeout|MaxRetryError|[Cc]onnection broken"
+            --only-rerun "RemoteProtocolError|ReadError|ConnectError|ConnectTimeout|ReadTimeout|PoolTimeout|IncompleteRead|ChunkedEncodingError|ConnectionError|MaxRetryError|[Cc]onnection broken"
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5.5.4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml
-          fail_ci_if_error: false
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1.2.1

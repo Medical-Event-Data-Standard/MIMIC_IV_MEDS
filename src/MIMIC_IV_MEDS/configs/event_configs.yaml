@@ -1,9 +1,32 @@
+# The complete MIMIC-IV MEDS ETL. This one file *is* the package: `sources:` says where
+# the raw data comes from, `etl:` supplies the handful of run knobs, and every other
+# top-level key is a raw table whose events are extracted from it. It is registered with
+# `meds-extract-run` under the name `MIMIC-IV` (see this repo's `pyproject.toml`), so the
+# whole ETL is one command:
+#
+#     meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
+#
 # NOTE: no top-level `_defaults.subject_id` is needed — the raw column is literally
 # `subject_id`, which MEDS-Extract 0.7 reads (and casts to Int64) by default.
 #
 # Null components of composite codes are coalesced to 'UNK' per component (the `??`
 # operator, dftly >= 0.5) to preserve the pre-0.7 behavior of rendering nulls as
 # "UNK" and keeping the row; under 0.7 a bare null component drops the row instead.
+
+# Reserved block, consumed only by `meds-extract-run` (stripped before event-table
+# parsing). It carries no credentials, so unlike `sources:` it is neither redacted from
+# logs nor from the config copy written into the output tree.
+etl:
+  # `meds-extract-run` defaults the dataset name to the registered entry-point name, so
+  # this is a fallback: it is what makes the spec self-describing when it is resolved by
+  # `pkg://` reference or filesystem path instead of by registered name.
+  dataset_name: MIMIC-IV
+  # Carried over from the pre-0.7 `ETL.yaml` stage block. That block's other entry,
+  # `shard_events.infer_schema_length: 999999999`, has no successor and needs none: 0.7
+  # removed the knob and always infers CSV schemas from the full file, which is exactly
+  # what the huge value was emulating.
+  n_subjects_per_shard: 1000
+
 hosp/admissions:
   ed_registration:
     code: ED_REGISTRATION
@@ -319,10 +342,10 @@ icu/outputevents:
         description: coalesce($omop_concept_name, $label)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
-# Where the raw data lives. This block is consumed by `meds-extract-download` (invoked
-# by the `MEDS_extract-MIMIC_IV` runner) and is a reserved key stripped before event
-# conversion, so the credential interpolations never need to be set to run the pipeline
-# and never land in logs or the config copy written to the output tree.
+# Where the raw data lives. This block is consumed by `meds-extract-download` (which
+# `meds-extract-run` spawns) and is a reserved key stripped before event conversion, so
+# the credential interpolations never need to be set to run the pipeline and never land
+# in logs or the config copy written to the output tree.
 #
 # - The download CLI resolves interpolations only for the selected bucket (plus
 #   `common`), so demo/CI runs never need the credential env vars below; a
@@ -331,16 +354,26 @@ icu/outputevents:
 # - The concept-map entries pin `sha256` because GitHub raw publishes no checksum
 #   manifest: without a recorded hash, an existing file cannot be verified on re-runs
 #   and the downloader (correctly) refuses to skip it. The `v2.4.0` tag is immutable,
-#   so these hashes are stable.
+#   so these hashes are stable. That tag is the one version here that is *not* declared
+#   below: `dataset_version` names the MIMIC-IV release, while the concept maps are
+#   pinned inline by URL + hash.
 sources:
+  # The raw release version, in mapping form because MIMIC's demo and full releases
+  # genuinely differ. Reserved (never treated as a bucket), interpolatable into the
+  # entries below, and stamped by `meds-extract-run` into the output's
+  # `etl_metadata.dataset_version` as `<selected bucket's version>:<this package's
+  # version>` — which is why no `raw_dataset_version` fallback is needed under `etl:`.
+  dataset_version:
+    dataset: "3.1"
+    demo: "2.2"
   dataset:
     - type: physionet
-      base_url: https://physionet.org/files/mimiciv/3.1
+      base_url: https://physionet.org/files/mimiciv/${sources.dataset_version.dataset}
       username: ${oc.env:DATASET_DOWNLOAD_USERNAME}
       password: ${oc.env:DATASET_DOWNLOAD_PASSWORD}
   demo:
     - type: physionet
-      base_url: https://physionet.org/files/mimic-iv-demo/2.2
+      base_url: https://physionet.org/files/mimic-iv-demo/${sources.dataset_version.demo}
   common:
     - type: http
       urls:

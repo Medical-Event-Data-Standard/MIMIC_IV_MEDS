@@ -16,23 +16,19 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-# Each dep is pinned with a lower bound at the version we actively test against,
-# and an upper bound at the next known-or-expected breaking major.
+# This package ships no Python: the whole ETL is `configs/event_configs.yaml`, run by
+# MEDS-Extract's own `meds-extract-run`. So there is exactly one dependency — the
+# `[download]` extra adds `meds-extract-download` (httpx + tenacity), which the runner
+# spawns to stage the raw data. MEDS-transforms, polars and hydra all arrive through it
+# at the versions it fences; duplicating those pins here would only create drift.
 #
 # INTERIM (0.7 migration, see #58): MEDS-Extract 0.7.0 is not released yet, so
-# `meds-extract` resolves from the upstream `dev` branch via [tool.uv.sources]
-# below. Git builds of that branch self-identify as `0.6.2.devN` (the 0.6.2 tag
-# is not an ancestor of dev), so the specifier here must admit dev pre-releases;
-# switch to `meds-extract>=0.7.0,<0.8` and drop the git source once 0.7.0 is on
-# PyPI. `meds-transforms>=0.6.7` is the floor MEDS-Extract 0.7 requires.
+# `meds-extract` resolves from the upstream `dev` branch via [tool.uv.sources] below.
+# Git builds of that branch self-identify as `0.6.3.devN`, so the specifier here must
+# admit dev pre-releases; switch to `meds-extract[download]>=0.7.0,<0.8` and drop the
+# git source once 0.7.0 is on PyPI.
 dependencies = [
-    "polars~=1.30",
-    "meds-transforms>=0.6.7,<0.7",
-    # The [download] extra provides `meds-extract-download` (httpx + tenacity), which
-    # replaced this package's bespoke requests/beautifulsoup4 downloader.
     "meds-extract[download]>=0.6.2.dev0,<0.8",
-    "hydra-core~=1.3",
-    "hydra-joblib-launcher~=1.2",
 ]
 
 [tool.uv.sources]
@@ -51,32 +47,39 @@ dev = [
     "pre-commit~=3.8",
     "ruff>=0.11,<1.0",
     "pytest~=9.0",
-    "pytest-cov~=7.1",
     "pytest-rerunfailures==16.1",
     "shfmt-py==3.12.0.2",
+    # The test suite reads the shipped MESSY config as raw OmegaConf. It arrives through
+    # `meds-extract` too, but the tests import it by name, so it is declared here.
+    "omegaconf~=2.3",
 ]
 
 [tool.setuptools_scm]
 
+# Parallelism is a property of the *pipeline run*, not of this config package: the
+# launchers live in MEDS-transforms, and are selected via a `parallelize:` block in the
+# pipeline config (see "Parallel and multi-node runs" in the README). These extras just
+# forward to MEDS-transforms' own launcher extras so `pip install MIMIC_IV_MEDS[...]`
+# keeps working as the way to get them.
 [project.optional-dependencies]
-slurm_parallelism = ["hydra-submitit-launcher~=1.2"]
+local_parallelism = ["meds-transforms[local-parallelism]"]
+slurm_parallelism = ["meds-transforms[slurm-parallelism]"]
 
-[project.scripts]
-MEDS_extract-MIMIC_IV = "MIMIC_IV_MEDS.__main__:main"
+# Registers this dataset with `meds-extract-run`, pointing directly at the bundled MESSY
+# config: `meds-extract-run spec=MIMIC-IV ...` resolves the name through this group to
+# `importlib.resources.files("MIMIC_IV_MEDS.configs") / "event_configs.yaml"`. The entry
+# point is never imported — its value string is parsed — and the providing distribution
+# (this one) supplies the ETL version stamped into `etl_metadata.dataset_version`.
+[project.entry-points."MEDS_extract.pipelines"]
+MIMIC-IV = "MIMIC_IV_MEDS.configs:event_configs.yaml"
 
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"
 Issues = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues"
 
-[tool.coverage.run]
-# The e2e tests exercise the runner, download, pre-MEDS, and pipeline through
-# subprocesses (the `MEDS_extract-MIMIC_IV` console script, which in turn spawns
-# `meds-extract-download` and `MEDS_transform-pipeline`). `patch = ["subprocess"]`
-# (coverage.py >= 7.10) propagates measurement into those children — transitively,
-# since each patched process patches its own children — so the code they execute
-# counts toward coverage instead of appearing untested.
-# https://pytest-cov.readthedocs.io/en/latest/subprocess-support.html
-patch = ["subprocess"]
+# No coverage configuration: this package ships no Python to measure. The ETL's own
+# coverage lives upstream in MEDS-Extract; what our tests assert is that the shipped
+# config is valid, complete, and produces a correct cohort end-to-end.
 
 [tool.ruff]
 target-version = "py311"

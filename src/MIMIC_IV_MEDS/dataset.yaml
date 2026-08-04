@@ -1,7 +1,0 @@
-dataset_name: MIMIC-IV
-raw_dataset_version: 3.1
-# Version tag of MIT-LCP/mimic-code from which the concept-map metadata CSVs are pulled.
-# The actual URLs (with pinned checksums) live in the `sources:` block of
-# configs/event_configs.yaml, consumed by `meds-extract-download`.
-dataset_metadata_version: v2.4.0
-dataset_description: ???

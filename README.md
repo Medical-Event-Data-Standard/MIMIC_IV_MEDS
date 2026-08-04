@@ -1,7 +1,6 @@
 # MIMIC-IV MEDS Extraction ETL
 
 [![PyPI - Version](https://img.shields.io/pypi/v/MIMIC-IV-MEDS)](https://pypi.org/project/MIMIC-IV-MEDS/)
-[![codecov](https://codecov.io/gh/Medical-Event-Data-Standard/MIMIC_IV_MEDS/graph/badge.svg?token=E7H6HKZV3O)](https://codecov.io/gh/Medical-Event-Data-Standard/MIMIC_IV_MEDS)
 [![tests](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/actions/workflows/tests.yaml/badge.svg)](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/actions/workflows/tests.yaml)
 [![code-quality](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/actions/workflows/code-quality-main.yaml/badge.svg)](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/actions/workflows/code-quality-main.yaml)
 ![python](https://img.shields.io/badge/-Python_3.11-blue?logo=python&logoColor=white)
@@ -10,7 +9,7 @@
 [![contributors](https://img.shields.io/github/contributors/Medical-Event-Data-Standard/MIMIC_IV_MEDS.svg)](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/graphs/contributors)
 [![DOI](https://zenodo.org/badge/901560093.svg)](https://doi.org/10.5281/zenodo.17535579)
 
-This pipeline extracts the MIMIC-IV dataset (from physionet) into the MEDS format.
+This pipeline extracts the MIMIC-IV dataset (from PhysioNet) into the MEDS format.
 
 ## Usage:
 
@@ -18,36 +17,91 @@ This pipeline extracts the MIMIC-IV dataset (from physionet) into the MEDS forma
 pip install MIMIC_IV_MEDS
 export DATASET_DOWNLOAD_USERNAME=$PHYSIONET_USERNAME
 export DATASET_DOWNLOAD_PASSWORD=$PHYSIONET_PASSWORD
-MEDS_extract-MIMIC_IV root_output_dir=$ROOT_OUTPUT_DIR
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
 ```
 
 When you run this, the program will:
 
-1. Download the needed raw MIMIC files for the currently supported version into
-    `$ROOT_OUTPUT_DIR/raw_input` (via MEDS-Extract's download layer; files that already
-    exist and verify against their checksums are skipped).
-2. Construct the final MEDS cohort directly from the raw files — all transformations,
+1. Download the needed raw MIMIC files for the currently supported version (v3.1) into
+    `$MEDS_OUTPUT_DIR/.meds_extract_run/raw_input`. Files that already exist and verify
+    against their checksums are skipped, so an interrupted download resumes. Pass
+    `download_dest_dir=$RAW_INPUT_DIR` to keep the raw data somewhere durable and reuse it
+    across runs.
+2. Construct the final MEDS cohort directly from those raw files — all transformations,
     joins, and metadata extraction are declared in
-    `src/MIMIC_IV_MEDS/configs/event_configs.yaml` — and save it to
-    `$ROOT_OUTPUT_DIR/MEDS_output`.
+    `src/MIMIC_IV_MEDS/configs/event_configs.yaml` — and write it to `$MEDS_OUTPUT_DIR`
+    (`data/` and `metadata/`, alongside the run's intermediate stage outputs).
 
-You can also specify the target directories more directly, with
-
-```bash
-export DATASET_DOWNLOAD_USERNAME=$PHYSIONET_USERNAME
-export DATASET_DOWNLOAD_PASSWORD=$PHYSIONET_PASSWORD
-MEDS_extract-MIMIC_IV raw_input_dir=$RAW_INPUT_DIR MEDS_output_dir=$MEDS_OUTPUT_DIR
-```
-
-## Examples and More Info:
-
-You can run `MEDS_extract-MIMIC_IV --help` for more information on the arguments and options. You can also run
+To run over the publicly available, fully open MIMIC-IV demo dataset (v2.2, no credentials
+required):
 
 ```bash
-MEDS_extract-MIMIC_IV root_output_dir=$ROOT_OUTPUT_DIR do_demo=True
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR download_key=demo
 ```
 
-to run the entire pipeline over the publicly available, fully open MIMIC-IV demo dataset.
+If you already have the raw MIMIC-IV files on disk, skip the download entirely:
+
+```bash
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR download_key=null input_dir=$RAW_INPUT_DIR
+```
+
+Run `meds-extract-run --help` for the full set of arguments and options.
+
+## How this ETL is defined
+
+There is no Python in this package. The entire ETL is one file —
+[`src/MIMIC_IV_MEDS/configs/event_configs.yaml`](src/MIMIC_IV_MEDS/configs/event_configs.yaml)
+— written in MESSY (MEDS-Extract Specification Syntax YAML):
+
+- a `sources:` block declaring the release versions and where to fetch the raw data
+    (PhysioNet for MIMIC-IV itself, checksum-pinned GitHub URLs for the
+    [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps);
+- an `etl:` block with the run's few knobs;
+- one block per raw table describing the events extracted from it, including joins,
+    derived columns, and the code-metadata programs that attach descriptions and parent
+    vocabulary codes.
+
+`pyproject.toml` registers that file with MEDS-Extract under the name `MIMIC-IV`, which is
+what makes `spec=MIMIC-IV` work from anywhere and what supplies the version stamped into
+the output's `metadata/dataset.json` (as `<MIMIC-IV release>:<this package's version>`).
+Everything the pipeline does is therefore inspectable — and modifiable — in that one YAML;
+see [MEDS-Extract's documentation](https://github.com/mmcdermott/MEDS_extract) for the
+syntax.
+
+## Parallel and multi-node runs
+
+`meds-extract-run` runs the pipeline's stages serially. To parallelize, run the pipeline
+step yourself with a `parallelize:` block, using the config the runner writes out:
+
+```bash
+pip install 'MIMIC_IV_MEDS[local_parallelism]' # or [slurm_parallelism]
+
+# The runner writes the pipeline config it is about to use, then runs it. Interrupt it
+# after the "Wrote synthesized pipeline config" line if you don't want the serial run.
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
+
+# Add parallelism and re-run the pipeline directly. This is resumable: stages whose
+# outputs already exist are skipped.
+cat >>$MEDS_OUTPUT_DIR/.meds_extract_run/pipeline.yaml <<'YAML'
+parallelize:
+  n_workers: 8
+  launcher: joblib
+YAML
+MEDS_transform-pipeline $MEDS_OUTPUT_DIR/.meds_extract_run/pipeline.yaml
+```
+
+That file is self-contained (every path and version inlined), so it is also the place to
+change the stage sequence, point a run at different directories, or add
+`launcher_params:` for a Slurm launcher.
+
+The raw download can be parallelized in the same spirit — PhysioNet rate-limits each TCP
+connection to roughly 50 KB/s but does not throttle aggregate per-IP throughput, so
+several connections give a near-linear speedup:
+
+```bash
+meds-extract-download spec=MIMIC-IV output_dir=$RAW_INPUT_DIR key=dataset concurrency=8
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR download_key=null input_dir=$RAW_INPUT_DIR
+```
 
 ## Expected runtime and compute needs
 
@@ -68,16 +122,18 @@ The citation information is maintained in the `CITATION.cff` file in this reposi
 
 ## 🔧 Common Issues / FAQ
 
-### ❓ Issue: `FileNotFoundError` or pipeline errors during the `pre_MEDS` step on Ubuntu (symlinks not recognized)
+### ❓ Issue: the download fails with a 403 on the full (non-demo) dataset
 
 #### Problem:
 
-Some users running the pipeline encounter errors during the `pre_MEDS` step, where the scripts attempt to **create symlinks** but later fails to recognize or access them — even though the symlinks appear to exist in the file system.
+MIMIC-IV itself is a credentialed PhysioNet release. A 403 means PhysioNet declined the
+request before any data was served.
 
 #### Solution:
 
-A `do_copy=True` option is available in the CLI that allows the pipeline to **copy files instead of symlinking**, avoiding this issue entirely (at the cost of additional disk usage). You can enable this by adding `do_copy=True` to your command:
-
-```bash
-MEDS_extract-MIMIC_IV root_output_dir=$ROOT_OUTPUT_DIR do_copy=True
-```
+Check, in order: that `DATASET_DOWNLOAD_USERNAME` / `DATASET_DOWNLOAD_PASSWORD` are
+exported in the shell that runs the command (the demo bucket needs neither, so a working
+`download_key=demo` run proves nothing about credentials); and that the PhysioNet account
+those credentials belong to has a signed data use agreement for MIMIC-IV — access is
+per-release, so credentials that work for another dataset will still 403 here. The error
+message names which of these applies.

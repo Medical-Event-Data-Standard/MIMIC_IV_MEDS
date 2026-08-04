@@ -1,80 +1,89 @@
 """Validates the ``sources:`` block shipped in ``configs/event_configs.yaml``.
 
-These tests are offline: constructing sources and validating explicit-URL manifests
-does no network I/O (PhysioNet manifests are fetched lazily, on first ``.files``
-access), so they exercise exactly what must hold before any download starts.
+These tests are offline: constructing sources and validating explicit-URL manifests does
+no network I/O (PhysioNet manifests are fetched lazily, on first ``.files`` access), so
+they exercise exactly what must hold before any download starts.
 
-The download CLI resolves interpolations per *selected* bucket (plus ``common``), not
-across the whole ``sources:`` subtree (mmcdermott/MEDS_extract#151, fixed upstream) —
-the helpers here mirror that behavior.
+Everything goes through :meth:`MessyConfig.selected_sources`, the same accessor
+``meds-extract-download`` uses — including its per-*selected*-bucket interpolation
+resolution (mmcdermott/MEDS_extract#151), which is what lets demo and CI runs work with no
+PhysioNet credentials in the environment.
 """
 
-from omegaconf import OmegaConf
+import pytest
+from MEDS_extract.download import HTTPSource, PhysioNetSource
 from omegaconf.errors import InterpolationResolutionError
 
-from MIMIC_IV_MEDS import EVENT_CFG
+
+@pytest.fixture
+def sources(messy):
+    """A ``key -> constructed sources`` callable that closes every source afterwards."""
+    opened = []
+
+    def _open(key: str):
+        opened.extend(new := messy.selected_sources(key))
+        return new
+
+    yield _open
+    for source in opened:
+        source.close()
 
 
-def _bucket_spec(*keys: str) -> dict:
-    """Resolve interpolations for only the selected buckets, mirroring the CLI."""
-    raw = OmegaConf.load(EVENT_CFG)
-    return {"sources": {k: OmegaConf.to_container(raw.sources[k], resolve=True) for k in keys}}
+def test_demo_bucket_constructs_without_credentials(no_credentials, sources):
+    """The demo (+ common) buckets must construct with no credential env vars set.
+
+    The credential interpolations live on the ``dataset`` bucket, and the download layer
+    resolves only the selected bucket — so demo and CI runs never need PhysioNet
+    credentials, even though the same file declares them.
+    """
+    assert [type(s) for s in sources("demo")] == [PhysioNetSource, HTTPSource]
 
 
-def test_demo_constructs_without_credentials(monkeypatch):
-    """The demo (and common) buckets must construct with no credential env vars set — demo and CI runs never
-    need PhysioNet credentials."""
-    from MEDS_extract.download import HTTPSource, PhysioNetSource, sources_from_spec
+def test_dataset_bucket_requires_credentials(no_credentials, monkeypatch, sources):
+    """The credentialed dataset bucket fails fast without credentials, and constructs with them.
 
-    monkeypatch.delenv("DATASET_DOWNLOAD_USERNAME", raising=False)
-    monkeypatch.delenv("DATASET_DOWNLOAD_PASSWORD", raising=False)
+    Failing up front with the missing variable named — rather than mid-download — is the intended UX for the
+    credentialed path.
+    """
+    with pytest.raises(InterpolationResolutionError, match="DATASET_DOWNLOAD_USERNAME"):
+        sources("dataset")
 
-    sources = sources_from_spec(_bucket_spec("demo", "common"), key="demo")
-    try:
-        assert [type(s) for s in sources] == [PhysioNetSource, HTTPSource]
-    finally:
-        for s in sources:
-            s.close()
+    monkeypatch.setenv("DATASET_DOWNLOAD_USERNAME", "unused-by-this-test")
+    monkeypatch.setenv("DATASET_DOWNLOAD_PASSWORD", "unused-by-this-test")
+    assert [type(s) for s in sources("dataset")] == [PhysioNetSource, HTTPSource]
 
 
-def test_dataset_requires_credentials(monkeypatch):
-    """The credentialed dataset bucket fails fast (clear missing-env-var error) without credentials, and
-    constructs once they are set — the intended UX for both cases."""
-    from MEDS_extract.download import HTTPSource, PhysioNetSource, sources_from_spec
+@pytest.mark.parametrize(
+    ("key", "expected_base_url"),
+    [
+        ("demo", "https://physionet.org/files/mimic-iv-demo/2.2/"),
+        ("dataset", "https://physionet.org/files/mimiciv/3.1/"),
+    ],
+)
+def test_release_version_reaches_the_download_url(key, expected_base_url, fake_credentials, sources):
+    """``sources.dataset_version`` must land in the URL the downloader actually fetches.
 
-    monkeypatch.delenv("DATASET_DOWNLOAD_USERNAME", raising=False)
-    monkeypatch.delenv("DATASET_DOWNLOAD_PASSWORD", raising=False)
-
-    try:
-        _bucket_spec("dataset")
-    except InterpolationResolutionError as e:
-        assert "DATASET_DOWNLOAD_USERNAME" in str(e)
-    else:
-        raise AssertionError("resolving the dataset bucket without credentials should fail")
-
-    monkeypatch.setenv("DATASET_DOWNLOAD_USERNAME", "someone")
-    monkeypatch.setenv("DATASET_DOWNLOAD_PASSWORD", "hunter2")
-    sources = sources_from_spec(_bucket_spec("dataset", "common"), key="dataset")
-    try:
-        assert [type(s) for s in sources] == [PhysioNetSource, HTTPSource]
-    finally:
-        for s in sources:
-            s.close()
+    The declared version is the single source of truth for both the download URL and the
+    ``etl_metadata.dataset_version`` stamp (pinned in ``test_spec_registration.py``); this
+    is the URL half, per bucket, including that demo and full releases stay distinct.
+    """
+    physionet, *_ = sources(key)
+    assert vars(physionet)["_base_url"] == expected_base_url
 
 
-def test_common_bucket_is_fully_checksum_pinned():
+def test_common_bucket_is_fully_checksum_pinned(raw_spec):
     """Every concept-map URL must carry a pinned ``sha256``.
 
     GitHub raw publishes no checksum manifest, and the downloader refuses to skip an
-    existing file it cannot verify — so an unpinned entry would make every resumed run
-    (``do_download=True`` over an existing ``raw_input_dir``) fail with
-    ``FileExistsError``. The ``v2.4.0`` tag is immutable, so pinned hashes are stable.
+    existing file it cannot verify — so an unpinned entry would make every resumed run fail
+    with ``FileExistsError``. The ``v2.4.0`` tag is immutable, so pinned hashes are stable.
+    Asserted against the raw file (not constructed sources) because it is a claim about
+    what is *written* in the spec.
     """
-    (common_entry,) = _bucket_spec("common")["sources"]["common"]
-    assert common_entry["type"] == "http"
-    urls = common_entry["urls"]
-    assert len(urls) == 10
-    for entry in urls:
+    (common_entry,) = raw_spec.sources.common
+    assert common_entry.type == "http"
+    assert len(common_entry.urls) == 10
+    for entry in common_entry.urls:
         assert set(entry) == {"url", "rel_path", "sha256"}, entry
-        assert len(entry["sha256"]) == 64
-        int(entry["sha256"], 16)  # well-formed hex
+        assert len(entry.sha256) == 64
+        int(entry.sha256, 16)  # well-formed hex
