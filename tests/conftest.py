@@ -37,8 +37,8 @@ def spec_fp():
 def messy() -> MessyConfig:
     """The shipped spec, loaded through the registered-name resolution ladder.
 
-    Resolving ``"MIMIC-IV"`` (rather than a path) is what makes this fixture exercise the
-    entry-point registration, and it validates every section of the document on load.
+    Resolving ``"MIMIC-IV"`` (rather than a path) is what makes this fixture exercise the entry-point
+    registration, and it validates every section of the document on load.
     """
     return MessyConfig.load(SPEC)
 
