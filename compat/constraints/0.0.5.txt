@@ -1,0 +1,8 @@
+# Constraints that make MIMIC-IV-MEDS 0.0.5 run again.
+#
+# Why: declared 'meds-transforms~=0.2.1' is correctly bounded; pinned here only to fix the exact upstream used
+#
+# Verified 2026-08-05 by building the MIMIC-IV demo cohort end to end on Python 3.12.
+# Usage:
+#   uv pip install "MIMIC-IV-MEDS==0.0.5" -c compat/constraints/0.0.5.txt
+meds-transforms==0.2.4
