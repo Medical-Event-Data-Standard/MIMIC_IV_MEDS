@@ -10,7 +10,10 @@ authors = [
 ]
 description = "An ETL pipeline to extract MIMIC-IV data into the MEDS format."
 readme = "README.md"
-requires-python = ">=3.11"
+# Mirrors MEDS-Extract's own floor and ceiling. Upstream narrowed to >=3.11.4,<3.14; a
+# looser range here admits interpreters it cannot be installed on, and uv refuses to
+# resolve at all ("the requested Python version (>=3.11) does not satisfy Python>=3.11.4,<3.14").
+requires-python = ">=3.11.4,<3.14"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
