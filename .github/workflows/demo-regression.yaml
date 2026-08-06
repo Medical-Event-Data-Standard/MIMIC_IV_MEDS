@@ -12,7 +12,7 @@ name: Demo summary-stats regression
 # build. Promote the policy's `fail_on` to `error` once a few PRs have shown the signal is
 # clean. Regenerate the baseline deliberately, never as a drive-by:
 #
-#   meds-extract-run spec=MIMIC-IV output_dir=$OUT download_key=demo
+#   meds-extract-run spec=MIMIC-IV output_dir=$OUT dataset_key=demo
 #   extract_MEDS_summary_stats $OUT -o tests/regression/demo_summary_stats.json
 #
 # The action, the package-spec, and the committed baseline are pinned together on
@@ -62,7 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           # The demo release is fully open, so no PhysioNet credentials are needed.
-          uv run meds-extract-run spec=MIMIC-IV output_dir="$OUT" download_key=demo
+          uv run meds-extract-run spec=MIMIC-IV output_dir="$OUT" dataset_key=demo
 
       - name: Summary-stats regression check
         id: stats

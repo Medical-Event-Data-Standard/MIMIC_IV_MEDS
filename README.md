@@ -36,13 +36,13 @@ To run over the publicly available, fully open MIMIC-IV demo dataset (v2.2, no c
 required):
 
 ```bash
-meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR download_key=demo
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
 ```
 
 If you already have the raw MIMIC-IV files on disk, skip the download entirely:
 
 ```bash
-meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR download_key=null input_dir=$RAW_INPUT_DIR
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
 ```
 
 Run `meds-extract-run --help` for the full set of arguments and options.
@@ -100,7 +100,7 @@ several connections give a near-linear speedup:
 
 ```bash
 meds-extract-download spec=MIMIC-IV output_dir=$RAW_INPUT_DIR key=dataset concurrency=8
-meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR download_key=null input_dir=$RAW_INPUT_DIR
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
 ```
 
 ## Expected runtime and compute needs
@@ -133,7 +133,7 @@ request before any data was served.
 
 Check, in order: that `DATASET_DOWNLOAD_USERNAME` / `DATASET_DOWNLOAD_PASSWORD` are
 exported in the shell that runs the command (the demo bucket needs neither, so a working
-`download_key=demo` run proves nothing about credentials); and that the PhysioNet account
+`dataset_key=demo` run proves nothing about credentials); and that the PhysioNet account
 those credentials belong to has a signed data use agreement for MIMIC-IV — access is
 per-release, so credentials that work for another dataset will still 403 here. The error
 message names which of these applies.
