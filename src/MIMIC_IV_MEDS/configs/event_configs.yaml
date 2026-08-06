@@ -136,7 +136,12 @@ hosp/labevents:
       d_labitems_to_loinc:
         itemid:
           column: itemid (omop_source_code)
-        valueuom: $valueuom
+        # `valueuom` was a second join key here. It is a component of this event's code, so
+        # producing it narrowed the match to rows whose dictionary unit equals the charted
+        # unit -- true for only 84% of (itemid, valueuom) pairs. Dropping it makes this a
+        # partial match on `itemid` alone, which is safe: `itemid (omop_source_code)` is
+        # unique in this file (1630 rows / 1630 distinct), so there is never a second
+        # candidate row that the unit would have disambiguated.
         description: coalesce($omop_concept_name, $label)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
@@ -240,18 +245,28 @@ icu/chartevents:
     hadm_id: $hadm_id
     icustay_id: $stay_id
     _metadata:
-      # TODO: make this work even with missing valueuom
-      #meas_chartevents_main:
-      #  itemid:
-      #    column: itemid (omop_source_code)
-      #  description: coalesce($omop_concept_name, $label)
-      #  parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
-      # TODO: I don't know if this is necessary...
-      d_labitems_to_loinc:
+      # `icu/d_items` is the dictionary for chartevents itemids and ships inside MIMIC-IV
+      # itself, so it covers 100% of them and needs no external map. It supplies the human
+      # name; without it every one of these codes reads as a bare `LAB//220045//bpm`.
+      #
+      # Joining on `itemid` alone is a deliberate PARTIAL match on the code's components
+      # (`itemid` and `valueuom`): the metadata broadcasts to every code sharing the itemid,
+      # whatever unit it was charted in. That is what the old "TODO: make this work even
+      # with missing valueuom" wanted. Keying on the unit as well is what made this block
+      # useless before -- `d_items.unitname` agrees with the charted `valueuom` for only
+      # 90% of (itemid, valueuom) pairs, and the disagreements are dictionary rows carrying
+      # the literal string 'None'.
+      icu/d_items:
+        itemid: $itemid
+        description: $label
+      # The OMOP map adds the LOINC/SNOMED parent where it has one. Coverage is thin (~12%
+      # of the itemids charted in the demo), which is why it cannot be the only source --
+      # but it is the correct map for chartevents. What was here before was
+      # `d_labitems_to_loinc`, the *labevents* map: its itemid space is 50xxx and
+      # chartevents is 22xxxx, so it matched essentially nothing.
+      meas_chartevents_main:
         itemid:
           column: itemid (omop_source_code)
-        valueuom: $valueuom
-        description: coalesce($omop_concept_name, $label)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 icu/procedureevents:
@@ -261,15 +276,26 @@ icu/procedureevents:
     hadm_id: $hadm_id
     icustay_id: $stay_id
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       proc_datetimeevents:
         itemid:
           column: itemid (omop_source_code)
-        description: coalesce($omop_concept_name, $label)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
       proc_itemid:
         itemid:
           column: itemid (omop_source_code)
-        description: coalesce($omop_concept_name, $label)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   end:
     code: 'f"PROCEDURE//END//{$itemid}"'
@@ -277,15 +303,26 @@ icu/procedureevents:
     hadm_id: $hadm_id
     icustay_id: $stay_id
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       proc_datetimeevents:
         itemid:
           column: itemid (omop_source_code)
-        description: coalesce($omop_concept_name, $label)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
       proc_itemid:
         itemid:
           column: itemid (omop_source_code)
-        description: coalesce($omop_concept_name, $label)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 icu/inputevents:
@@ -300,10 +337,17 @@ icu/inputevents:
     unit: $rateuom
     ordercategorydescription: $ordercategorydescription
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       inputevents_to_rxnorm:
         itemid:
           column: itemid (omop_source_code)
-        description: coalesce($omop_concept_name, $label)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   input_end:
     code: 'f"INFUSION_END//{$itemid}"'
@@ -317,10 +361,17 @@ icu/inputevents:
     statusdescription: $statusdescription
     unit: $amountuom
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       inputevents_to_rxnorm:
         itemid:
           column: itemid (omop_source_code)
-        description: coalesce($omop_concept_name, $label)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   subject_weight:
     code: '"SUBJECT_WEIGHT_AT_INFUSION//KG"'
@@ -335,11 +386,15 @@ icu/outputevents:
     icustay_id: $stay_id
     numeric_value: $value
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       outputevents_to_loinc:
         itemid:
           column: itemid (omop_source_code)
-        valueuom: $unitname
-        description: coalesce($omop_concept_name, $label)
+        # `valueuom: $unitname` was a second join key; dropped for the same reason as in
+        # labevents. Only one itemid in this file has duplicate rows and they agree on both
+        # label and concept code, so the unit never disambiguated anything.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 # Where the raw data lives. This block is consumed by `meds-extract-download` (which
