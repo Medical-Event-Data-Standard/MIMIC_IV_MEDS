@@ -1,54 +1,121 @@
 name: Tests
 
+# This repo ships no Python — only `event_configs.yaml` and the entry-point
+# registration naming it `MIMIC-IV`. So CI asks exactly two questions, and both are
+# answered by building the public demo cohort:
+#
+#   1. does the ETL still run?          -> tests/e2e_demo_test.py
+#   2. did its output change?           -> the summary-stats regression step
+#
+# The extraction is the expensive, flaky part: it downloads from PhysioNet and takes
+# minutes. It therefore happens ONCE, on ONE Python version, and both checks read the same
+# cohort — the test writes it to $MEDS_DEMO_OUTPUT_DIR and the stats step reads from there.
+# A Python-version matrix would multiply PhysioNet downloads for no signal about a package
+# that contains no Python.
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main, "release/*", "dev"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Read by tests/e2e_demo_test.py (which builds the cohort here instead of in a temp dir)
+  # and by the summary-stats step below.
+  MEDS_DEMO_OUTPUT_DIR: ${{ github.workspace }}/.demo-cohort
 
 jobs:
-  run_tests_ubuntu:
+  demo:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-      fail-fast: false
-
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup package
         uses: ./.github/actions/setup
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
 
-      - name: Run tests
-        # `--reruns`/`--only-rerun` (from pytest-rerunfailures) retries the
-        # e2e demo-download test when PhysioNet returns transient network
-        # errors. These are upstream failures, not real regressions, and
-        # blocking CI on them means no PR can land during a bad PhysioNet
-        # minute. The pattern is intentionally scoped to network-shaped
-        # failures: anything else fails hard on first occurrence.
-        # ConnectTimeout/ReadTimeout/MaxRetryError cover requests/urllib3
-        # timeout paths (surfaced as ConnectTimeoutError, not ConnectionError),
-        # and `[Cc]onnection broken` matches urllib3's lowercase message.
+      - name: Build and validate the demo cohort
+        # The demo release is fully open, so no PhysioNet credentials are needed.
+        #
+        # `src/` is not passed to pytest and there is no coverage measurement: this package
+        # ships no Python.
+        #
+        # `--reruns`/`--only-rerun` (pytest-rerunfailures) retries the extraction when
+        # PhysioNet returns transient network errors. Those are upstream failures, not
+        # regressions, and blocking CI on them means no PR can land during a bad PhysioNet
+        # minute. The pattern is deliberately scoped to network-shaped failures; anything
+        # else fails hard on the first occurrence.
+        #
+        # The download layer is httpx (MEDS-Extract's `[download]` extra), so the httpx
+        # exception names lead: RemoteProtocolError is a connection dropped mid-response,
+        # ReadError/ConnectError are its transport errors (note `ConnectionError` does not
+        # match `ConnectError`), and ConnectTimeout/ReadTimeout/PoolTimeout are its timeout
+        # family. The requests/urllib3 names are kept because the same shapes surface
+        # through other dependencies' HTTP stacks.
         run: |
-          uv run pytest src/ tests/ -v --doctest-modules \
-            --cov=src --cov-report=xml --cov-report=term \
+          mkdir -p "$MEDS_DEMO_OUTPUT_DIR"
+          uv run pytest tests/ -v \
             --junitxml=junit.xml -s \
             --reruns 3 --reruns-delay 20 \
-            --only-rerun "IncompleteRead|ChunkedEncodingError|ConnectionError|ConnectTimeout|ReadTimeout|MaxRetryError|[Cc]onnection broken"
+            --only-rerun "RemoteProtocolError|ReadError|ConnectError|ConnectTimeout|ReadTimeout|PoolTimeout|IncompleteRead|ChunkedEncodingError|ConnectionError|MaxRetryError|[Cc]onnection broken"
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5.5.4
+      - name: Summary-stats regression check
+        id: stats
+        # Compares the cohort just built against the baseline committed at
+        # tests/regression/demo_summary_stats.json. The demo release is pinned in the MESSY
+        # config, so the raw input does not move between runs: any change in the
+        # fingerprint is a change this repo made. That is what makes a committed baseline
+        # meaningful here, and what lets the policy treat cohort content as an error.
+        #
+        # Which drift errors and which only warns is decided in tests/regression/policy.yaml.
+        # When a PR changes the output on purpose, regenerate the baseline in that same PR:
+        #
+        #   meds-extract-run spec=MIMIC-IV output_dir=$OUT dataset_key=demo
+        #   extract_MEDS_summary_stats $OUT -o tests/regression/demo_summary_stats.json
+        #
+        # The action, the package-spec, and the committed baseline are pinned together on
+        # meds_summary_stats 0.0.2 (stats_schema_version 1) and must move together:
+        # comparison refuses to diff across schema versions, so bumping one without the
+        # others fails the job with a precondition error rather than a useful diff.
+        uses: Medical-Event-Data-Standard/meds_summary_stats@0.0.2
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.xml
-          fail_ci_if_error: false
+          meds-dir: ${{ env.MEDS_DEMO_OUTPUT_DIR }}/MEDS_cohort
+          baseline: tests/regression/demo_summary_stats.json
+          policy: tests/regression/policy.yaml
+          package-spec: meds_summary_stats==0.0.2
+          # Passed explicitly because the action sends `--fail-on` on every invocation and
+          # the CLI flag overrides the policy file. Leaving it unset does not defer to the
+          # policy, it silently applies the action's own default; this must match the
+          # `fail_on:` in tests/regression/policy.yaml.
+          fail-on: error
+          upload-artifacts: "true"
+          artifact-name: mimic-demo-summary-stats
+
+      # Errors already fail the step above with their own annotation. This surfaces the
+      # warning-only verdict, which exits zero and would otherwise be visible only to
+      # someone who opened the job summary.
+      - name: Warn on divergence
+        if: ${{ steps.stats.outputs.status == 'warn' }}
+        run: |
+          echo "::warning title=Demo cohort fingerprint changed::" \
+               "meds_summary_stats reported warnings against" \
+               "tests/regression/demo_summary_stats.json. Review the job summary." \
+               "If the change is intended, regenerate the baseline in this PR."
+
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1.2.1
