@@ -115,8 +115,11 @@ gradations attached to that assignment.
 
 ### Order modifiers
 
-`priority` (`ROUTINE` / `STAT`) joins the `LAB//*` codes: it is a categorical modifier of the
-order and belongs in the identity of what was measured. It is coalesced, being 4.8% null.
+`priority` (`ROUTINE` / `STAT`) joins the `LAB//SPECIMEN_COLLECTED` code only, not
+`LAB//RESULT`. Priority modifies how the specimen was collected; the result is simply what was
+observed, and is the same measurement however urgently it was drawn. Nothing is lost by leaving
+it off the result: `charttime` is never null across all 158M rows, so the collection event is
+always emitted. It is coalesced, being 4.8% null.
 
 `route` and `frequency` on `hosp/pharmacy` were considered for the same treatment and
 **deliberately left as extension columns**. Adding them takes `MEDICATION//START` from 22,539 to

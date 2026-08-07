@@ -194,7 +194,7 @@ hosp/labevents:
         description: coalesce($omop_concept_name, $label)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   lab_result:
-    code: f"LAB//RESULT//{$itemid}//{$valueuom ?? 'UNK'}//{$priority ?? 'UNK'}"
+    code: f"LAB//RESULT//{$itemid}//{$valueuom ?? 'UNK'}"
     hadm_id: $hadm_id
     time: '$storetime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $valuenum
