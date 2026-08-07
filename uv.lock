@@ -253,8 +253,8 @@ wheels = [
 
 [[package]]
 name = "meds-extract"
-version = "0.6.3.dev293+gc074f8d10"
-source = { git = "https://github.com/mmcdermott/MEDS_extract?branch=dev#c074f8d10c4ca76726a0441eddb16a05f391fc1f" }
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dftly" },
     { name = "hydra-core" },
@@ -266,6 +266,10 @@ dependencies = [
     { name = "pyarrow" },
     { name = "universal-pathlib" },
     { name = "yaml-to-disk" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f8/29/11e1d268233a7b99a945ae19a8dea44b5eaa13197ed1452d3de241ce6222/meds_extract-0.7.0.tar.gz", hash = "sha256:1ee53859e74801ddfd867b72749a894bf5b28ff47b111206b0a728a2375fe403", size = 450479, upload-time = "2026-08-07T19:03:44.958Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/23/10c17cb0bbfa4b0109757d7f4cd940e502c10beeadc5184c529e6d705074/meds_extract-0.7.0-py3-none-any.whl", hash = "sha256:96accb6b84d59f461322b4a311e2fa4f3d6653dc07871000c2377ca1e33d59cb", size = 221114, upload-time = "2026-08-07T19:03:43.393Z" },
 ]
 
 [package.optional-dependencies]
@@ -331,7 +335,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "meds-extract", extras = ["download"], git = "https://github.com/mmcdermott/MEDS_extract?branch=dev" }]
+requires-dist = [{ name = "meds-extract", extras = ["download"], specifier = ">=0.7.0,<0.8" }]
 
 [package.metadata.requires-dev]
 dev = [

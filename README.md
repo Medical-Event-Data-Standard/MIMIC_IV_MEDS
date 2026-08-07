@@ -106,12 +106,54 @@ meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false inp
 
 ## Expected runtime and compute needs
 
-This pipeline can be successfully run over the full MIMIC-IV on a 5-core machine leveraging around 165GB of
-memory in approximately 7 hours (note this time includes the time to download all of the MIMIC-IV files as
-well, and this test was run on a machine with poor network transfer speeds and without any parallelization
-applied to the transformation steps, so these speeds can likely be greatly increased). The output folder of
-data is 9.8 GB. This can be reduced significantly as well as intermediate files not necessary for the final
-MEDS dataset are retained in additional folders. See
+Measured on the full MIMIC-IV 3.1 release — all 364,627 subjects — with MEDS-Extract 0.7.0, no
+parallelism configured, raw data already downloaded:
+
+| | |
+|---|---|
+| wall time | **32 min** |
+| peak RSS | **20.3 GB** |
+| MEDS data output | 4.5 GB (366 shards) |
+| metadata output | 8.6 MB |
+| whole output tree | 15 GB (includes per-stage intermediates) |
+
+Hardware: 20-core aarch64, 121 GB RAM, local NVMe. The run used ~350–400% CPU, i.e. about four
+cores' worth, so it is I/O- and single-thread-bound rather than CPU-bound — adding cores alone
+will not help much, and 20 GB of headroom is the real requirement.
+
+Per stage, for anyone budgeting a smaller machine:
+
+| stage | duration | peak RSS |
+|---|---|---|
+| convert_to_parquet | 4.1 min | 14.4 GB |
+| split_and_shard_subjects | 5 s | 20.3 GB |
+| convert_to_subject_sharded | 8.3 min | 4.5 GB |
+| convert_to_MEDS_events | 5.0 min | 2.6 GB |
+| extract_code_metadata | 3.6 min | 8.1 GB |
+| merge_to_MEDS_cohort | 6.5 min | 3.9 GB |
+| finalize_MEDS_metadata | 1 s | 0.6 GB |
+| finalize_MEDS_data | 4.4 min | 2.6 GB |
+
+Peak memory lives in the early, whole-file stages — `convert_to_parquet` and the shard split —
+not in the per-subject work. (Stage peaks are attributed by sampling the process tree and
+binning against stage boundaries, so the 5-second `split_and_shard_subjects` figure includes
+memory `convert_to_parquet` had not yet returned to the OS; treat those two as one 20 GB
+envelope rather than two independent peaks.)
+
+Memory is only weakly sensitive to cohort size under 0.7.0. Measured over a nested subject
+ladder, peak RSS ran 3.1 GB at 3,200 subjects and 3.8 GB at 25,600 — a tail growth exponent of
+0.12, essentially flat — with the remainder of the full-scale 20.3 GB coming from whole-file
+stages that see every row regardless. Wall time, by contrast, is close to linear in subjects.
+
+> \[!NOTE\]
+> These figures are much lower than earlier releases of this ETL reported (~165 GB, ~7 hours).
+> Before 0.7.0, `extract_code_metadata` performed a full-dataset scan/unique/collect and
+> dominated peak memory — a full run was OOM-killed on this machine holding 115 GB. 0.7.0
+> reworked that stage into a shard-scoped map-reduce, cutting its marginal cost by ~45× at no
+> measurable runtime cost.
+
+Intermediate stage outputs are retained under the output directory, which is why the tree is
+15 GB against 4.5 GB of actual MEDS data. See
 [this github issue](https://github.com/Medical-Event-Data-Standard/MEDS_transforms/issues/235) for tracking on ensuring these
 directories are automatically cleaned up in the future.
 

@@ -25,17 +25,11 @@ classifiers = [
 # spawns to stage the raw data. MEDS-transforms, polars and hydra all arrive through it
 # at the versions it fences; duplicating those pins here would only create drift.
 #
-# INTERIM (0.7 migration, see #58): MEDS-Extract 0.7.0 is not released yet, so
-# `meds-extract` resolves from the upstream `dev` branch via [tool.uv.sources] below.
-# Git builds of that branch self-identify as `0.6.3.devN`, so the specifier here must
-# admit dev pre-releases; switch to `meds-extract[download]>=0.7.0,<0.8` and drop the
-# git source once 0.7.0 is on PyPI.
+# The floor is 0.7.0, not 0.6.x: this config uses `_self` metadata blocks and composite
+# join keys, neither of which exists before 0.7.
 dependencies = [
-    "meds-extract[download]>=0.6.2.dev0,<0.8",
+    "meds-extract[download]>=0.7.0,<0.8",
 ]
-
-[tool.uv.sources]
-meds-extract = { git = "https://github.com/mmcdermott/MEDS_extract", branch = "dev" }
 
 [dependency-groups]
 # `shfmt-py` bundles the `shfmt` binary that the `mdformat-shfmt` pre-commit
