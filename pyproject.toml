@@ -17,7 +17,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-   "polars~=1.30.0", "meds-transforms~=0.6", "meds-extract~=0.5", "requests", "beautifulsoup4",
+   "polars~=1.30.0", "meds-transforms>=0.6,<0.7", "meds-extract>=0.5,<0.6", "requests", "beautifulsoup4",
    "hydra-core", "hydra-joblib-launcher",
 ]
 
