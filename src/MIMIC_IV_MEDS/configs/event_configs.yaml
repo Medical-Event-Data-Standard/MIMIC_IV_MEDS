@@ -92,12 +92,50 @@ hosp/drgcodes:
     drg_mortality: $drg_mortality
 
 hosp/emar:
+  _table:
+    cols:
+      # A constant, used only as the second half of the composite join key below.
+      # MEDS-Extract materializes any `_table.cols` entry that appears in `left_on` *before*
+      # applying the join, which is what makes this work.
+      #
+      # `prescriptions` stores one order as several rows -- `drug_type` MAIN (the drug),
+      # BASE (the diluent bag, whose ndc is '0'), ADDITIVE. Joining on `pharmacy_id` alone
+      # fans out: 18.7% of pharmacy_ids carry more than one row, which would inflate the
+      # emar event count by ~15%, i.e. more medication administrations than occurred.
+      # Restricted to MAIN the key is exactly 1:1 and the join is row-preserving.
+      drug_type: "'MAIN'"
+      # Only `cols` entries named in `left_on` are materialised before the join; this one
+      # is not, so it is evaluated afterwards and sees the joined `ndc`. '0' is
+      # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
+      # it) and an unmatched join leaves it null -- both collapse to UNK.
+      ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
+    join:
+      hosp/prescriptions:
+        left_on: [pharmacy_id, drug_type]
+        right_on: [pharmacy_id, drug_type]
+        cols: [ndc]
   medication:
-    code: f"MEDICATION//{$medication ?? 'UNK'}//{$event_txt ?? 'UNK'}"
+    # `ndc` is a code component because `parent_codes` lives in codes.parquet and can only
+    # be produced by a `_metadata` block, which joins on the code's own components. The drug
+    # name stays in the code, so it remains readable -- including when no NDC resolves and
+    # this segment renders 'UNK'.
+    code: f"MEDICATION//{$medication ?? 'UNK'}//{$event_txt ?? 'UNK'}//{$ndc_clean}"
     time: '$charttime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     emar_id: $emar_id
     emar_seq: $emar_seq
+    _metadata:
+      # The NDC is emitted as the parent verbatim. MIMIC ships no RxNorm identifier, and
+      # NDC -> RxNorm needs an external vocabulary whose free subset covers only currently
+      # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
+      # users who want RxNorm can fan the NDC out themselves; what matters here is that the
+      # NDC attached is exactly the one dispensed for this order.
+      hosp/prescriptions:
+        # Join key is the metadata table's RAW `ndc`. A data code whose segment is 'UNK'
+        # therefore matches nothing here and gets no parent -- which is what we want, rather
+        # than emitting a meaningless `NDC/0`.
+        ndc_clean: $ndc
+        parent_codes: f"NDC/{$ndc}"
 
 hosp/hcpcsevents:
   hcpcs:
@@ -178,8 +216,30 @@ hosp/patients:
     time: coalesce($deathtime::?"%Y-%m-%d %H:%M:%S", $dod::?"%Y-%m-%d")
 
 hosp/pharmacy:
+  _table:
+    cols:
+      # A constant, used only as the second half of the composite join key below.
+      # MEDS-Extract materializes any `_table.cols` entry that appears in `left_on` *before*
+      # applying the join, which is what makes this work.
+      #
+      # `prescriptions` stores one order as several rows -- `drug_type` MAIN (the drug),
+      # BASE (the diluent bag, whose ndc is '0'), ADDITIVE. Joining on `pharmacy_id` alone
+      # fans out: 18.7% of pharmacy_ids carry more than one row, which would inflate the
+      # emar event count by ~15%, i.e. more medication administrations than occurred.
+      # Restricted to MAIN the key is exactly 1:1 and the join is row-preserving.
+      drug_type: "'MAIN'"
+      # Only `cols` entries named in `left_on` are materialised before the join; this one
+      # is not, so it is evaluated afterwards and sees the joined `ndc`. '0' is
+      # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
+      # it) and an unmatched join leaves it null -- both collapse to UNK.
+      ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
+    join:
+      hosp/prescriptions:
+        left_on: [pharmacy_id, drug_type]
+        right_on: [pharmacy_id, drug_type]
+        cols: [ndc]
   medication_start:
-    code: f"MEDICATION//START//{$medication ?? 'UNK'}"
+    code: f"MEDICATION//START//{$medication ?? 'UNK'}//{$ndc_clean}"
     # Raw pharmacy times mix datetime and date-only formats; parse leniently with
     # each format and take the first success (dftly >= 0.1.3; mmcdermott/dftly#46).
     time: coalesce($starttime::?"%Y-%m-%d %H:%M:%S", $starttime::?"%Y-%m-%d")
@@ -187,10 +247,34 @@ hosp/pharmacy:
     frequency: $frequency
     doses_per_24_hrs: $doses_per_24_hrs
     poe_id: $poe_id
+    _metadata:
+      # The NDC is emitted as the parent verbatim. MIMIC ships no RxNorm identifier, and
+      # NDC -> RxNorm needs an external vocabulary whose free subset covers only currently
+      # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
+      # users who want RxNorm can fan the NDC out themselves; what matters here is that the
+      # NDC attached is exactly the one dispensed for this order.
+      hosp/prescriptions:
+        # Join key is the metadata table's RAW `ndc`. A data code whose segment is 'UNK'
+        # therefore matches nothing here and gets no parent -- which is what we want, rather
+        # than emitting a meaningless `NDC/0`.
+        ndc_clean: $ndc
+        parent_codes: f"NDC/{$ndc}"
   medication_stop:
-    code: f"MEDICATION//STOP//{$medication ?? 'UNK'}"
+    code: f"MEDICATION//STOP//{$medication ?? 'UNK'}//{$ndc_clean}"
     time: coalesce($stoptime::?"%Y-%m-%d %H:%M:%S", $stoptime::?"%Y-%m-%d")
     poe_id: $poe_id
+    _metadata:
+      # The NDC is emitted as the parent verbatim. MIMIC ships no RxNorm identifier, and
+      # NDC -> RxNorm needs an external vocabulary whose free subset covers only currently
+      # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
+      # users who want RxNorm can fan the NDC out themselves; what matters here is that the
+      # NDC attached is exactly the one dispensed for this order.
+      hosp/prescriptions:
+        # Join key is the metadata table's RAW `ndc`. A data code whose segment is 'UNK'
+        # therefore matches nothing here and gets no parent -- which is what we want, rather
+        # than emitting a meaningless `NDC/0`.
+        ndc_clean: $ndc
+        parent_codes: f"NDC/{$ndc}"
 
 hosp/procedures_icd:
   _table:
