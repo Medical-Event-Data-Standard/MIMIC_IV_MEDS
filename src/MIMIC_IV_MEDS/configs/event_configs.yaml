@@ -130,12 +130,21 @@ hosp/emar:
       # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
       # NDC attached is exactly the one dispensed for this order.
-      hosp/prescriptions:
-        # Join key is the metadata table's RAW `ndc`. A data code whose segment is 'UNK'
-        # therefore matches nothing here and gets no parent -- which is what we want, rather
-        # than emitting a meaningless `NDC/0`.
-        ndc_clean: $ndc
-        parent_codes: f"NDC/{$ndc}"
+      # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
+      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
+      # `extract_code_metadata` re-scan that whole table and join it against every observed
+      # code -- a full-data materialization for a column we already have.
+      _self:
+        # The conditional deliberately has no `else`: an else-less dftly conditional yields
+        # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
+        # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
+        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # code whose segment rendered 'UNK' matched no metadata row.
+        #
+        # Do not write `else null` here: dftly has no null literal, and the bare word parses
+        # as the *string* "null" (it warns, but the result is a wrong parent code).
+        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
 
 hosp/hcpcsevents:
   hcpcs:
@@ -253,12 +262,21 @@ hosp/pharmacy:
       # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
       # NDC attached is exactly the one dispensed for this order.
-      hosp/prescriptions:
-        # Join key is the metadata table's RAW `ndc`. A data code whose segment is 'UNK'
-        # therefore matches nothing here and gets no parent -- which is what we want, rather
-        # than emitting a meaningless `NDC/0`.
-        ndc_clean: $ndc
-        parent_codes: f"NDC/{$ndc}"
+      # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
+      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
+      # `extract_code_metadata` re-scan that whole table and join it against every observed
+      # code -- a full-data materialization for a column we already have.
+      _self:
+        # The conditional deliberately has no `else`: an else-less dftly conditional yields
+        # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
+        # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
+        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # code whose segment rendered 'UNK' matched no metadata row.
+        #
+        # Do not write `else null` here: dftly has no null literal, and the bare word parses
+        # as the *string* "null" (it warns, but the result is a wrong parent code).
+        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
   medication_stop:
     code: f"MEDICATION//STOP//{$medication ?? 'UNK'}//{$ndc_clean}"
     time: coalesce($stoptime::?"%Y-%m-%d %H:%M:%S", $stoptime::?"%Y-%m-%d")
@@ -269,12 +287,21 @@ hosp/pharmacy:
       # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
       # NDC attached is exactly the one dispensed for this order.
-      hosp/prescriptions:
-        # Join key is the metadata table's RAW `ndc`. A data code whose segment is 'UNK'
-        # therefore matches nothing here and gets no parent -- which is what we want, rather
-        # than emitting a meaningless `NDC/0`.
-        ndc_clean: $ndc
-        parent_codes: f"NDC/{$ndc}"
+      # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
+      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
+      # `extract_code_metadata` re-scan that whole table and join it against every observed
+      # code -- a full-data materialization for a column we already have.
+      _self:
+        # The conditional deliberately has no `else`: an else-less dftly conditional yields
+        # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
+        # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
+        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # code whose segment rendered 'UNK' matched no metadata row.
+        #
+        # Do not write `else null` here: dftly has no null literal, and the bare word parses
+        # as the *string* "null" (it warns, but the result is a wrong parent code).
+        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
 
 hosp/procedures_icd:
   _table:

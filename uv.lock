@@ -253,8 +253,8 @@ wheels = [
 
 [[package]]
 name = "meds-extract"
-version = "0.6.3.dev291+g59abdd83d"
-source = { git = "https://github.com/mmcdermott/MEDS_extract?branch=dev#59abdd83d5025031eb7c05ca86046e5817ed0633" }
+version = "0.6.3.dev293+gc074f8d10"
+source = { git = "https://github.com/mmcdermott/MEDS_extract?branch=dev#c074f8d10c4ca76726a0441eddb16a05f391fc1f" }
 dependencies = [
     { name = "dftly" },
     { name = "hydra-core" },
