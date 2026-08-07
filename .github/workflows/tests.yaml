@@ -1,6 +1,6 @@
 name: Tests
 
-# This repo ships no Python — only `configs/event_configs.yaml` and the entry-point
+# This repo ships no Python — only `event_configs.yaml` and the entry-point
 # registration naming it `MIMIC-IV`. So CI asks exactly two questions, and both are
 # answered by building the public demo cohort:
 #

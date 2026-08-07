@@ -19,7 +19,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-# This package ships no Python: the whole ETL is `configs/event_configs.yaml`, run by
+# This package ships no Python: the whole ETL is `event_configs.yaml`, run by
 # MEDS-Extract's own `meds-extract-run`. So there is exactly one dependency — the
 # `[download]` extra adds `meds-extract-download` (httpx + tenacity), which the runner
 # spawns to stage the raw data. MEDS-transforms, polars and hydra all arrive through it
@@ -51,7 +51,7 @@ dev = [
 [tool.setuptools_scm]
 
 [project.entry-points."MEDS_extract.pipelines"]
-MIMIC-IV = "MIMIC_IV_MEDS.configs:event_configs.yaml"
+MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
 
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"

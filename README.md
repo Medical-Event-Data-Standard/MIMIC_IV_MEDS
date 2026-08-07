@@ -29,7 +29,7 @@ When you run this, the program will:
     across runs.
 2. Construct the final MEDS cohort directly from those raw files — all transformations,
     joins, and metadata extraction are declared in
-    `src/MIMIC_IV_MEDS/configs/event_configs.yaml` — and write it to `$MEDS_OUTPUT_DIR`
+    `src/MIMIC_IV_MEDS/event_configs.yaml` — and write it to `$MEDS_OUTPUT_DIR`
     (`data/` and `metadata/`, alongside the run's intermediate stage outputs).
 
 To run over the publicly available, fully open MIMIC-IV demo dataset (v2.2, no credentials
@@ -47,10 +47,15 @@ meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false inp
 
 Run `meds-extract-run --help` for the full set of arguments and options.
 
+Budget for the download rather than the extraction: the raw release is 41 files and 9.9 GiB
+from PhysioNet, which rate-limits each connection to roughly 50 KB/s, while the extraction
+itself is ~32 minutes and ~20 GB of RAM. Raise `download_concurrency` and keep the raw data
+with `download_dest_dir`; see [Expected runtime and compute needs](#expected-runtime-and-compute-needs).
+
 ## How this ETL is defined
 
 There is no Python in this package. The entire ETL is one file —
-[`src/MIMIC_IV_MEDS/configs/event_configs.yaml`](src/MIMIC_IV_MEDS/configs/event_configs.yaml)
+[`src/MIMIC_IV_MEDS/event_configs.yaml`](src/MIMIC_IV_MEDS/event_configs.yaml)
 — written in MESSY (MEDS-Extract Specification Syntax YAML):
 
 - a `sources:` block declaring the release versions and where to fetch the raw data

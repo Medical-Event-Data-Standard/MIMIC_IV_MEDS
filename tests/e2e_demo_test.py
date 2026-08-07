@@ -1,6 +1,6 @@
 """End-to-end run of the shipped ETL over the public MIMIC-IV demo release.
 
-This distribution ships no Python — it is `configs/event_configs.yaml` plus the entry-point
+This distribution ships no Python — it is `event_configs.yaml` plus the entry-point
 registration that names it `MIMIC-IV`. So there is exactly one thing worth testing: that
 `meds-extract-run spec=MIMIC-IV` resolves that registration, downloads the demo bucket from
 PhysioNet (no credentials needed), runs the pipeline, and leaves a well-formed MEDS cohort
