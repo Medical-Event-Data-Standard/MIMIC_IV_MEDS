@@ -1,60 +1,107 @@
 # Comparison policy for the demo summary-stats regression check.
 #
-# Starting posture is deliberately non-blocking: `fail_on: never` reports everything and
-# always exits 0, which is the tool's own recommended first step for a repo that has never
-# had this check. The workflow turns a non-pass verdict into a visible ::warning:: so it
-# is not silent. Promote to `fail_on: error` once the noise level here is known to be zero
-# across a few real PRs.
-fail_on: never
+# The MIMIC-IV demo release is pinned in the MESSY config, so the raw input never moves
+# between runs. Anything that changes in the fingerprint is therefore something this repo
+# did, which is what makes a committed baseline meaningful and what justifies a strict
+# posture: the cohort's content is an *error*, and a clean run reports nothing at all.
+#
+# When a PR changes the output on purpose, regenerate the baseline in that same PR:
+#
+#   meds-extract-run spec=MIMIC-IV output_dir=$OUT dataset_key=demo
+#   extract_MEDS_summary_stats $OUT -o tests/regression/demo_summary_stats.json
+#
+# NOTE: the GitHub action always passes `--fail-on`, and the CLI flag overrides this file.
+# The action input and this value must agree; both are `error`.
+fail_on: error
 
-# `dataset_version` on this ETL is "<MIMIC release>:<ETL version>", and the ETL version is
-# derived from git describe -- so it changes on *every commit*, not just when the data
-# changes. Comparing against a committed baseline would therefore trip the version-change
-# path on every single PR. The MIMIC demo release is pinned in the config, so the data
-# genuinely is not moving underneath us.
+# `dataset_version` here is "<MIMIC release>:<ETL version>", and the ETL version comes from
+# `git describe` -- so it changes on every commit, not just when the data changes. Left at
+# the default this would trip the version-change path on every PR.
 on_dataset_version_change: ignore
 
+# A key the tool no longer emits is a real signal (a stat we were watching disappeared); a
+# new key is just a newer tool with more to say.
 on_removed_key: error
 on_added_key: warning
 
 rules:
   # ---------------------------------------------------------------------------------
-  # The checks that actually matter for this ETL: the demo release is fixed, so any
-  # movement in volume is an ETL change and should be looked at.
+  # Errors: the semantic content of the cohort. With the input pinned, none of this can
+  # move unless the ETL changed.
   # ---------------------------------------------------------------------------------
-  - path: counts.n_subjects
+
+  # Volumes and the quality counters (`counts.quality.*` should sit at zero).
+  - path: counts.**
     kind: exact
     on_change: error
 
-  - path: counts.n_measurements
+  # The code vocabulary changed iff a digest changed.
+  - path: codes.digests.**
     kind: exact
     on_change: error
 
-  - path: counts.n_events
+  # Metadata coverage: how many codes carry a description or parent codes, and how many
+  # observed codes have no metadata row at all. This is the number the 0.7 metadata work
+  # moved, so it is precisely what this check exists to notice.
+  - path: code_metadata.n_codes
     kind: exact
     on_change: error
-
-  - path: counts.n_unique_codes
-    kind: exact
-    on_change: error
-
-  # Should never leave zero regardless of what the ETL does.
-  - path: counts.quality.**
-    kind: absolute
-    error: 0
 
   - path: code_metadata.n_data_codes_missing_from_metadata
-    kind: absolute
-    error: 0
+    kind: exact
+    on_change: error
 
-  # The code set changed iff this digest changed.
-  - path: codes.digests.alphabetical
+  - path: code_metadata.n_with_description
+    kind: exact
+    on_change: error
+
+  - path: code_metadata.n_with_parent_codes
+    kind: exact
+    on_change: error
+
+  # Split assignment is deterministic given the pinned input and the configured seed.
+  - path: splits.**
+    kind: exact
+    on_change: error
+
+  # Two columns disagreeing on dtype across shards is a defect at any count.
+  - path: layout.column_dtype_conflicts
     kind: exact
     on_change: error
 
   # ---------------------------------------------------------------------------------
-  # Ignored: volatile provenance that moves on every run or every commit.
+  # Warnings: real signal, but driven by things other than this repo's config.
   # ---------------------------------------------------------------------------------
+
+  # Byte-level digests move whenever parquet encoding does -- writer version, compression,
+  # row-group boundaries -- which a dependency bump can do without any ETL change. Worth
+  # seeing, not worth blocking.
+  - path: dataset_digest.**
+    kind: exact
+    on_change: warning
+
+  # Column lists are compared positionally upstream, so one added column fans out into
+  # ~20 findings that all say the same thing:
+  #   Medical-Event-Data-Standard/meds_summary_stats#6
+  # Kept as warnings until that is fixed; a removed key still errors via `on_removed_key`.
+  - path: layout.extra_data_columns.**
+    kind: exact
+    on_change: warning
+
+  # ---------------------------------------------------------------------------------
+  # Ignored: volatile by construction, so a rule here would fire on every single run and
+  # teach readers that findings are noise.
+  # ---------------------------------------------------------------------------------
+
+  # `metadata/dataset.json` embeds `created_at` and the git-derived ETL version, so its
+  # digest -- and the metadata-wide digest covering it -- differ between two runs over
+  # byte-identical input. Verified by running the demo extraction twice.
+  - path: dataset_digest.by_file.metadata/dataset\.json
+    kind: ignore
+
+  - path: dataset_digest.dataset_metadata
+    kind: ignore
+
   - path: dataset.etl_version
     kind: ignore
 
@@ -66,18 +113,3 @@ rules:
 
   - path: dataset.location_uri
     kind: ignore
-
-  # Byte-level digests move whenever parquet encoding does (writer version, compression,
-  # row-group boundaries), which is not an ETL regression. Left as warnings so a change is
-  # still visible in the report.
-  - path: dataset_digest.**
-    kind: exact
-    on_change: warning
-
-  # Column lists are currently compared positionally upstream, so a single added column
-  # fans out into ~20 findings that all say the same thing:
-  #   Medical-Event-Data-Standard/meds_summary_stats#6
-  # Kept as warnings until that is fixed; `layout.**` removals still surface.
-  - path: layout.extra_data_columns.**
-    kind: exact
-    on_change: warning

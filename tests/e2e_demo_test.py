@@ -8,7 +8,11 @@ behind. Driving it through the registered name rather than a path is deliberate:
 this test cover the registration too.
 
 Whether the *contents* of that cohort have changed is a separate question, answered by the
-summary-stats regression check in `.github/workflows/demo-regression.yaml`.
+summary-stats regression check. That check runs against the cohort *this* test builds
+rather than building its own: the extraction downloads from PhysioNet and takes minutes, so
+CI does it exactly once, on one Python version, and both checks read the result. Setting
+`MEDS_DEMO_OUTPUT_DIR` is how CI asks for the cohort to be left behind; unset (the local
+default) it goes to a temporary directory and is cleaned up.
 """
 
 import json
@@ -16,6 +20,7 @@ import os
 import subprocess
 import sys
 import sysconfig
+from contextlib import nullcontext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -23,6 +28,9 @@ SPEC = "MIMIC-IV"
 
 #: The demo release the spec pins, as it appears in `dataset_version`'s `<release>:<pkg>` stamp.
 DEMO_RELEASE = "2.2"
+
+#: Set by CI to a path that outlives the test, so the summary-stats step can read the cohort.
+OUTPUT_DIR_ENV_VAR = "MEDS_DEMO_OUTPUT_DIR"
 
 
 def test_e2e_demo():
@@ -36,8 +44,15 @@ def test_e2e_demo():
     assert runner.exists(), f"meds-extract-run is not installed in this environment ({sys.executable})."
     env = os.environ | {"PATH": f"{scripts}{os.pathsep}{os.environ.get('PATH', '')}"}
 
-    with TemporaryDirectory() as temp_dir:
+    preset = os.environ.get(OUTPUT_DIR_ENV_VAR)
+    # `nullcontext` rather than a temp dir when CI has named the destination: the cohort must
+    # survive the test for the summary-stats step to read it.
+    with TemporaryDirectory() if preset is None else nullcontext(preset) as temp_dir:
         out = Path(temp_dir) / "MEDS_cohort"
+        # No overwrite flag: CI retries this test on transient PhysioNet errors, and a retry
+        # re-entering a partly-filled directory is exactly the resumable case the runner
+        # already handles — the downloader skips files it can verify and the pipeline skips
+        # stages whose outputs exist.
         command = [str(runner), f"spec={SPEC}", f"output_dir={out.resolve()!s}", "dataset_key=demo"]
 
         # Captured rather than streamed so a failure's message carries the child's stderr:
