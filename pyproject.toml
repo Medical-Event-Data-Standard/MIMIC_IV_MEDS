@@ -52,21 +52,15 @@ dev = [
     "pytest~=9.0",
     "pytest-rerunfailures==16.1",
     "shfmt-py==3.12.0.2",
-    # The test suite reads the shipped MESSY config as raw OmegaConf. It arrives through
-    # `meds-extract` too, but the tests import it by name, so it is declared here.
-    "omegaconf~=2.3",
 ]
 
 [tool.setuptools_scm]
 
-# Parallelism is a property of the *pipeline run*, not of this config package: the
-# launchers live in MEDS-transforms, and are selected via a `parallelize:` block in the
-# pipeline config (see "Parallel and multi-node runs" in the README). These extras just
-# forward to MEDS-transforms' own launcher extras so `pip install MIMIC_IV_MEDS[...]`
-# keeps working as the way to get them.
-[project.optional-dependencies]
-local_parallelism = ["meds-transforms[local-parallelism]"]
-slurm_parallelism = ["meds-transforms[slurm-parallelism]"]
+# No launcher extras. Parallelism is a property of the *pipeline run*, not of this config
+# package: the launchers live in MEDS-transforms, two levels down the dependency chain, and
+# are selected via a `parallelize:` block in the pipeline config. Re-exporting them here
+# would only add indirection over `pip install 'meds-transforms[local-parallelism]'`, which
+# is what the README tells you to run (see "Parallel and multi-node runs").
 
 # Registers this dataset with `meds-extract-run`, pointing directly at the bundled MESSY
 # config: `meds-extract-run spec=MIMIC-IV ...` resolves the name through this group to

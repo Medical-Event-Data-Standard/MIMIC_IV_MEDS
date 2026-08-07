@@ -58,15 +58,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cloudpickle"
-version = "3.1.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/27/fb/576f067976d320f5f0114a8d9fa1215425441bb35627b1993e5afd8111e5/cloudpickle-3.1.2.tar.gz", hash = "sha256:7fda9eb655c9c230dab534f1983763de5835249750e85fbcef43aaa30a9a2414", size = 22330, upload-time = "2025-11-03T09:25:26.604Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/39/799be3f2f0f38cc727ee3b4f1445fe6d5e4133064ec2e4115069418a5bb6/cloudpickle-3.1.2-py3-none-any.whl", hash = "sha256:9acb47f6afd73f60dc1df93bb801b472f05ff42fa6c84167d25cb206be1fbf4a", size = 22228, upload-time = "2025-11-03T09:25:25.534Z" },
-]
-
-[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -183,32 +174,6 @@ wheels = [
 ]
 
 [[package]]
-name = "hydra-joblib-launcher"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "hydra-core" },
-    { name = "joblib" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d0/94/6d81cd0858295b6efaa420624f120a594a90e54f36b165de8b47b62e0f76/hydra-joblib-launcher-1.2.0.tar.gz", hash = "sha256:b4dc8b990221a0df048c094954356c6532585557e708e8198c46a877b379a6d5", size = 4647, upload-time = "2022-05-17T22:18:42.076Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/50/40613fdf65f9227bc0b073c1ee9db2e2298f7b6cd248e8b4825eedc292eb/hydra_joblib_launcher-1.2.0-py3-none-any.whl", hash = "sha256:57bfd042b015056157297de93e8ec1c6bc75fd39bd3b300e1599db0c5d992eee", size = 5203, upload-time = "2022-05-17T22:18:40.304Z" },
-]
-
-[[package]]
-name = "hydra-submitit-launcher"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "hydra-core" },
-    { name = "submitit" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4f/93/8f19eba16318fe79f17ae5a86ed4efc9641c33151f67a0f172fbd15ddd41/hydra-submitit-launcher-1.2.0.tar.gz", hash = "sha256:e14c8eb46d020fac60ba25f82bcc368dc55851d2683dc95c88631ffcf15e4a34", size = 4875, upload-time = "2022-05-17T22:19:47.548Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/9b/0ea17f1780004c52f83566b5ca78a0844c93f5abdbbf625e40962af1ffcc/hydra_submitit_launcher-1.2.0-py3-none-any.whl", hash = "sha256:51ce468fbc91211c3a46677eefde94bbb9f721c9545af0be6dd0a95658515613", size = 5207, upload-time = "2022-05-17T22:19:45.664Z" },
-]
-
-[[package]]
 name = "identify"
 version = "2.6.18"
 source = { registry = "https://pypi.org/simple" }
@@ -233,15 +198,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc35312d08ba8bf51fdd999c576889fc2c24cb97f4f10/iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730", size = 20503, upload-time = "2025-10-18T21:55:43.219Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
-]
-
-[[package]]
-name = "joblib"
-version = "1.5.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/41/f2/d34e8b3a08a9cc79a50b2208a93dce981fe615b64d5a4d4abee421d898df/joblib-1.5.3.tar.gz", hash = "sha256:8561a3269e6801106863fd0d6d84bb737be9e7631e33aaed3fb9ce5953688da3", size = 331603, upload-time = "2025-12-15T08:41:46.427Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl", hash = "sha256:5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713", size = 309071, upload-time = "2025-12-15T08:41:44.973Z" },
 ]
 
 [[package]]
@@ -297,8 +253,8 @@ wheels = [
 
 [[package]]
 name = "meds-extract"
-version = "0.6.3.dev284+gb0826dd47"
-source = { git = "https://github.com/mmcdermott/MEDS_extract?branch=dev#b0826dd47e8aebc3dc3944169e50d0e50effa3e9" }
+version = "0.6.3.dev291+g59abdd83d"
+source = { git = "https://github.com/mmcdermott/MEDS_extract?branch=dev#59abdd83d5025031eb7c05ca86046e5817ed0633" }
 dependencies = [
     { name = "dftly" },
     { name = "hydra-core" },
@@ -358,14 +314,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4f/c0/8e21ccf0c87fcc706eca7a5249ad3148896db2b4a36e802325cc09a075f2/meds_transforms-0.7.0-py3-none-any.whl", hash = "sha256:6f4509866c1da26cf9f952a45c4545a8fc27c9876f2391217b852b3ee7351609", size = 232448, upload-time = "2026-08-05T18:51:08.09Z" },
 ]
 
-[package.optional-dependencies]
-local-parallelism = [
-    { name = "hydra-joblib-launcher" },
-]
-slurm-parallelism = [
-    { name = "hydra-submitit-launcher" },
-]
-
 [[package]]
 name = "mimic-iv-meds"
 source = { editable = "." }
@@ -373,17 +321,8 @@ dependencies = [
     { name = "meds-extract", extra = ["download"] },
 ]
 
-[package.optional-dependencies]
-local-parallelism = [
-    { name = "meds-transforms", extra = ["local-parallelism"] },
-]
-slurm-parallelism = [
-    { name = "meds-transforms", extra = ["slurm-parallelism"] },
-]
-
 [package.dev-dependencies]
 dev = [
-    { name = "omegaconf" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-rerunfailures" },
@@ -392,16 +331,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "meds-extract", extras = ["download"], git = "https://github.com/mmcdermott/MEDS_extract?branch=dev" },
-    { name = "meds-transforms", extras = ["local-parallelism"], marker = "extra == 'local-parallelism'" },
-    { name = "meds-transforms", extras = ["slurm-parallelism"], marker = "extra == 'slurm-parallelism'" },
-]
-provides-extras = ["local-parallelism", "slurm-parallelism"]
+requires-dist = [{ name = "meds-extract", extras = ["download"], git = "https://github.com/mmcdermott/MEDS_extract?branch=dev" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "omegaconf", specifier = "~=2.3" },
     { name = "pre-commit", specifier = "~=3.8" },
     { name = "pytest", specifier = "~=9.0" },
     { name = "pytest-rerunfailures", specifier = "==16.1" },
@@ -857,19 +790,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
-]
-
-[[package]]
-name = "submitit"
-version = "1.5.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cloudpickle" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/47/86/497018fb3b74e71bef45df82762b176e6b3d159f29941c20d2f141ec4096/submitit-1.5.4.tar.gz", hash = "sha256:7100848bd1cdda79c7196e54ee830793ae75fd7adde0c5bef738d72360a07508", size = 81538, upload-time = "2025-12-17T19:20:03.396Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ea/bb/711e1c2ebd18a21202c972dd5d5c8e09a921f2d3560e3a53d6350c808ab7/submitit-1.5.4-py3-none-any.whl", hash = "sha256:c26f3a7c8d4150eaf70b1da71e2023e9e9936c93e8342ed7db910f29158561c5", size = 76043, upload-time = "2025-12-17T19:20:01.941Z" },
 ]
 
 [[package]]

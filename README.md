@@ -74,7 +74,8 @@ syntax.
 step yourself with a `parallelize:` block, using the config the runner writes out:
 
 ```bash
-pip install 'MIMIC_IV_MEDS[local_parallelism]' # or [slurm_parallelism]
+# The launchers live in MEDS-transforms; install the extra you need directly.
+pip install 'meds-transforms[local-parallelism]' # or [slurm-parallelism]
 
 # The runner writes the pipeline config it is about to use, then runs it. Interrupt it
 # after the "Wrote synthesized pipeline config" line if you don't want the serial run.
