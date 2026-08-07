@@ -68,6 +68,68 @@ Everything the pipeline does is therefore inspectable — and modifiable — in 
 see [MEDS-Extract's documentation](https://github.com/mmcdermott/MEDS_extract) for the
 syntax.
 
+## What goes in the code, and what doesn't
+
+MIMIC carries a lot of columns that are neither the measurement nor metadata about it. Where
+each one lands is a modelling decision, so the reasoning is recorded here rather than in the
+config. All figures are from the full 3.1 release.
+
+### Demographics
+
+`insurance`, `language`, `marital_status` and `race` are properties of the subject, not
+annotations on the admission, so they are emitted as their own events (`INSURANCE//…`,
+`LANGUAGE//…`, `MARITAL_STATUS//…`, `RACE//…`) rather than carried as extension columns. MIMIC
+records no separate timestamp for them, so they are co-timed with the admission.
+
+Their nulls are **not** coalesced to `UNK`. A null code component drops the row under 0.7, so a
+missing demographic produces no event — which is the honest encoding, and avoids minting a
+`RACE//UNK` code that would read as an observed category. Null rates: insurance 1.71%, language
+0.14%, marital_status 2.49%, race 0%.
+
+### DRG
+
+**`drg_type: HCFA` means MS-DRG**, not the legacy CMS-DRG the name suggests. 302 distinct HCFA
+codes fall above 579, inside the MS-DRG-only numbering space (MS-DRG replaced CMS-DRG in FY2008;
+MIMIC-IV spans 2008–2022). `APR` is Solventum's proprietary APR-DRG. Both are genuine external
+classifications, so each code carries the bare identifier as a parent — `MS-DRG/003`,
+`APR-DRG/047` — via a `_self` metadata block.
+
+**`description` is not part of the code.** It is not a function of the code: 87.8% of HCFA
+`(drg_type, drg_code)` pairs carry more than one description, up to five, and the variants are
+spelling differences for the same DRG — `W MCC` vs `WITH MCC`, `&` vs `AND`, some truncated
+near 72 characters. Rendering it into the code split single DRGs across several MEDS codes and
+inflated the HCFA vocabulary **1.98×** (1,557 codes for 787 real DRGs). It rides in `text_value`
+instead, which keeps the string without letting MIMIC's spelling changes fragment the
+vocabulary.
+
+**`drg_severity` and `drg_mortality` stay extension columns.** They are the APR-DRG severity-of-
+illness and risk-of-mortality subclasses, computed by the grouper from the coded diagnoses —
+external model output, not something observed on the patient — so they are not MEDS
+measurements. They remain available for cohort selection. They are not redundant either: 278 of
+300 APR codes span all four severity levels, and knowing severity still leaves 66% of
+mortality's own entropy. Both are APR-only, hence null on every HCFA row.
+
+Note that the DRG code is itself grouper-assigned. What distinguishes it is that the DRG is an
+administrative fact with consequences — it is what was billed — whereas the subclasses are
+gradations attached to that assignment.
+
+### Order modifiers
+
+`priority` (`ROUTINE` / `STAT`) joins the `LAB//*` codes: it is a categorical modifier of the
+order and belongs in the identity of what was measured. It is coalesced, being 4.8% null.
+
+`route` and `frequency` on `hosp/pharmacy` were considered for the same treatment and
+**deliberately left as extension columns**. Adding them takes `MEDICATION//START` from 22,539 to
+125,381 codes — **5.56×**, with 56,248 singleton codes — and `frequency` alone accounts for
+4.53× of that across 177 values. That fragments the medication vocabulary far more than it
+sharpens it.
+
+`icu/inputevents` is untouched for related reasons: `ordercategorydescription` (5 values) and
+`statusdescription` (6 values) are closed enums rather than text, they cannot both occupy the
+single `text_value` slot on `input_end` (100% of rows carry both), and `rateuom` is 44.7% null
+so promoting it would stamp `UNK` into half of all `INFUSION_START` codes. See
+[#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15).
+
 ## Parallel and multi-node runs
 
 `meds-extract-run` runs the pipeline's stages serially. To parallelize, run the pipeline

@@ -37,10 +37,24 @@ hosp/admissions:
   admission:
     code: f"HOSPITAL_ADMISSION//{$admission_type}//{$admission_location ?? 'UNK'}"
     time: '$admittime::"%Y-%m-%d %H:%M:%S"'
-    insurance: $insurance
-    language: $language
-    marital_status: $marital_status
-    race: $race
+    hadm_id: $hadm_id
+  # Nulls are deliberately not coalesced here: a missing demographic should produce no event
+  # rather than an `INSURANCE//UNK` code. See "Demographics" in the README.
+  insurance:
+    code: f"INSURANCE//{$insurance}"
+    time: '$admittime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+  language:
+    code: f"LANGUAGE//{$language}"
+    time: '$admittime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+  marital_status:
+    code: f"MARITAL_STATUS//{$marital_status}"
+    time: '$admittime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+  race:
+    code: f"RACE//{$race}"
+    time: '$admittime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
   discharge:
     code: f"HOSPITAL_DISCHARGE//{$discharge_location ?? 'UNK'}"
@@ -85,11 +99,19 @@ hosp/drgcodes:
         key: hadm_id
         cols: [dischtime]
   drg:
-    code: f"DRG//{$drg_type}//{$drg_code}//{$description ?? 'UNK'}"
+    code: f"DRG//{$drg_type}//{$drg_code}"
     hadm_id: $hadm_id
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    text_value: $description
     drg_severity: $drg_severity
     drg_mortality: $drg_mortality
+    _metadata:
+      _self:
+        # `drg_code` is an Int64, so the canonical zero padding is gone: DRG 3 must render as
+        # `003`. dftly has no format specifiers and `len_chars` rejects an integer, hence the
+        # prefix-and-slice. `HCFA` denotes MS-DRG; see "DRG" in the README.
+        parent_codes: >-
+          f"{'MS-DRG' if $drg_type == 'HCFA' else 'APR-DRG'}/{f'000{$drg_code}'[-3:]}"
 
 hosp/emar:
   _table:
@@ -160,10 +182,9 @@ hosp/hcpcsevents:
 
 hosp/labevents:
   lab_specimen_collected:
-    code: 'f"LAB//SPECIMEN_COLLECTED//{$itemid}"'
+    code: 'f"LAB//SPECIMEN_COLLECTED//{$itemid}//{$priority ?? ''UNK''}"'
     hadm_id: $hadm_id
     time: '$charttime::"%Y-%m-%d %H:%M:%S"'
-    priority: $priority
     _metadata:
       d_labitems_to_loinc:
         # The join key is sourced from the differently-named raw column via the dftly
@@ -173,12 +194,11 @@ hosp/labevents:
         description: coalesce($omop_concept_name, $label)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   lab_result:
-    code: f"LAB//RESULT//{$itemid}//{$valueuom ?? 'UNK'}"
+    code: f"LAB//RESULT//{$itemid}//{$valueuom ?? 'UNK'}//{$priority ?? 'UNK'}"
     hadm_id: $hadm_id
     time: '$storetime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $valuenum
     text_value: $value
-    priority: $priority
     _metadata:
       d_labitems_to_loinc:
         itemid:

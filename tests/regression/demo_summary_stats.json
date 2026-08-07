@@ -1,26 +1,34 @@
 {
   "code_metadata": {
     "description_length": {
-      "mean": 35.7095,
-      "n": 4734,
+      "mean": 36.8127,
+      "n": 5360,
       "quantiles": {
         "p1": 4.0,
-        "p25": 19.0,
-        "p5": 8.65,
-        "p50": 30.0,
-        "p75": 48.0,
-        "p95": 80.0,
-        "p99": 112.0
+        "p25": 20.0,
+        "p5": 8.0,
+        "p50": 33.0,
+        "p75": 49.25,
+        "p95": 79.0,
+        "p99": 110.0
       },
-      "std": 23.6635
+      "std": 23.1921
     },
-    "n_codes": 9932,
+    "n_codes": 10580,
     "n_data_codes_missing_from_metadata": 0,
     "n_metadata_codes_absent_from_data": 0,
-    "n_with_description": 4734,
-    "n_with_parent_codes": 7373,
+    "n_with_description": 5360,
+    "n_with_parent_codes": 8208,
     "ontology": {
       "by_vocabulary": {
+        "APR-DRG": {
+          "keys_digest": "sha256:351f10257c5bfb811d245a14f0a51354761a5f5abb5c463270dbb6b28a7f23ae",
+          "n_child_codes": 110,
+          "n_distinct_keys": 110,
+          "n_measurements": 221,
+          "n_subjects": 98,
+          "recognized": false
+        },
         "ICD10CM": {
           "keys_digest": "sha256:13164fed20c59cd59b80f7c9c688626dfbfe64fb3cf00a2f75daf295aed3373b",
           "n_child_codes": 734,
@@ -55,7 +63,7 @@
         },
         "LOINC": {
           "keys_digest": "sha256:7e1025301545708e6a2084baa4f6c9d157fb51025441675ae468e9fa5c749d06",
-          "n_child_codes": 1135,
+          "n_child_codes": 1712,
           "n_distinct_keys": 540,
           "n_measurements": 424219,
           "n_subjects": 100,
@@ -65,6 +73,14 @@
             "std": 1311.38
           },
           "recognized": true
+        },
+        "MS-DRG": {
+          "keys_digest": "sha256:1b2837a140cff56ca637d79e3dd3003179038255905b3991dfff237416284d4d",
+          "n_child_codes": 148,
+          "n_distinct_keys": 148,
+          "n_measurements": 233,
+          "n_subjects": 100,
+          "recognized": false
         },
         "NDC": {
           "keys_digest": "sha256:7eaaa3e4e6d64a3136a555e6bb216158c7d448bb83669f8442bff6079b0de2cd",
@@ -102,77 +118,77 @@
         }
       },
       "coverage": {
-        "frac_measurements_mapped": 0.514065,
-        "frac_observed_codes_with_parents": 0.742348,
-        "n_measurements_mapped": 526320,
-        "n_measurements_unmapped": 497519,
-        "n_observed_codes": 9932,
-        "n_observed_codes_with_parents": 7373,
-        "n_observed_codes_without_parents": 2559
+        "frac_measurements_mapped": 0.513962,
+        "frac_observed_codes_with_parents": 0.775803,
+        "n_measurements_mapped": 526774,
+        "n_measurements_unmapped": 498153,
+        "n_observed_codes": 10580,
+        "n_observed_codes_with_parents": 8208,
+        "n_observed_codes_without_parents": 2372
       },
       "n_codes_in_multiple_vocabularies": 0,
-      "n_codes_with_parents": 7373,
-      "n_distinct_parents": 3748,
-      "n_parent_links": 7395,
+      "n_codes_with_parents": 8208,
+      "n_distinct_parents": 4006,
+      "n_parent_links": 8230,
       "n_parents_without_vocabulary": 0,
-      "n_vocabularies": 8,
+      "n_vocabularies": 10,
       "n_vocabularies_recognized": 8,
       "parents_per_code": {
-        "mean": 0.744563,
-        "n": 9932,
+        "mean": 0.777883,
+        "n": 10580,
         "quantiles": {
           "p1": 0.0,
-          "p25": 0.0,
+          "p25": 1.0,
           "p5": 0.0,
           "p50": 1.0,
           "p75": 1.0,
           "p95": 1.0,
           "p99": 1.0
         },
-        "std": 0.441179
+        "std": 0.420662
       },
       "present": true,
       "vocabularies_per_code": {
-        "mean": 0.742348,
-        "n": 9932,
+        "mean": 0.775803,
+        "n": 10580,
         "quantiles": {
           "p1": 0.0,
-          "p25": 0.0,
+          "p25": 1.0,
           "p5": 0.0,
           "p50": 1.0,
           "p75": 1.0,
           "p95": 1.0,
           "p99": 1.0
         },
-        "std": 0.437363
+        "std": 0.417072
       }
     },
     "present": true,
-    "vocabulary_digest": "sha256:08518dd479f1f29a7a61e86d75a9517a3e3f74b82cdcf9542c5ae0eb959f9d38"
+    "vocabulary_digest": "sha256:58f35951036a43f45c528247e8a6e1a2ba18fbcb7440b35cc87738555faf77a7"
   },
   "codes": {
     "concentration": {
-      "frac_measurements_in_top_10": 0.118245,
-      "frac_measurements_in_top_100": 0.405875,
-      "frac_measurements_in_top_1000": 0.91291,
-      "n_codes_covering_50pct": 147,
-      "n_codes_covering_90pct": 885,
-      "n_codes_covering_99pct": 4295
+      "frac_measurements_in_top_10": 0.11812,
+      "frac_measurements_in_top_100": 0.380437,
+      "frac_measurements_in_top_1000": 0.894727,
+      "n_codes_covering_50pct": 174,
+      "n_codes_covering_90pct": 1046,
+      "n_codes_covering_99pct": 4752
     },
     "digests": {
-      "alphabetical": "sha256:08518dd479f1f29a7a61e86d75a9517a3e3f74b82cdcf9542c5ae0eb959f9d38",
-      "by_measurement_frequency": "sha256:76198546f1452a367e132d67cbcea0ae60e5e1bfea53b4564885ff3ff81f063d",
-      "by_subject_frequency": "sha256:28aba787fed3bfb775c45efcb5ab1c89f4f7050a1a73ffdd395a792cb937cdf6",
+      "alphabetical": "sha256:58f35951036a43f45c528247e8a6e1a2ba18fbcb7440b35cc87738555faf77a7",
+      "by_measurement_frequency": "sha256:9a1f4452307bf36e6b74eb38b7a1a3858446ca175ede195c57ba09ddf758a166",
+      "by_subject_frequency": "sha256:3e017abc15454afebc3cf948d6c361b51b6aabc2350ae50aa331174e7d86a404",
       "numeric_moments": {
-        "digest": "sha256:c53316893a4bcaadfa44d9333babddcfc3faedebc46f7aabca7519e623c568a1",
-        "n_codes": 388
+        "digest": "sha256:768d34252328e96de5638916294f6adb40ec89ad91372587862b0a9551ed9cff",
+        "n_codes": 440
       },
       "thresholded": {
         "100": {
-          "alphabetical": "sha256:e824427af180a7de0737996afbe99a498fe0854095658ab7472c659a45519dcd",
-          "by_measurement_frequency": "sha256:681b7cc2d07be07847fc278a2cee9423a37a21f651c26fd87c6ebe16b635678a",
-          "by_subject_frequency": "sha256:e824427af180a7de0737996afbe99a498fe0854095658ab7472c659a45519dcd",
-          "n_codes": 93
+          "alphabetical": "sha256:ab30b7321c3f5fdf11bd190ad32a32e805adfc5b5666970468c7124a36379d85",
+          "by_measurement_frequency": "sha256:9e426357e395433af4923a8330c3cb0e06939b9d16ec1b11117ff21ebb131985",
+          "by_subject_frequency": "sha256:ab30b7321c3f5fdf11bd190ad32a32e805adfc5b5666970468c7124a36379d85",
+          "n_codes": 48
         },
         "1000": {
           "alphabetical": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -181,43 +197,43 @@
           "n_codes": 0
         },
         "20": {
-          "alphabetical": "sha256:45099ab573261950d85b113a23350a9cc5608ae110a6208e06f54a5c34f97a1d",
-          "by_measurement_frequency": "sha256:b914743f66fc511a4fce72097f8d2b75242987fee6d26b404ec44dc3e4b4a4dd",
-          "by_subject_frequency": "sha256:27968a21f1e1e33b0bd2a4e53c9add3595d53a3f1026827fc5b056fed96ee983",
-          "n_codes": 1056
+          "alphabetical": "sha256:10382724b8630fc9d48a49714eb09e4db94ceb45db0364ee61eedb6efc787b93",
+          "by_measurement_frequency": "sha256:4373b57470cc071e725ec397736acb219ae3ca5e3fe015c1c776dd5ef6c2b5a1",
+          "by_subject_frequency": "sha256:9636741112231d0d14d04408c7730d622a7340265ec0cd223888766077f61c7b",
+          "n_codes": 1198
         }
       }
     },
-    "n_codes_below_min_cell_size": 8876,
-    "n_unique_codes": 9932,
+    "n_codes_below_min_cell_size": 9382,
+    "n_unique_codes": 10580,
     "occurrence": {
       "n_measurements": {
-        "mean": 103.085,
-        "n": 9932,
+        "mean": 96.874,
+        "n": 10580,
         "quantiles": {
           "p1": 1.0,
           "p25": 1.0,
           "p5": 1.0,
-          "p50": 3.0,
-          "p75": 17.0,
-          "p95": 402.0,
-          "p99": 2376.69
+          "p50": 4.0,
+          "p75": 18.0,
+          "p95": 425.0,
+          "p99": 1846.84
         },
-        "std": 558.312
+        "std": 525.573
       },
       "n_subjects": {
-        "mean": 8.34948,
-        "n": 9932,
+        "mean": 8.70832,
+        "n": 10580,
         "quantiles": {
           "p1": 1.0,
           "p25": 1.0,
           "p5": 1.0,
           "p50": 2.0,
           "p75": 5.0,
-          "p95": 48.0,
-          "p99": 99.0
+          "p95": 53.0,
+          "p99": 98.0
         },
-        "std": 18.0937
+        "std": 18.4693
       }
     }
   },
@@ -246,13 +262,13 @@
   },
   "counts": {
     "n_events": 96949,
-    "n_measurements": 1023839,
+    "n_measurements": 1024927,
     "n_static_measurements": 100,
     "n_subjects": 100,
     "n_subjects_with_birth": 100,
     "n_subjects_with_death": 31,
     "n_subjects_with_static": 100,
-    "n_unique_codes": 9932,
+    "n_unique_codes": 10580,
     "numeric": {
       "mean": 80.5556,
       "n_finite": 405331,
@@ -270,9 +286,9 @@
     }
   },
   "dataset": {
-    "created_at": "2026-08-07T16:11:55.909092+00:00",
+    "created_at": "2026-08-07T21:41:24.042649+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.1.1.dev46+g909d60791",
+    "dataset_version": "2.2:0.1.1.dev47+g4018eceec.d20260807",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.0",
     "meds_version": "0.4.1",
@@ -280,25 +296,25 @@
   },
   "dataset_digest": {
     "by_file": {
-      "data/held_out/0.parquet": "sha256:39fcc1c854783b0f088344e974f82f1c21ad5c0a90f37c8505e932b94031d5c7",
-      "data/train/0.parquet": "sha256:fb08073d8769f757fc546d192833e994d954055ce4a40255791bc1f246a67a9b",
-      "data/tuning/0.parquet": "sha256:f49c5f43c0a9145151608a6cceccb2f4c34f272094ec931c89427b864d305c25",
-      "metadata/codes.parquet": "sha256:6a48b764114203065a72369ca270012dccdf5ab26d5d8267053ae136258a6f58",
-      "metadata/dataset.json": "sha256:9b829ee326f5263fe5503f359f49a318fcebc2aa22acf9f26825ee881496e7d3",
+      "data/held_out/0.parquet": "sha256:6e44e72c57c8fbdfaf96551fd29eb8884973e0f73e5254e58879c0a8b4952427",
+      "data/train/0.parquet": "sha256:79fbe6545148bcbc515847ee52ffdccfe9d470ec2ca28de5eeba5b95e5185975",
+      "data/tuning/0.parquet": "sha256:40a743df4a934a3a62820400f63060f6a58c884fd0bed5cc9ce180a2a988b1ce",
+      "metadata/codes.parquet": "sha256:710a1cb2c54bb2423643417277cacf1025a06542559507a777ddae187a39e359",
+      "metadata/dataset.json": "sha256:68c28cd158567d465fafc14e84bb5001c69ba13e99a40beb1d310609d8d7a819",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
-    "code_metadata": "sha256:93718eea9a5fcff85220b48f98c1c0cf1b5648dec742c827cf0c04724655b5cf",
-    "combined": "sha256:cba50f43e3175717c890bf980dce570151ef92c15660475ef612bbdb3946f9de",
+    "code_metadata": "sha256:2df75cc21c6e3ca40547d61830df1851e25001ba7dcacee528fe1d872224ee5a",
+    "combined": "sha256:cb562b28ad324b0332bc26efd50ab0422f2a9941e78c80a7ba921ef3f5d6518b",
     "data": {
-      "digest": "sha256:921a1301df5b94a917291d662c746bd34efbea75b1f5b2037a3bac95b2312c2b",
+      "digest": "sha256:1e76e7a2f634029d4c50be5859b2736e8af610bc56facbb01a579800674be9bc",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:822759c93ee43f2fb3f442fdbe665e8bc2a5c0e573645020e6d4ab15232b575e",
+    "dataset_metadata": "sha256:48daef6ea7e9950de1c94e8021d617b1ab85906eee4daac1279e097994349764",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-08-07T16:12:07.773121",
+  "extracted_at": "2026-08-07T21:41:38.606909",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
@@ -318,16 +334,11 @@
       "frequency": 3,
       "hadm_id": 3,
       "icustay_id": 3,
-      "insurance": 3,
-      "language": 3,
       "link_order_id": 3,
-      "marital_status": 3,
       "numeric_value": 3,
       "order_id": 3,
       "ordercategorydescription": 3,
       "poe_id": 3,
-      "priority": 3,
-      "race": 3,
       "route": 3,
       "source_block": 3,
       "statusdescription": 3,
@@ -346,16 +357,11 @@
       "frequency": "String",
       "hadm_id": "Int64",
       "icustay_id": "Int64",
-      "insurance": "String",
-      "language": "String",
       "link_order_id": "Int64",
-      "marital_status": "String",
       "numeric_value": "Float32",
       "order_id": "Int64",
       "ordercategorydescription": "String",
       "poe_id": "String",
-      "priority": "String",
-      "race": "String",
       "route": "String",
       "source_block": "String",
       "statusdescription": "String",
@@ -373,15 +379,10 @@
       "frequency",
       "hadm_id",
       "icustay_id",
-      "insurance",
-      "language",
       "link_order_id",
-      "marital_status",
       "order_id",
       "ordercategorydescription",
       "poe_id",
-      "priority",
-      "race",
       "route",
       "source_block",
       "statusdescription",
@@ -417,32 +418,32 @@
       "std": 1097.27
     },
     "n_measurements": {
-      "mean": 10238.4,
+      "mean": 10249.3,
       "n": 100,
       "quantiles": {
-        "p1": 1101.63,
-        "p25": 2680.0,
-        "p5": 1333.85,
-        "p50": 4704.5,
-        "p75": 11251.2,
-        "p95": 38757.2,
-        "p99": 49125.4
+        "p1": 1109.59,
+        "p25": 2687.5,
+        "p5": 1337.85,
+        "p50": 4712.5,
+        "p75": 11297.2,
+        "p95": 38785.0,
+        "p99": 49165.3
       },
-      "std": 12199.3
+      "std": 12206.0
     },
     "n_unique_codes": {
-      "mean": 829.27,
+      "mean": 921.34,
       "n": 100,
       "quantiles": {
-        "p1": 375.58,
-        "p25": 549.5,
-        "p5": 428.0,
-        "p50": 757.0,
-        "p75": 936.0,
-        "p95": 1537.4,
-        "p99": 1955.92
+        "p1": 379.86,
+        "p25": 622.0,
+        "p5": 476.8,
+        "p50": 809.0,
+        "p75": 1033.0,
+        "p95": 1756.1,
+        "p99": 2190.18
       },
-      "std": 369.627
+      "std": 412.915
     },
     "span_days": {
       "mean": 23298.5,
@@ -462,11 +463,11 @@
   "splits": {
     "by_split": {
       "<suppressed>": {
-        "n_measurements": 123292,
+        "n_measurements": 123436,
         "n_splits": 2
       },
       "train": {
-        "n_measurements": 900547,
+        "n_measurements": 901491,
         "n_subjects": 80
       }
     },
@@ -479,11 +480,11 @@
   "time": {
     "by_year": {
       "<suppressed>": {
-        "n_measurements": 1023739,
+        "n_measurements": 1024827,
         "n_years": 134
       }
     },
-    "n_measurements_with_time": 1023739,
+    "n_measurements_with_time": 1024827,
     "n_years_observed": 134
   }
 }
