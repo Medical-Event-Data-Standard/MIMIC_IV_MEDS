@@ -1,339 +1,575 @@
-subject_id_col: subject_id
+# The complete MIMIC-IV MEDS ETL. This one file *is* the package: `sources:` says where
+# the raw data comes from, `etl:` supplies the handful of run knobs, and every other
+# top-level key is a raw table whose events are extracted from it. It is registered with
+# `meds-extract-run` under the name `MIMIC-IV` (see this repo's `pyproject.toml`), so the
+# whole ETL is one command:
+#
+#     meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
+#
+# NOTE: no top-level `_defaults.subject_id` is needed — the raw column is literally
+# `subject_id`, which MEDS-Extract 0.7 reads (and casts to Int64) by default.
+#
+# Null components of composite codes are coalesced to 'UNK' per component (the `??`
+# operator, dftly >= 0.5) to preserve the pre-0.7 behavior of rendering nulls as
+# "UNK" and keeping the row; under 0.7 a bare null component drops the row instead.
+
+# Reserved block, consumed only by `meds-extract-run` (stripped before event-table
+# parsing). It carries no credentials, so unlike `sources:` it is neither redacted from
+# logs nor from the config copy written into the output tree.
+etl:
+  # `meds-extract-run` defaults the dataset name to the registered entry-point name, so
+  # this is a fallback: it is what makes the spec self-describing when it is resolved by
+  # `pkg://` reference or filesystem path instead of by registered name.
+  dataset_name: MIMIC-IV
+  # Carried over from the pre-0.7 `ETL.yaml` stage block. That block's other entry,
+  # `shard_events.infer_schema_length: 999999999`, has no successor and needs none: 0.7
+  # removed the knob and always infers CSV schemas from the full file, which is exactly
+  # what the huge value was emulating.
+  n_subjects_per_shard: 1000
+
 hosp/admissions:
   ed_registration:
     code: ED_REGISTRATION
-    time: col(edregtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
+    time: '$edregtime::"%Y-%m-%d %H:%M:%S"'
   ed_out:
     code: ED_OUT
-    time: col(edouttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
+    time: '$edouttime::"%Y-%m-%d %H:%M:%S"'
   admission:
-    code:
-      - HOSPITAL_ADMISSION
-      - col(admission_type)
-      - col(admission_location)
-    time: col(admittime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    insurance: insurance
-    language: language
-    marital_status: marital_status
-    race: race
-    hadm_id: hadm_id
+    code: f"HOSPITAL_ADMISSION//{$admission_type}//{$admission_location ?? 'UNK'}"
+    time: '$admittime::"%Y-%m-%d %H:%M:%S"'
+    insurance: $insurance
+    language: $language
+    marital_status: $marital_status
+    race: $race
+    hadm_id: $hadm_id
   discharge:
-    code:
-      - HOSPITAL_DISCHARGE
-      - col(discharge_location)
-    time: col(dischtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-  # We omit the death event here as it is joined to the data in the subjects table in the pre-MEDS step.
+    code: f"HOSPITAL_DISCHARGE//{$discharge_location ?? 'UNK'}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+  # We omit the death event here: `deathtime` is joined into hosp/patients via that
+  # table's aggregated `_table.join`, and the death event is emitted there.
 
 hosp/diagnoses_icd:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
   diagnosis:
-    code:
-      - DIAGNOSIS
-      - ICD
-      - col(icd_version)
-      - col(icd_code)
-    hadm_id: hadm_id
-    time: col(hadm_discharge_time)
-    time_format: "%Y-%m-%d %H:%M:%S"
+    code: 'f"DIAGNOSIS//ICD//{$icd_version}//{$icd_code}"'
+    hadm_id: $hadm_id
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
+      # A dftly program over the raw metadata table: `icd_version`/`icd_code` name-match
+      # the code's components (join keys); `parent_codes` inlines the ICD dot
+      # normalization that previously required pre-MEDS Python (ICD-9 E-codes dot after
+      # position 4, other ICD-9 after 3, ICD-10 after 3; codes at or under the position
+      # are left undotted).
       hosp/d_icd_diagnoses:
-        description: "long_title"
-        parent_codes: "ICD{icd_version}CM/{norm_icd_code}" # Single strings are templates of columns.
+        icd_version: $icd_version
+        icd_code: $icd_code
+        description: $long_title
+        parent_codes: >-
+          f"ICD{$icd_version}CM/{$icd_code[0:4]}.{$icd_code[4:]}"
+          if $icd_version == "9" and $icd_code[0:1] == "E" and len_chars($icd_code) > 4
+          else f"ICD{$icd_version}CM/{$icd_code}"
+          if $icd_version == "9" and $icd_code[0:1] == "E"
+          else f"ICD{$icd_version}CM/{$icd_code[0:3]}.{$icd_code[3:]}"
+          if len_chars($icd_code) > 3
+          else f"ICD{$icd_version}CM/{$icd_code}"
 
 hosp/drgcodes:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
   drg:
-    code:
-      - DRG
-      - col(drg_type)
-      - col(drg_code)
-      - col(description)
-    hadm_id: hadm_id
-    time: col(hadm_discharge_time)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    drg_severity: drg_severity
-    drg_mortality: drg_mortality
+    code: f"DRG//{$drg_type}//{$drg_code}//{$description ?? 'UNK'}"
+    hadm_id: $hadm_id
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    drg_severity: $drg_severity
+    drg_mortality: $drg_mortality
 
 hosp/emar:
+  _table:
+    cols:
+      # A constant, used only as the second half of the composite join key below.
+      # MEDS-Extract materializes any `_table.cols` entry that appears in `left_on` *before*
+      # applying the join, which is what makes this work.
+      #
+      # `prescriptions` stores one order as several rows -- `drug_type` MAIN (the drug),
+      # BASE (the diluent bag, whose ndc is '0'), ADDITIVE. Joining on `pharmacy_id` alone
+      # fans out: 18.7% of pharmacy_ids carry more than one row, which would inflate the
+      # emar event count by ~15%, i.e. more medication administrations than occurred.
+      # Restricted to MAIN the key is exactly 1:1 and the join is row-preserving.
+      drug_type: "'MAIN'"
+      # Only `cols` entries named in `left_on` are materialised before the join; this one
+      # is not, so it is evaluated afterwards and sees the joined `ndc`. '0' is
+      # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
+      # it) and an unmatched join leaves it null -- both collapse to UNK.
+      ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
+    join:
+      hosp/prescriptions:
+        left_on: [pharmacy_id, drug_type]
+        right_on: [pharmacy_id, drug_type]
+        cols: [ndc]
   medication:
-    code:
-      - MEDICATION
-      - col(medication)
-      - col(event_txt)
-    time: col(charttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    emar_id: emar_id
-    emar_seq: emar_seq
+    # `ndc` is a code component because `parent_codes` lives in codes.parquet and can only
+    # be produced by a `_metadata` block, which joins on the code's own components. The drug
+    # name stays in the code, so it remains readable -- including when no NDC resolves and
+    # this segment renders 'UNK'.
+    code: f"MEDICATION//{$medication ?? 'UNK'}//{$event_txt ?? 'UNK'}//{$ndc_clean}"
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    emar_id: $emar_id
+    emar_seq: $emar_seq
+    _metadata:
+      # The NDC is emitted as the parent verbatim. MIMIC ships no RxNorm identifier, and
+      # NDC -> RxNorm needs an external vocabulary whose free subset covers only currently
+      # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
+      # users who want RxNorm can fan the NDC out themselves; what matters here is that the
+      # NDC attached is exactly the one dispensed for this order.
+      # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
+      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
+      # `extract_code_metadata` re-scan that whole table and join it against every observed
+      # code -- a full-data materialization for a column we already have.
+      _self:
+        # The conditional deliberately has no `else`: an else-less dftly conditional yields
+        # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
+        # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
+        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # code whose segment rendered 'UNK' matched no metadata row.
+        #
+        # Do not write `else null` here: dftly has no null literal, and the bare word parses
+        # as the *string* "null" (it warns, but the result is a wrong parent code).
+        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
 
 hosp/hcpcsevents:
   hcpcs:
-    code:
-      - HCPCS
-      - col(short_description)
-    hadm_id: hadm_id
-    time: col(chartdate)
-    time_format: "%Y-%m-%d"
+    code: f"HCPCS//{$short_description ?? 'UNK'}"
+    hadm_id: $hadm_id
+    time: '$chartdate::"%Y-%m-%d"'
     _metadata:
       # These are not all CPT codes, unfortunately
       hosp/d_hcpcs:
-        description: "long_description"
-        possibly_cpt_code: "code"
+        short_description: $short_description
+        description: $long_description
+        possibly_cpt_code: $code
 
 hosp/labevents:
   lab_specimen_collected:
-    code:
-      - LAB
-      - SPECIMEN_COLLECTED
-      - col(itemid)
-    hadm_id: hadm_id
-    time: col(charttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    priority: priority
+    code: 'f"LAB//SPECIMEN_COLLECTED//{$itemid}"'
+    hadm_id: $hadm_id
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    priority: $priority
     _metadata:
       d_labitems_to_loinc:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        # The join key is sourced from the differently-named raw column via the dftly
+        # dict form (the string grammar's `$name` cannot express names with spaces).
+        itemid:
+          column: itemid (omop_source_code)
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   lab_result:
-    code:
-      - LAB
-      - RESULT
-      - col(itemid)
-      - col(valueuom)
-    hadm_id: hadm_id
-    time: col(storetime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    numeric_value: valuenum
-    text_value: value
-    priority: priority
+    code: f"LAB//RESULT//{$itemid}//{$valueuom ?? 'UNK'}"
+    hadm_id: $hadm_id
+    time: '$storetime::"%Y-%m-%d %H:%M:%S"'
+    numeric_value: $valuenum
+    text_value: $value
+    priority: $priority
     _metadata:
       d_labitems_to_loinc:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-        valueuom: "valueuom"
+        itemid:
+          column: itemid (omop_source_code)
+        # `valueuom` was a second join key here. It is a component of this event's code, so
+        # producing it narrowed the match to rows whose dictionary unit equals the charted
+        # unit -- true for only 84% of (itemid, valueuom) pairs. Dropping it makes this a
+        # partial match on `itemid` alone, which is safe: `itemid (omop_source_code)` is
+        # unique in this file (1630 rows / 1630 distinct), so there is never a second
+        # candidate row that the unit would have disambiguated.
+        description: coalesce($omop_concept_name, $label)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 hosp/omr:
   omr:
-    code: col(result_name)
-    text_value: col(result_value)
-    time: col(chartdate)
-    time_format: "%Y-%m-%d"
+    code: $result_name
+    text_value: $result_value
+    time: '$chartdate::"%Y-%m-%d"'
 
 hosp/patients:
+  _table:
+    cols:
+      year_of_birth: "($anchor_year - $anchor_age)::str"
+    join:
+      # Earliest per-subject in-hospital death time, via an aggregated join
+      # (mmcdermott/MEDS_extract#65 / #98, on the 0.7 line). `min` over the fixed-width
+      # "%Y-%m-%d %H:%M:%S" strings is chronological. This replaces the last
+      # data-joining step MIMIC needed in pre-MEDS.
+      hosp/admissions:
+        key: subject_id
+        cols: { deathtime: min }
   gender:
-    code:
-      - GENDER
-      - col(gender)
+    code: 'f"GENDER//{$gender}"'
     time: null
   dob:
     code: MEDS_BIRTH # This is the MEDS official code for birth.
-    time: col(year_of_birth)
-    time_format: "%Y"
+    time: "$year_of_birth::year"
   death:
     code: MEDS_DEATH # This is the MEDS official code for death.
-    time: col(dod)
-    time_format:
-      - "%Y-%m-%d %H:%M:%S"
-      - "%Y-%m-%d"
+    # `deathtime` (precise, in-hospital, joined above) takes precedence over the raw
+    # date-only `dod`. The `::?` casts are lenient (null on format mismatch) so the two
+    # formats coalesce cleanly; rows where both are null (living subjects) are dropped
+    # by the extraction's computed-time filter.
+    time: coalesce($deathtime::?"%Y-%m-%d %H:%M:%S", $dod::?"%Y-%m-%d")
 
 hosp/pharmacy:
+  _table:
+    cols:
+      # A constant, used only as the second half of the composite join key below.
+      # MEDS-Extract materializes any `_table.cols` entry that appears in `left_on` *before*
+      # applying the join, which is what makes this work.
+      #
+      # `prescriptions` stores one order as several rows -- `drug_type` MAIN (the drug),
+      # BASE (the diluent bag, whose ndc is '0'), ADDITIVE. Joining on `pharmacy_id` alone
+      # fans out: 18.7% of pharmacy_ids carry more than one row, which would inflate the
+      # emar event count by ~15%, i.e. more medication administrations than occurred.
+      # Restricted to MAIN the key is exactly 1:1 and the join is row-preserving.
+      drug_type: "'MAIN'"
+      # Only `cols` entries named in `left_on` are materialised before the join; this one
+      # is not, so it is evaluated afterwards and sees the joined `ndc`. '0' is
+      # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
+      # it) and an unmatched join leaves it null -- both collapse to UNK.
+      ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
+    join:
+      hosp/prescriptions:
+        left_on: [pharmacy_id, drug_type]
+        right_on: [pharmacy_id, drug_type]
+        cols: [ndc]
   medication_start:
-    code:
-      - MEDICATION
-      - START
-      - col(medication)
-    time: col(starttime)
-    route: route
-    frequency: frequency
-    doses_per_24_hrs: doses_per_24_hrs
-    poe_id: poe_id
-    time_format:
-      - "%Y-%m-%d %H:%M:%S"
-      - "%Y-%m-%d"
+    code: f"MEDICATION//START//{$medication ?? 'UNK'}//{$ndc_clean}"
+    # Raw pharmacy times mix datetime and date-only formats; parse leniently with
+    # each format and take the first success (dftly >= 0.1.3; mmcdermott/dftly#46).
+    time: coalesce($starttime::?"%Y-%m-%d %H:%M:%S", $starttime::?"%Y-%m-%d")
+    route: $route
+    frequency: $frequency
+    doses_per_24_hrs: $doses_per_24_hrs
+    poe_id: $poe_id
+    _metadata:
+      # The NDC is emitted as the parent verbatim. MIMIC ships no RxNorm identifier, and
+      # NDC -> RxNorm needs an external vocabulary whose free subset covers only currently
+      # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
+      # users who want RxNorm can fan the NDC out themselves; what matters here is that the
+      # NDC attached is exactly the one dispensed for this order.
+      # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
+      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
+      # `extract_code_metadata` re-scan that whole table and join it against every observed
+      # code -- a full-data materialization for a column we already have.
+      _self:
+        # The conditional deliberately has no `else`: an else-less dftly conditional yields
+        # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
+        # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
+        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # code whose segment rendered 'UNK' matched no metadata row.
+        #
+        # Do not write `else null` here: dftly has no null literal, and the bare word parses
+        # as the *string* "null" (it warns, but the result is a wrong parent code).
+        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
   medication_stop:
-    code:
-      - MEDICATION
-      - STOP
-      - col(medication)
-    time: col(stoptime)
-    poe_id: poe_id
-    time_format:
-      - "%Y-%m-%d %H:%M:%S"
-      - "%Y-%m-%d"
+    code: f"MEDICATION//STOP//{$medication ?? 'UNK'}//{$ndc_clean}"
+    time: coalesce($stoptime::?"%Y-%m-%d %H:%M:%S", $stoptime::?"%Y-%m-%d")
+    poe_id: $poe_id
+    _metadata:
+      # The NDC is emitted as the parent verbatim. MIMIC ships no RxNorm identifier, and
+      # NDC -> RxNorm needs an external vocabulary whose free subset covers only currently
+      # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
+      # users who want RxNorm can fan the NDC out themselves; what matters here is that the
+      # NDC attached is exactly the one dispensed for this order.
+      # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
+      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
+      # `extract_code_metadata` re-scan that whole table and join it against every observed
+      # code -- a full-data materialization for a column we already have.
+      _self:
+        # The conditional deliberately has no `else`: an else-less dftly conditional yields
+        # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
+        # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
+        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # code whose segment rendered 'UNK' matched no metadata row.
+        #
+        # Do not write `else null` here: dftly has no null literal, and the bare word parses
+        # as the *string* "null" (it warns, but the result is a wrong parent code).
+        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
 
 hosp/procedures_icd:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
   procedure:
-    code:
-      - PROCEDURE
-      - ICD
-      - col(icd_version)
-      - col(icd_code)
-    hadm_id: hadm_id
-    time: col(hadm_discharge_time)
-    time_format: "%Y-%m-%d %H:%M:%S"
+    code: 'f"PROCEDURE//ICD//{$icd_version}//{$icd_code}"'
+    hadm_id: $hadm_id
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
+      # ICD-9 procedure codes take a dot after position 2 (when longer); ICD-10-PCS
+      # codes are never dotted. Versions other than 9/10 yield a null parent (the
+      # conditional has no final else), matching the old matcher-list semantics.
       hosp/d_icd_procedures:
-        description: "long_title"
-        parent_codes: # List of objects are string labels mapping to filters to be evaluated.
-          - "ICD{icd_version}Proc/{norm_icd_code}": { icd_version: "9" }
-          - "ICD{icd_version}PCS/{norm_icd_code}": { icd_version: "10" }
+        icd_version: $icd_version
+        icd_code: $icd_code
+        description: $long_title
+        parent_codes: >-
+          f"ICD9Proc/{$icd_code[0:2]}.{$icd_code[2:]}"
+          if $icd_version == "9" and len_chars($icd_code) > 2
+          else f"ICD9Proc/{$icd_code}"
+          if $icd_version == "9"
+          else f"ICD10PCS/{$icd_code}"
+          if $icd_version == "10"
 
 hosp/transfers:
   transfer:
-    code:
-      - TRANSFER_TO
-      - col(eventtype)
-      - col(careunit)
-    time: col(intime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
+    code: f"TRANSFER_TO//{$eventtype}//{$careunit ?? 'UNK'}"
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
 
 icu/icustays:
   icu_admission:
-    code:
-      - ICU_ADMISSION
-      - col(first_careunit)
-    time: col(intime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: 'f"ICU_ADMISSION//{$first_careunit}"'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
   icu_discharge:
-    code:
-      - ICU_DISCHARGE
-      - col(last_careunit)
-    time: col(outtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: 'f"ICU_DISCHARGE//{$last_careunit}"'
+    time: '$outtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
 
 icu/chartevents:
   event:
-    code:
-      - LAB
-      - col(itemid)
-      - col(valueuom)
-    time: col(charttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    numeric_value: valuenum
-    text_value: value
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: f"LAB//{$itemid}//{$valueuom ?? 'UNK'}"
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    numeric_value: $valuenum
+    text_value: $value
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
     _metadata:
-      # TODO: make this work even with missing valueuom
-      #meas_chartevents_main:
-      #  description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-      #  itemid: "itemid (omop_source_code)"
-      #  parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-      # TODO: I don't know if this is necessary...
-      d_labitems_to_loinc:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
-        valueuom: "valueuom"
+      # `icu/d_items` is the dictionary for chartevents itemids and ships inside MIMIC-IV
+      # itself, so it covers 100% of them and needs no external map. It supplies the human
+      # name; without it every one of these codes reads as a bare `LAB//220045//bpm`.
+      #
+      # Joining on `itemid` alone is a deliberate PARTIAL match on the code's components
+      # (`itemid` and `valueuom`): the metadata broadcasts to every code sharing the itemid,
+      # whatever unit it was charted in. That is what the old "TODO: make this work even
+      # with missing valueuom" wanted. Keying on the unit as well is what made this block
+      # useless before -- `d_items.unitname` agrees with the charted `valueuom` for only
+      # 90% of (itemid, valueuom) pairs, and the disagreements are dictionary rows carrying
+      # the literal string 'None'.
+      icu/d_items:
+        itemid: $itemid
+        description: $label
+      # The OMOP map adds the LOINC/SNOMED parent where it has one. Coverage is thin (~12%
+      # of the itemids charted in the demo), which is why it cannot be the only source --
+      # but it is the correct map for chartevents. What was here before was
+      # `d_labitems_to_loinc`, the *labevents* map: its itemid space is 50xxx and
+      # chartevents is 22xxxx, so it matched essentially nothing.
+      meas_chartevents_main:
+        itemid:
+          column: itemid (omop_source_code)
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 icu/procedureevents:
   start:
-    code:
-      - PROCEDURE
-      - START
-      - col(itemid)
-    time: col(starttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: 'f"PROCEDURE//START//{$itemid}"'
+    time: '$starttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       proc_datetimeevents:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
       proc_itemid:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   end:
-    code:
-      - PROCEDURE
-      - END
-      - col(itemid)
-    time: col(endtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
+    code: 'f"PROCEDURE//END//{$itemid}"'
+    time: '$endtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       proc_datetimeevents:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
       proc_itemid:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 icu/inputevents:
   input_start:
-    code:
-      - INFUSION_START
-      - col(itemid)
-    time: col(starttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
-    order_id: orderid
-    link_order_id: linkorderid
-    numeric_value: rate
-    unit: rateuom
-    ordercategorydescription: ordercategorydescription
+    code: 'f"INFUSION_START//{$itemid}"'
+    time: '$starttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
+    order_id: $orderid
+    link_order_id: $linkorderid
+    numeric_value: $rate
+    unit: $rateuom
+    ordercategorydescription: $ordercategorydescription
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       inputevents_to_rxnorm:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   input_end:
-    code:
-      - INFUSION_END
-      - col(itemid)
-    time: col(endtime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
-    order_id: orderid
-    link_order_id: linkorderid
-    numeric_value: amount
-    ordercategorydescription: ordercategorydescription
-    statusdescription: statusdescription
-    unit: amountuom
+    code: 'f"INFUSION_END//{$itemid}"'
+    time: '$endtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
+    order_id: $orderid
+    link_order_id: $linkorderid
+    numeric_value: $amount
+    ordercategorydescription: $ordercategorydescription
+    statusdescription: $statusdescription
+    unit: $amountuom
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       inputevents_to_rxnorm:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        # `description` intentionally omitted: `icu/d_items` above is the single source
+        # for it in this table. When two _metadata prefixes both emit `description`,
+        # MEDS-Extract merges them into one newline-joined string -- which put values
+        # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
+        # job it is uniquely good at: the RxNorm/SNOMED parent.
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   subject_weight:
-    code:
-      - SUBJECT_WEIGHT_AT_INFUSION
-      - KG
-    time: col(starttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    numeric_value: patientweight
+    code: '"SUBJECT_WEIGHT_AT_INFUSION//KG"'
+    time: '$starttime::"%Y-%m-%d %H:%M:%S"'
+    numeric_value: $patientweight
 
 icu/outputevents:
   output:
-    code:
-      - SUBJECT_FLUID_OUTPUT
-      - col(itemid)
-      - col(valueuom)
-    time: col(charttime)
-    time_format: "%Y-%m-%d %H:%M:%S"
-    hadm_id: hadm_id
-    icustay_id: stay_id
-    numeric_value: value
+    code: f"SUBJECT_FLUID_OUTPUT//{$itemid}//{$valueuom ?? 'UNK'}"
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    icustay_id: $stay_id
+    numeric_value: $value
     _metadata:
+      icu/d_items:
+        itemid: $itemid
+        description: $label
       outputevents_to_loinc:
-        description: ["omop_concept_name", "label"] # List of strings are columns to be collated
-        itemid: "itemid (omop_source_code)"
-        valueuom: "unitname"
-        parent_codes: "{omop_vocabulary_id}/{omop_concept_code}"
+        itemid:
+          column: itemid (omop_source_code)
+        # `valueuom: $unitname` was a second join key; dropped for the same reason as in
+        # labevents. Only one itemid in this file has duplicate rows and they agree on both
+        # label and concept code, so the unit never disambiguated anything.
+        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+
+# Where the raw data lives. This block is consumed by `meds-extract-download` (which
+# `meds-extract-run` spawns) and is a reserved key stripped before event conversion, so
+# the credential interpolations never need to be set to run the pipeline and never land
+# in logs or the config copy written to the output tree.
+#
+# - The download CLI resolves interpolations only for the selected bucket (plus
+#   `common`), so demo/CI runs never need the credential env vars below; a
+#   `key=dataset` run without them fails up front with a clear missing-env-var error
+#   (mmcdermott/MEDS_extract#151, fixed upstream).
+# - The concept-map entries pin `sha256` because GitHub raw publishes no checksum
+#   manifest: without a recorded hash, an existing file cannot be verified on re-runs
+#   and the downloader (correctly) refuses to skip it. The `v2.4.0` tag is immutable,
+#   so these hashes are stable. That tag is the one version here that is *not* declared
+#   below: `dataset_version` names the MIMIC-IV release, while the concept maps are
+#   pinned inline by URL + hash.
+sources:
+  # The raw release version, in mapping form because MIMIC's demo and full releases
+  # genuinely differ. Reserved (never treated as a bucket), interpolatable into the
+  # entries below, and stamped by `meds-extract-run` into the output's
+  # `etl_metadata.dataset_version` as `<selected bucket's version>:<this package's
+  # version>` — which is why no `raw_dataset_version` fallback is needed under `etl:`.
+  dataset_version:
+    dataset: "3.1"
+    demo: "2.2"
+  dataset:
+    - type: physionet
+      base_url: https://physionet.org/files/mimiciv/${sources.dataset_version.dataset}
+      username: ${oc.env:DATASET_DOWNLOAD_USERNAME}
+      password: ${oc.env:DATASET_DOWNLOAD_PASSWORD}
+  demo:
+    - type: physionet
+      base_url: https://physionet.org/files/mimic-iv-demo/${sources.dataset_version.demo}
+  common:
+    - type: http
+      urls:
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/d_labitems_to_loinc.csv
+          rel_path: d_labitems_to_loinc.csv
+          sha256: f7ef583bb2669cbf8f450e1b629dd83161c1d3f2f3ebe6abd2ff8111570e86b8
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/inputevents_to_rxnorm.csv
+          rel_path: inputevents_to_rxnorm.csv
+          sha256: ead9fd462f1165e2615f4ec99edb759ab4b8c6333f8949731fada68066181f16
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/lab_itemid_to_loinc.csv
+          rel_path: lab_itemid_to_loinc.csv
+          sha256: 2e4994fa858b55cae48286728fb6ba8dde019716080e34759fbde3d604d8ce64
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_main.csv
+          rel_path: meas_chartevents_main.csv
+          sha256: a7a262cac30daeb18c63e124540c6a82acb6ad796af4f0ce3f2480b975fc3f28
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_value.csv
+          rel_path: meas_chartevents_value.csv
+          sha256: 51cd79cf9d220eef94236df8d475b270670b908e82d7c078254492474b144f30
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/numerics-summary.csv
+          rel_path: numerics-summary.csv
+          sha256: f663f9e418d417306b55dd0e9c47e8780f1c64547d212aad0e0d908abc977fea
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/outputevents_to_loinc.csv
+          rel_path: outputevents_to_loinc.csv
+          sha256: e46a7b0e1ef4debcbd283d0c0fa8a698e761b36bd710eb69be3f1a1eed7ec103
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_datetimeevents.csv
+          rel_path: proc_datetimeevents.csv
+          sha256: ee4592ddabd7f8995943c3ac18df883034e5f9960a954e738db9f0c02e9a824e
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_itemid.csv
+          rel_path: proc_itemid.csv
+          sha256: b77460531714501b0008f94574580dbf33724cee3de0f45186d149fe05cf04d0
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/waveforms-summary.csv
+          rel_path: waveforms-summary.csv
+          sha256: 289e8357ff474fe6485634d176051f30161ffb52f2bb9933f1a8c482ee9f6024

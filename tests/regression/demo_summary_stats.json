@@ -1,0 +1,489 @@
+{
+  "code_metadata": {
+    "description_length": {
+      "mean": 35.7095,
+      "n": 4734,
+      "quantiles": {
+        "p1": 4.0,
+        "p25": 19.0,
+        "p5": 8.65,
+        "p50": 30.0,
+        "p75": 48.0,
+        "p95": 80.0,
+        "p99": 112.0
+      },
+      "std": 23.6635
+    },
+    "n_codes": 9932,
+    "n_data_codes_missing_from_metadata": 0,
+    "n_metadata_codes_absent_from_data": 0,
+    "n_with_description": 4734,
+    "n_with_parent_codes": 7373,
+    "ontology": {
+      "by_vocabulary": {
+        "ICD10CM": {
+          "keys_digest": "sha256:13164fed20c59cd59b80f7c9c688626dfbfe64fb3cf00a2f75daf295aed3373b",
+          "n_child_codes": 734,
+          "n_distinct_keys": 734,
+          "n_measurements": 2313,
+          "n_subjects": 44,
+          "recognized": true
+        },
+        "ICD10PCS": {
+          "keys_digest": "sha256:b947ef5b560c6442ff392a7dd2d22e99d384c1e4c5aa7c0856b4110cba5cb627",
+          "n_child_codes": 169,
+          "n_distinct_keys": 169,
+          "n_measurements": 297,
+          "n_subjects": 38,
+          "recognized": true
+        },
+        "ICD9CM": {
+          "keys_digest": "sha256:11346b99676c094a7f3e5f4edc54f838d0393ff383d48b2ad804af77a941a2be",
+          "n_child_codes": 740,
+          "n_distinct_keys": 740,
+          "n_measurements": 2193,
+          "n_subjects": 76,
+          "recognized": true
+        },
+        "ICD9Proc": {
+          "keys_digest": "sha256:63799b8d413fcdead2d61ff2f84b0ad2280b79ec5f1bb8abf5943fdb3b1b33d4",
+          "n_child_codes": 183,
+          "n_distinct_keys": 183,
+          "n_measurements": 370,
+          "n_subjects": 66,
+          "recognized": true
+        },
+        "LOINC": {
+          "keys_digest": "sha256:7e1025301545708e6a2084baa4f6c9d157fb51025441675ae468e9fa5c749d06",
+          "n_child_codes": 1135,
+          "n_distinct_keys": 540,
+          "n_measurements": 424219,
+          "n_subjects": 100,
+          "numeric": {
+            "mean": 72.1579,
+            "n_finite": 253009,
+            "std": 1311.38
+          },
+          "recognized": true
+        },
+        "NDC": {
+          "keys_digest": "sha256:7eaaa3e4e6d64a3136a555e6bb216158c7d448bb83669f8442bff6079b0de2cd",
+          "n_child_codes": 4043,
+          "n_distinct_keys": 1202,
+          "n_measurements": 50960,
+          "n_subjects": 100,
+          "recognized": true
+        },
+        "RxNorm": {
+          "keys_digest": "sha256:31635e0efd2886ae6d90fc4f0b2ee57d1656fc7730f7b33910309beeae1edcc7",
+          "n_child_codes": 208,
+          "n_distinct_keys": 106,
+          "n_measurements": 20078,
+          "n_subjects": 96,
+          "numeric": {
+            "mean": 178.424,
+            "n_finite": 14652,
+            "std": 1523.18
+          },
+          "recognized": true
+        },
+        "SNOMED": {
+          "keys_digest": "sha256:3e47e92e4a1d8fe06bd0737cfdc5f9b74f3d22abd054e9d7d56704108c1fde91",
+          "n_child_codes": 161,
+          "n_distinct_keys": 74,
+          "n_measurements": 25890,
+          "n_subjects": 100,
+          "numeric": {
+            "mean": 3.19263,
+            "n_finite": 3255,
+            "std": 204.995
+          },
+          "recognized": true
+        }
+      },
+      "coverage": {
+        "frac_measurements_mapped": 0.514065,
+        "frac_observed_codes_with_parents": 0.742348,
+        "n_measurements_mapped": 526320,
+        "n_measurements_unmapped": 497519,
+        "n_observed_codes": 9932,
+        "n_observed_codes_with_parents": 7373,
+        "n_observed_codes_without_parents": 2559
+      },
+      "n_codes_in_multiple_vocabularies": 0,
+      "n_codes_with_parents": 7373,
+      "n_distinct_parents": 3748,
+      "n_parent_links": 7395,
+      "n_parents_without_vocabulary": 0,
+      "n_vocabularies": 8,
+      "n_vocabularies_recognized": 8,
+      "parents_per_code": {
+        "mean": 0.744563,
+        "n": 9932,
+        "quantiles": {
+          "p1": 0.0,
+          "p25": 0.0,
+          "p5": 0.0,
+          "p50": 1.0,
+          "p75": 1.0,
+          "p95": 1.0,
+          "p99": 1.0
+        },
+        "std": 0.441179
+      },
+      "present": true,
+      "vocabularies_per_code": {
+        "mean": 0.742348,
+        "n": 9932,
+        "quantiles": {
+          "p1": 0.0,
+          "p25": 0.0,
+          "p5": 0.0,
+          "p50": 1.0,
+          "p75": 1.0,
+          "p95": 1.0,
+          "p99": 1.0
+        },
+        "std": 0.437363
+      }
+    },
+    "present": true,
+    "vocabulary_digest": "sha256:08518dd479f1f29a7a61e86d75a9517a3e3f74b82cdcf9542c5ae0eb959f9d38"
+  },
+  "codes": {
+    "concentration": {
+      "frac_measurements_in_top_10": 0.118245,
+      "frac_measurements_in_top_100": 0.405875,
+      "frac_measurements_in_top_1000": 0.91291,
+      "n_codes_covering_50pct": 147,
+      "n_codes_covering_90pct": 885,
+      "n_codes_covering_99pct": 4295
+    },
+    "digests": {
+      "alphabetical": "sha256:08518dd479f1f29a7a61e86d75a9517a3e3f74b82cdcf9542c5ae0eb959f9d38",
+      "by_measurement_frequency": "sha256:76198546f1452a367e132d67cbcea0ae60e5e1bfea53b4564885ff3ff81f063d",
+      "by_subject_frequency": "sha256:28aba787fed3bfb775c45efcb5ab1c89f4f7050a1a73ffdd395a792cb937cdf6",
+      "numeric_moments": {
+        "digest": "sha256:c53316893a4bcaadfa44d9333babddcfc3faedebc46f7aabca7519e623c568a1",
+        "n_codes": 388
+      },
+      "thresholded": {
+        "100": {
+          "alphabetical": "sha256:e824427af180a7de0737996afbe99a498fe0854095658ab7472c659a45519dcd",
+          "by_measurement_frequency": "sha256:681b7cc2d07be07847fc278a2cee9423a37a21f651c26fd87c6ebe16b635678a",
+          "by_subject_frequency": "sha256:e824427af180a7de0737996afbe99a498fe0854095658ab7472c659a45519dcd",
+          "n_codes": 93
+        },
+        "1000": {
+          "alphabetical": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "by_measurement_frequency": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "by_subject_frequency": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "n_codes": 0
+        },
+        "20": {
+          "alphabetical": "sha256:45099ab573261950d85b113a23350a9cc5608ae110a6208e06f54a5c34f97a1d",
+          "by_measurement_frequency": "sha256:b914743f66fc511a4fce72097f8d2b75242987fee6d26b404ec44dc3e4b4a4dd",
+          "by_subject_frequency": "sha256:27968a21f1e1e33b0bd2a4e53c9add3595d53a3f1026827fc5b056fed96ee983",
+          "n_codes": 1056
+        }
+      }
+    },
+    "n_codes_below_min_cell_size": 8876,
+    "n_unique_codes": 9932,
+    "occurrence": {
+      "n_measurements": {
+        "mean": 103.085,
+        "n": 9932,
+        "quantiles": {
+          "p1": 1.0,
+          "p25": 1.0,
+          "p5": 1.0,
+          "p50": 3.0,
+          "p75": 17.0,
+          "p95": 402.0,
+          "p99": 2376.69
+        },
+        "std": 558.312
+      },
+      "n_subjects": {
+        "mean": 8.34948,
+        "n": 9932,
+        "quantiles": {
+          "p1": 1.0,
+          "p25": 1.0,
+          "p5": 1.0,
+          "p50": 2.0,
+          "p75": 5.0,
+          "p95": 48.0,
+          "p99": 99.0
+        },
+        "std": 18.0937
+      }
+    }
+  },
+  "config": {
+    "code_metadata_only_digests": true,
+    "dataset_digest": "files",
+    "digest_subject_thresholds": [
+      20,
+      100,
+      1000
+    ],
+    "emit_ontology_keys": false,
+    "min_cell_size": 20,
+    "min_numeric_cell_size": 20,
+    "moment_digest_sig_digits": 6,
+    "numeric_detail": "moments",
+    "quantiles": [
+      0.01,
+      0.05,
+      0.25,
+      0.5,
+      0.75,
+      0.95,
+      0.99
+    ]
+  },
+  "counts": {
+    "n_events": 96949,
+    "n_measurements": 1023839,
+    "n_static_measurements": 100,
+    "n_subjects": 100,
+    "n_subjects_with_birth": 100,
+    "n_subjects_with_death": 31,
+    "n_subjects_with_static": 100,
+    "n_unique_codes": 9932,
+    "numeric": {
+      "mean": 80.5556,
+      "n_finite": 405331,
+      "n_infinite": 0,
+      "n_nan": 0,
+      "n_negative": 2920,
+      "n_present": 405331,
+      "n_zero": 26220,
+      "std": 2483.12
+    },
+    "quality": {
+      "n_empty_code": 0,
+      "n_null_code": 0,
+      "n_null_subject_id": 0
+    }
+  },
+  "dataset": {
+    "created_at": "2026-08-07T16:11:55.909092+00:00",
+    "dataset_name": "MIMIC-IV",
+    "dataset_version": "2.2:0.1.1.dev46+g909d60791",
+    "etl_name": "MEDS_transforms",
+    "etl_version": "0.7.0",
+    "meds_version": "0.4.1",
+    "present": true
+  },
+  "dataset_digest": {
+    "by_file": {
+      "data/held_out/0.parquet": "sha256:39fcc1c854783b0f088344e974f82f1c21ad5c0a90f37c8505e932b94031d5c7",
+      "data/train/0.parquet": "sha256:fb08073d8769f757fc546d192833e994d954055ce4a40255791bc1f246a67a9b",
+      "data/tuning/0.parquet": "sha256:f49c5f43c0a9145151608a6cceccb2f4c34f272094ec931c89427b864d305c25",
+      "metadata/codes.parquet": "sha256:6a48b764114203065a72369ca270012dccdf5ab26d5d8267053ae136258a6f58",
+      "metadata/dataset.json": "sha256:9b829ee326f5263fe5503f359f49a318fcebc2aa22acf9f26825ee881496e7d3",
+      "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
+    },
+    "code_metadata": "sha256:93718eea9a5fcff85220b48f98c1c0cf1b5648dec742c827cf0c04724655b5cf",
+    "combined": "sha256:cba50f43e3175717c890bf980dce570151ef92c15660475ef612bbdb3946f9de",
+    "data": {
+      "digest": "sha256:921a1301df5b94a917291d662c746bd34efbea75b1f5b2037a3bac95b2312c2b",
+      "n_files": 3
+    },
+    "dataset_metadata": "sha256:822759c93ee43f2fb3f442fdbe665e8bc2a5c0e573645020e6d4ab15232b575e",
+    "method": "files",
+    "n_files": 6,
+    "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
+  },
+  "extracted_at": "2026-08-07T16:12:07.773121",
+  "layout": {
+    "code_metadata_columns": {
+      "code": "String",
+      "code_template": "String",
+      "description": "String",
+      "parent_codes": "List(String)",
+      "possibly_cpt_code": "List(String)"
+    },
+    "column_dtype_conflicts": {},
+    "column_presence": {
+      "code": 3,
+      "doses_per_24_hrs": 3,
+      "drg_mortality": 3,
+      "drg_severity": 3,
+      "emar_id": 3,
+      "emar_seq": 3,
+      "frequency": 3,
+      "hadm_id": 3,
+      "icustay_id": 3,
+      "insurance": 3,
+      "language": 3,
+      "link_order_id": 3,
+      "marital_status": 3,
+      "numeric_value": 3,
+      "order_id": 3,
+      "ordercategorydescription": 3,
+      "poe_id": 3,
+      "priority": 3,
+      "race": 3,
+      "route": 3,
+      "source_block": 3,
+      "statusdescription": 3,
+      "subject_id": 3,
+      "text_value": 3,
+      "time": 3,
+      "unit": 3
+    },
+    "data_columns": {
+      "code": "String",
+      "doses_per_24_hrs": "Int64",
+      "drg_mortality": "Int64",
+      "drg_severity": "Int64",
+      "emar_id": "String",
+      "emar_seq": "Int64",
+      "frequency": "String",
+      "hadm_id": "Int64",
+      "icustay_id": "Int64",
+      "insurance": "String",
+      "language": "String",
+      "link_order_id": "Int64",
+      "marital_status": "String",
+      "numeric_value": "Float32",
+      "order_id": "Int64",
+      "ordercategorydescription": "String",
+      "poe_id": "String",
+      "priority": "String",
+      "race": "String",
+      "route": "String",
+      "source_block": "String",
+      "statusdescription": "String",
+      "subject_id": "Int64",
+      "text_value": "String",
+      "time": "Datetime(time_unit='us', time_zone=None)",
+      "unit": "String"
+    },
+    "extra_data_columns": [
+      "doses_per_24_hrs",
+      "drg_mortality",
+      "drg_severity",
+      "emar_id",
+      "emar_seq",
+      "frequency",
+      "hadm_id",
+      "icustay_id",
+      "insurance",
+      "language",
+      "link_order_id",
+      "marital_status",
+      "order_id",
+      "ordercategorydescription",
+      "poe_id",
+      "priority",
+      "race",
+      "route",
+      "source_block",
+      "statusdescription",
+      "text_value",
+      "unit"
+    ],
+    "has_code_metadata": true,
+    "has_dataset_metadata": true,
+    "has_subject_splits": true,
+    "missing_core_columns": [],
+    "n_data_shards": 3,
+    "shard_names": [
+      "held_out/0",
+      "train/0",
+      "tuning/0"
+    ],
+    "shard_names_digest": "sha256:c174c5889f749f77ea6b42c3a4de7374f846ef20a492a34c6cf75e4aa266709f"
+  },
+  "meds_summary_stats_version": "0.0.2",
+  "per_subject": {
+    "n_events": {
+      "mean": 969.49,
+      "n": 100,
+      "quantiles": {
+        "p1": 114.92,
+        "p25": 280.25,
+        "p5": 140.95,
+        "p50": 517.5,
+        "p75": 1217.75,
+        "p95": 3204.4,
+        "p99": 4711.73
+      },
+      "std": 1097.27
+    },
+    "n_measurements": {
+      "mean": 10238.4,
+      "n": 100,
+      "quantiles": {
+        "p1": 1101.63,
+        "p25": 2680.0,
+        "p5": 1333.85,
+        "p50": 4704.5,
+        "p75": 11251.2,
+        "p95": 38757.2,
+        "p99": 49125.4
+      },
+      "std": 12199.3
+    },
+    "n_unique_codes": {
+      "mean": 829.27,
+      "n": 100,
+      "quantiles": {
+        "p1": 375.58,
+        "p25": 549.5,
+        "p5": 428.0,
+        "p50": 757.0,
+        "p75": 936.0,
+        "p95": 1537.4,
+        "p99": 1955.92
+      },
+      "std": 369.627
+    },
+    "span_days": {
+      "mean": 23298.5,
+      "n": 100,
+      "quantiles": {
+        "p1": 9840.01,
+        "p25": 19329.8,
+        "p5": 12667.9,
+        "p50": 23693.5,
+        "p75": 27194.0,
+        "p95": 32233.7,
+        "p99": 33646.0
+      },
+      "std": 5912.35
+    }
+  },
+  "splits": {
+    "by_split": {
+      "<suppressed>": {
+        "n_measurements": 123292,
+        "n_splits": 2
+      },
+      "train": {
+        "n_measurements": 900547,
+        "n_subjects": 80
+      }
+    },
+    "n_splits": 3,
+    "n_subjects_in_data_without_split": 0,
+    "n_subjects_in_splits_without_data": 0,
+    "present": true
+  },
+  "stats_schema_version": 1,
+  "time": {
+    "by_year": {
+      "<suppressed>": {
+        "n_measurements": 1023739,
+        "n_years": 134
+      }
+    },
+    "n_measurements_with_time": 1023739,
+    "n_years_observed": 134
+  }
+}
