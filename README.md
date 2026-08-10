@@ -179,11 +179,18 @@ meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false inp
 > [!IMPORTANT]
 > **The download dominates, not the ETL.** The figures below are for the extraction alone,
 > with the raw data already on disk. Fetching MIMIC-IV 3.1 from PhysioNet is **41 files and
-> 9.9 GiB**, and PhysioNet rate-limits each TCP connection to roughly 50 KB/s. At the default
-> `download_concurrency=4` that is on the order of several hours to a day; a single connection
+> 9.9 GiB**, and PhysioNet rate-limits each TCP connection to roughly 50 KB/s.
+>
+> Measured on a fresh download of the whole release at `download_concurrency=8`: **7 h 58 min**,
+> averaging 0.35 MiB/s. That is roughly **15× the 32 minutes the extraction itself takes**. At
+> the default `download_concurrency=4` expect something closer to a day; a single connection
 > would be far worse. Aggregate per-IP throughput is *not* throttled, so raising
 > `download_concurrency` speeds this up close to linearly and is the single most effective
 > thing you can change.
+>
+> Do not run several PhysioNet downloads at once to go faster. Three concurrent releases at
+> `concurrency=8` — 24 connections — got this machine throttled into `ConnectTimeout` failures
+> and had to be restarted one at a time.
 >
 > Download once and keep it. Pass `download_dest_dir=$RAW_INPUT_DIR` so the raw files land
 > somewhere durable, then use `do_download=false input_dir=$RAW_INPUT_DIR` for every
