@@ -118,6 +118,27 @@ Note that the DRG code is itself grouper-assigned. What distinguishes it is that
 administrative fact with consequences — it is what was billed — whereas the subclasses are
 gradations attached to that assignment.
 
+### OMR
+
+**`omr` results are numbers, so they go in `numeric_value`.** `hosp/omr.result_value` is a varchar
+that holds two kinds of result: a single number (weight, height, BMI, ...) and a blood pressure
+written as `systolic/diastolic`. Earlier versions copied the string into `text_value` and left
+`numeric_value` null for every `omr` row, which hid these measurements from everything downstream
+that reads numbers: value binning, feature aggregation, threshold predicates. On the full v3.1
+release that is 7.63 M rows: 4.80 M plain numbers, 2.83 M blood pressures, and 1,132 other
+strings (a censored `eGFR` such as `>60`, a handful of odd weight and height entries). A plain
+decimal is now cast into `numeric_value` (`text_value` left null for it); a blood pressure becomes
+two events, `<result_name>//SYSTOLIC` and `<result_name>//DIASTOLIC`, each with its number, the
+way `icu/chartevents` already keeps systolic and diastolic as two items; anything else stays in
+`text_value` under the bare code as before, so a code such as `eGFR` can carry both numeric and
+text rows. Two consequences worth knowing: `omr` rows are dated to the day, so several readings on
+one day give several `SYSTOLIC` and `DIASTOLIC` events at one timestamp and the pairing between
+them is not recoverable, and readings that share a component value on one day collapse to one
+event for that component (the pre-existing per-block de-duplication); and every shard logs three
+`dropped N/M rows with null code` warnings for the `omr` blocks, which is how a row is routed to
+one block rather than another, not a data loss. This changes the `omr` codes, so cohorts built
+before and after are not comparable on them.
+
 ### Order modifiers
 
 `priority` (`ROUTINE` / `STAT`) joins the `LAB//SPECIMEN_COLLECTED` code only, not
