@@ -32,6 +32,13 @@ DEMO_RELEASE = "2.2"
 #: Set by CI to a path that outlives the test, so the summary-stats step can read the cohort.
 OUTPUT_DIR_ENV_VAR = "MEDS_DEMO_OUTPUT_DIR"
 
+#: Set by CI to a cached directory for the raw demo download, passed to the runner as
+#: `download_dest_dir`. The downloader verifies every file against PhysioNet's `SHA256SUMS.txt`
+#: and skips the ones that match, so a restored cache turns the download into a manifest fetch
+#: while a stale or partial one is repaired rather than trusted. Unset, the raw data lands
+#: inside the output tree as before.
+DOWNLOAD_DIR_ENV_VAR = "MEDS_DEMO_DOWNLOAD_DIR"
+
 
 def test_e2e_demo():
     # Everything resolves against `sysconfig`'s script dir — the one `activate` puts on
@@ -54,6 +61,8 @@ def test_e2e_demo():
         # already handles — the downloader skips files it can verify and the pipeline skips
         # stages whose outputs exist.
         command = [str(runner), f"spec={SPEC}", f"output_dir={out.resolve()!s}", "dataset_key=demo"]
+        if download_dir := os.environ.get(DOWNLOAD_DIR_ENV_VAR):
+            command.append(f"download_dest_dir={Path(download_dir).resolve()!s}")
 
         # Captured rather than streamed so a failure's message carries the child's stderr:
         # CI matches network-shaped exception names in it to decide whether a failure is a

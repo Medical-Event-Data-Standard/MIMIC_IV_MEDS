@@ -31,6 +31,9 @@ env:
   # Read by tests/e2e_demo_test.py (which builds the cohort here instead of in a temp dir)
   # and by the summary-stats step below.
   MEDS_DEMO_OUTPUT_DIR: ${{ github.workspace }}/.demo-cohort
+  # Read by tests/e2e_demo_test.py and passed to the runner as `download_dest_dir`, so the raw
+  # demo download lives outside the cohort tree and can be cached between runs (see below).
+  MEDS_DEMO_DOWNLOAD_DIR: ${{ github.workspace }}/.demo-raw
 
 jobs:
   demo:
@@ -47,6 +50,20 @@ jobs:
         uses: ./.github/actions/setup
         with:
           python-version: "3.12"
+
+      # The raw demo download is the slow, flaky part of this job, and the pinned release never
+      # changes, so keep it for a week. The key rotates every ISO week, which bounds how long one
+      # copy is reused; within a week a cache hit leaves only the SHA256SUMS.txt fetch, because the
+      # downloader skips every file whose hash matches and re-fetches any that do not.
+      - name: Week for demo download cache key
+        id: cache-week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache raw demo download
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.MEDS_DEMO_DOWNLOAD_DIR }}
+          key: mimic-iv-demo-raw-${{ steps.cache-week.outputs.week }}
 
       - name: Build and validate the demo cohort
         # The demo release is fully open, so no PhysioNet credentials are needed.
