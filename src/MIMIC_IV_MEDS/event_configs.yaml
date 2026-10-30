@@ -308,10 +308,8 @@ hosp/patients:
       _self:
         description: >-
           f"Sex of the patient: {$gender} (hosp/patients.gender, documented as genotypical sex)"
-        # The OMOP Gender vocabulary codes FEMALE and MALE as `F` and `M`, MIMIC-IV's own values.
-        # Inferred by identity; the MIMIC-IV demo in the OMOP CDM (PhysioNet, ODbL) maps them
-        # the same way (gender_source_value F/M to gender_concept_id 8532/8507).
-        parent_codes: '"Gender/F" if $gender == "F" else "Gender/M" if $gender == "M"'
+        # No `parent_codes`: the OMOP Gender tag (`Gender//F`, `Gender//M`) is an external-ontology
+        # link, added by suMEDS from `sumeds_rules.yaml` (see the README).
   dob:
     code: $meds_birth_code # MEDS_BIRTH, the MEDS official code for birth.
     time: "$year_of_birth::year"
