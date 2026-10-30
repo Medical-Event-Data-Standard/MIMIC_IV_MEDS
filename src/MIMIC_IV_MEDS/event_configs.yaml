@@ -276,15 +276,48 @@ hosp/labevents:
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 hosp/omr:
+  # Three blocks partition the rows through null codes: a blood-pressure string goes only to
+  # the two blood-pressure blocks, everything else only to `omr`, so each shard logs three
+  # "dropped N/M rows with null code" warnings for this table (expected, not a data loss).
+  # The row classes are computed once in `_table.cols` so the blocks cannot drift apart.
+  # See "OMR" in the README.
+  _table:
+    cols:
+      is_number: '/^[-+]?[0-9]+(\.[0-9]+)?$/ in ($result_value ?? "")'
+      bp_systolic: 'extract group 1 of /^([0-9]+(?:\.[0-9]+)?)\/[0-9]+(?:\.[0-9]+)?$/ from $result_value'
+      bp_diastolic: 'extract group 1 of /^[0-9]+(?:\.[0-9]+)?\/([0-9]+(?:\.[0-9]+)?)$/ from $result_value'
   omr:
-    code: $result_name
-    text_value: $result_value
+    code: '$result_name if ($bp_systolic ?? "") == ""'
+    numeric_value: "$result_value::?float if $is_number"
+    text_value: "$result_value if not $is_number"
     time: '$chartdate::"%Y-%m-%d"'
     _metadata:
       _self:
         description: >-
           f"Online Medical Record (OMR) observation, mostly outpatient: {$result_name} (hosp/omr.result_name);
-          the recorded value is in text_value"
+          a numeric result is in numeric_value, any other in text_value"
+  omr_systolic:
+    code: 'f"{$result_name}//SYSTOLIC" if ($bp_systolic ?? "") != ""'
+    numeric_value: "$bp_systolic::?float"
+    time: '$chartdate::"%Y-%m-%d"'
+    seq_num: $seq_num
+    _metadata:
+      _self:
+        description: >-
+          f"Online Medical Record (OMR) observation, mostly outpatient: {$result_name} (hosp/omr.result_name),
+          systolic pressure, the number before the slash in hosp/omr.result_value; in numeric_value, paired
+          with the DIASTOLIC event of the same day and seq_num"
+  omr_diastolic:
+    code: 'f"{$result_name}//DIASTOLIC" if ($bp_diastolic ?? "") != ""'
+    numeric_value: "$bp_diastolic::?float"
+    time: '$chartdate::"%Y-%m-%d"'
+    seq_num: $seq_num
+    _metadata:
+      _self:
+        description: >-
+          f"Online Medical Record (OMR) observation, mostly outpatient: {$result_name} (hosp/omr.result_name),
+          diastolic pressure, the number after the slash in hosp/omr.result_value; in numeric_value, paired
+          with the SYSTOLIC event of the same day and seq_num"
 
 hosp/patients:
   _table:
