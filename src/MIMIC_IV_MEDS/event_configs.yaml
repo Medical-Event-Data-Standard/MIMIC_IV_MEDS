@@ -213,31 +213,31 @@ hosp/labevents:
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 hosp/omr:
-  # `result_value` is a varchar that holds two kinds of result: a single number (weight,
-  # height, BMI, ...) and a blood pressure written as "systolic/diastolic". A number
-  # belongs in `numeric_value`, where downstream binning, feature aggregation and value
-  # predicates can reach it; left in `text_value` it is invisible to all of them. A blood
-  # pressure is two numbers and MEDS has one numeric slot, so it becomes two events with
-  # their own codes, the way `icu/chartevents` already keeps systolic and diastolic as two
-  # items. The three blocks partition the rows: a blood-pressure string goes only to the
-  # two blood-pressure blocks, everything else only to the first; a block routes a row
-  # away by giving it a null code, which MEDS-Extract drops and reports per shard as
-  # "dropped N/M rows with null code" (expected here, not a data problem). One rule says
-  # what a number is, for the cast and for the text: a plain decimal; anything else (a
-  # censored "<30", "1e3", "inf", ...) stays in `text_value` as before, under the bare code.
+  # Three blocks partition the rows through null codes: a blood-pressure string goes only to
+  # the two blood-pressure blocks, everything else only to `omr`, so each shard logs three
+  # "dropped N/M rows with null code" warnings for this table (expected, not a data loss).
+  # The row classes are computed once in `_table.cols` so the blocks cannot drift apart.
+  # See "OMR" in the README.
+  _table:
+    cols:
+      is_number: '/^[-+]?[0-9]+(\.[0-9]+)?$/ in ($result_value ?? "")'
+      bp_systolic: 'extract group 1 of /^([0-9]+(?:\.[0-9]+)?)\/[0-9]+(?:\.[0-9]+)?$/ from $result_value'
+      bp_diastolic: 'extract group 1 of /^[0-9]+(?:\.[0-9]+)?\/([0-9]+(?:\.[0-9]+)?)$/ from $result_value'
   omr:
-    code: '$result_name if not /^[0-9]+(\.[0-9]+)?\/[0-9]+(\.[0-9]+)?$/ in ($result_value ?? "")'
-    numeric_value: '$result_value::?float if /^[-+]?[0-9]+(\.[0-9]+)?$/ in ($result_value ?? "")'
-    text_value: '$result_value if not /^[-+]?[0-9]+(\.[0-9]+)?$/ in ($result_value ?? "")'
+    code: '$result_name if ($bp_systolic ?? "") == ""'
+    numeric_value: "$result_value::?float if $is_number"
+    text_value: "$result_value if not $is_number"
     time: '$chartdate::"%Y-%m-%d"'
   omr_systolic:
-    code: 'f"{$result_name}//SYSTOLIC" if /^[0-9]+(\.[0-9]+)?\/[0-9]+(\.[0-9]+)?$/ in ($result_value ?? "")'
-    numeric_value: '(extract group 1 of /^([0-9]+(?:\.[0-9]+)?)\/[0-9]+(?:\.[0-9]+)?$/ from $result_value)::?float'
+    code: 'f"{$result_name}//SYSTOLIC" if ($bp_systolic ?? "") != ""'
+    numeric_value: "$bp_systolic::?float"
     time: '$chartdate::"%Y-%m-%d"'
+    seq_num: $seq_num
   omr_diastolic:
-    code: 'f"{$result_name}//DIASTOLIC" if /^[0-9]+(\.[0-9]+)?\/[0-9]+(\.[0-9]+)?$/ in ($result_value ?? "")'
-    numeric_value: '(extract group 1 of /^[0-9]+(?:\.[0-9]+)?\/([0-9]+(?:\.[0-9]+)?)$/ from $result_value)::?float'
+    code: 'f"{$result_name}//DIASTOLIC" if ($bp_diastolic ?? "") != ""'
+    numeric_value: "$bp_diastolic::?float"
     time: '$chartdate::"%Y-%m-%d"'
+    seq_num: $seq_num
 
 hosp/patients:
   _table:

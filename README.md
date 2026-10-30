@@ -125,18 +125,34 @@ that holds two kinds of result: a single number (weight, height, BMI, ...) and a
 written as `systolic/diastolic`. Earlier versions copied the string into `text_value` and left
 `numeric_value` null for every `omr` row, which hid these measurements from everything downstream
 that reads numbers: value binning, feature aggregation, threshold predicates. On the full v3.1
-release that is 7.63 M rows: 4.80 M plain numbers, 2.83 M blood pressures, and 1,132 other
-strings (a censored `eGFR` such as `>60`, a handful of odd weight and height entries). A plain
-decimal is now cast into `numeric_value` (`text_value` left null for it); a blood pressure becomes
-two events, `<result_name>//SYSTOLIC` and `<result_name>//DIASTOLIC`, each with its number, the
-way `icu/chartevents` already keeps systolic and diastolic as two items; anything else stays in
+release the raw table has 7.75 M rows: 4.91 M plain numbers, 2.84 M blood pressures, and 1,133
+other strings (a censored `eGFR` such as `>60`, a handful of odd weight and height entries);
+same-day repeats of one value collapse at the merge stage, which leaves 7.63 M distinct events.
+
+**Three blocks partition the rows.** The row classes are computed once, in `_table.cols`
+(`is_number`, `bp_systolic`, `bp_diastolic`), and the blocks only read them, so the patterns
+cannot drift apart. A plain decimal is cast into `numeric_value` under the bare code, with
+`text_value` left null for it (`labevents` and `chartevents` keep the raw string next to the
+number; here the string carries nothing the number does not). A blood pressure becomes two
+events, `<result_name>//SYSTOLIC` and `<result_name>//DIASTOLIC`, each with its number, the way
+`icu/chartevents` already keeps systolic and diastolic as two items. Anything else stays in
 `text_value` under the bare code as before, so a code such as `eGFR` can carry both numeric and
-text rows. Two consequences worth knowing: `omr` rows are dated to the day, so several readings on
-one day give several `SYSTOLIC` and `DIASTOLIC` events at one timestamp and the pairing between
-them is not recoverable, and readings that share a component value on one day collapse to one
-event for that component (the pre-existing per-block de-duplication); and every shard logs three
-`dropped N/M rows with null code` warnings for the `omr` blocks, which is how a row is routed to
-one block rather than another, not a data loss. This changes the `omr` codes, so cohorts built
+text rows. A block routes a row away by giving it a null code, which MEDS-Extract drops and
+reports per shard as `dropped N/M rows with null code`: three such warnings per shard for this
+table are expected and are not a data loss.
+
+**`seq_num` rides on the two blood-pressure blocks.** `omr` is dated to the day, so several
+readings on one day share one timestamp. `seq_num` is unique per (subject, day, result name) in
+the raw table; carried as an extension column on the `SYSTOLIC` and `DIASTOLIC` events (null on
+every other row), it keeps each systolic/diastolic pair recoverable and stops the merge stage's
+`unique_by: "*"` de-duplication from collapsing same-day components that happen to share a value.
+On the full release 4.6% of blood-pressure subject-days carry more than one reading (123,740 of
+2,710,497 days; 257,684 readings), and 12,648 readings that repeat a same-day value would otherwise
+collapse. The bare `omr` block does not carry it, so its existing de-duplication of same-day repeat
+weights is unchanged.
+
+**This changes the `omr` vocabulary.** `Blood Pressure` becomes `//SYSTOLIC` and `//DIASTOLIC`
+codes, and weight, BMI and height move from `text_value` to `numeric_value`, so cohorts built
 before and after are not comparable on them.
 
 ### Order modifiers
