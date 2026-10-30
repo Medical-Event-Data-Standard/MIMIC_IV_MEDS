@@ -138,6 +138,45 @@ single `text_value` slot on `input_end` (100% of rows carry both), and `rateuom`
 so promoting it would stamp `UNK` into half of all `INFUSION_START` codes. See
 [#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15).
 
+## Code metadata
+
+`metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary
+applies, `parent_codes` in OMOP form (`LOINC/2160-0`, `ICD10CM/I10`, `NDC/…`), so tooling
+that maps codes across datasets or resolves them through OHDSI Athena has something to work
+with. All of it is declared in `event_configs.yaml`, through three routes:
+
+| Codes                                                                                                                                                                                | Route                                                                     | Source                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DIAGNOSIS`, `PROCEDURE//ICD`, `HCPCS`, ICU itemid codes (`LAB//<itemid>`, `PROCEDURE//START`/`END`, `INFUSION_*`, `SUBJECT_FLUID_OUTPUT`), `LAB//RESULT`, `LAB//SPECIMEN_COLLECTED` | `_metadata` joins against dictionary tables at run time                   | MIMIC-IV's own `d_icd_diagnoses`, `d_icd_procedures`, `d_hcpcs` and `d_items`; the [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps (MIT, tag v2.4.0, checksum-pinned under `sources:`) for lab descriptions and the LOINC, SNOMED and RxNorm parents |
+| every other component-coded event (admissions, demographics, transfers, ICU stays, DRGs, medications, OMR)                                                                           | `_self` templates over the code's own components                          | the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) of the column each component comes from (MIT-LCP/mimic-website, MIT), paraphrased, with the column named in parentheses                                                                                  |
+| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION//KG`                                                                                            | `_self` templates, the code rendered from a constant `_table.cols` column | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                   |
+
+Literal codes take the detour through a constant column because MEDS-Extract attaches
+metadata only through a code's components and rejects a `_metadata` block on a code with
+none. The pre-existing `codes.parquet` it suggests for that case is not read by the
+standard pipeline (`extract_code_metadata` reads it from the output of
+`split_and_shard_subjects`, which writes none). The constant changes nothing in the data;
+only the codes' `code_template` names the column.
+
+Two parents are inferred rather than read from a map: `GENDER//F` and `GENDER//M` carry
+`Gender/F` and `Gender/M`, the OMOP Gender vocabulary's codes for the same values, as in the
+[MIMIC-IV demo in the OMOP CDM](https://physionet.org/content/mimic-iv-demo-omop/0.9/) (ODbL).
+
+On the demo (2.2), 10,245 of 10,249 codes are described and 7,901 have a parent code. What
+is left uncovered, and why:
+
+- **Labs missing from mimic-code's lab map.** Lab descriptions come from
+    `d_labitems_to_loinc.csv`, which lacks 28 of the demo's 1,622 `d_labitems` (all
+    `53xxx`; one occurs in the demo's lab events, giving the four undescribed codes). A second
+    description block over `hosp/d_labitems` would fill them, but MEDS-Extract has no
+    precedence between blocks: it joins both strings, with a newline, into the description
+    of every lab code.
+- **No vocabulary parent:** medications whose order carries no NDC; ICU items absent from
+    the mimic-code maps; admission, discharge, transfer, ICU-stay, demographic and OMR codes;
+    CPT codes (`HCPCS//…` is keyed on MIMIC's short description, which for CPT is only the
+    section name). The `DRG` parents use `MS-DRG/` and `APR-DRG/` (see [DRG](#drg)), which
+    vocabulary tooling does not resolve; OMOP's own id for MS-DRGs is `DRG`.
+
 ## Parallel and multi-node runs
 
 `meds-extract-run` runs the pipeline's stages serially. To parallelize, run the pipeline

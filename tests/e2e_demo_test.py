@@ -24,6 +24,9 @@ from contextlib import nullcontext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pyarrow.parquet as pq
+from meds import CodeMetadataSchema
+
 SPEC = "MIMIC-IV"
 
 #: The demo release the spec pins, as it appears in `dataset_version`'s `<release>:<pkg>` stamp.
@@ -84,3 +87,15 @@ def test_e2e_demo():
         dataset_json = json.loads((metadata / "dataset.json").read_text())
         assert dataset_json["dataset_name"] == SPEC
         assert dataset_json["dataset_version"].startswith(f"{DEMO_RELEASE}:")
+
+        # Code metadata, as read from disk, is valid MEDS code metadata, and every code is
+        # described except lab items absent from mimic-code's lab map, which have no other
+        # source (see "Code metadata" in the README). No description may hold a newline:
+        # that is MEDS-Extract joining the output of two `_metadata` blocks for one code.
+        codes = pq.read_table(metadata / "codes.parquet")
+        CodeMetadataSchema.validate(codes)
+        described = dict(zip(codes["code"].to_pylist(), codes["description"].to_pylist(), strict=True))
+        undescribed = sorted(c for c, d in described.items() if d is None and not c.startswith("LAB//"))
+        assert not undescribed, f"codes without a description: {undescribed}"
+        multi = sorted(c for c, d in described.items() if d is not None and "\n" in d)
+        assert not multi, f"codes with several joined descriptions: {multi}"
