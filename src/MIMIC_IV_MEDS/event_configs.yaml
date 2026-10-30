@@ -28,38 +28,84 @@ etl:
   n_subjects_per_shard: 1000
 
 hosp/admissions:
+  _table:
+    cols:
+      # Constants that render the two literal ED codes. MEDS-Extract attaches code metadata
+      # (`_self` included) only through a code's components and rejects a `_metadata` block on
+      # a literal code; the pre-existing `codes.parquet` it suggests instead is not read by
+      # the standard pipeline. A constant component gives these codes something to attach
+      # through without changing the data: the code strings are identical, and rows without
+      # a time are still dropped. The same idiom renders MEDS_BIRTH, MEDS_DEATH and
+      # SUBJECT_WEIGHT_AT_INFUSION//KG below. See "Code metadata" in the README.
+      ed_registration_code: "'ED_REGISTRATION'"
+      ed_out_code: "'ED_OUT'"
+  # The `_self` descriptions in this file paraphrase the MIMIC-IV documentation of the
+  # column each code component comes from (https://mimic.mit.edu/docs/iv/; source
+  # MIT-LCP/mimic-website at 8182227, MIT), and name that column in parentheses.
   ed_registration:
-    code: ED_REGISTRATION
+    code: $ed_registration_code
     time: '$edregtime::"%Y-%m-%d %H:%M:%S"'
+    _metadata:
+      _self:
+        description: "'Registration in the emergency department (hosp/admissions.edregtime)'"
   ed_out:
-    code: ED_OUT
+    code: $ed_out_code
     time: '$edouttime::"%Y-%m-%d %H:%M:%S"'
+    _metadata:
+      _self:
+        description: "'Discharge from the emergency department (hosp/admissions.edouttime)'"
   admission:
     code: f"HOSPITAL_ADMISSION//{$admission_type}//{$admission_location ?? 'UNK'}"
     time: '$admittime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Hospital admission; admission type (urgency) {$admission_type} (hosp/admissions.admission_type);
+          location before arriving at the hospital: {$admission_location ?? 'UNK'} (admission_location)"
   # Nulls are deliberately not coalesced here: a missing demographic should produce no event
   # rather than an `INSURANCE//UNK` code. See "Demographics" in the README.
   insurance:
     code: f"INSURANCE//{$insurance}"
     time: '$admittime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Insurance recorded for the hospital admission: {$insurance} (hosp/admissions.insurance)"
   language:
     code: f"LANGUAGE//{$language}"
     time: '$admittime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Language recorded for the hospital admission: {$language} (hosp/admissions.language)"
   marital_status:
     code: f"MARITAL_STATUS//{$marital_status}"
     time: '$admittime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Marital status recorded for the hospital admission: {$marital_status} (hosp/admissions.marital_status)"
   race:
     code: f"RACE//{$race}"
     time: '$admittime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Race recorded for the hospital admission: {$race} (hosp/admissions.race)"
   discharge:
     code: f"HOSPITAL_DISCHARGE//{$discharge_location ?? 'UNK'}"
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Hospital discharge; disposition after leaving the hospital: {$discharge_location ?? 'UNK'}
+          (hosp/admissions.discharge_location)"
   # We omit the death event here: `deathtime` is joined into hosp/patients via that
   # table's aggregated `_table.join`, and the death event is emitted there.
 
@@ -112,6 +158,12 @@ hosp/drgcodes:
         # prefix-and-slice. `HCFA` denotes MS-DRG; see "DRG" in the README.
         parent_codes: >-
           f"{'MS-DRG' if $drg_type == 'HCFA' else 'APR-DRG'}/{f'000{$drg_code}'[-3:]}"
+        # The DRG title is not used: it varies in spelling across rows of one DRG (see "DRG" in
+        # the README), and `_self` would join the variants into one multi-line description.
+        description: >-
+          f"Diagnosis-related group {'MS-DRG' if $drg_type == 'HCFA' else 'APR-DRG' if $drg_type == 'APR' else
+          $drg_type} {f'000{$drg_code}'[-3:]} assigned to the hospital admission (hosp/drgcodes, drg_type
+          {$drg_type}); the DRG title is in text_value"
 
 hosp/emar:
   _table:
@@ -167,6 +219,10 @@ hosp/emar:
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
         parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
+        description: >-
+          f"Medication administration recorded in the eMAR: {$medication ?? 'UNK'} (hosp/emar.medication);
+          administration event: {$event_txt ?? 'UNK'} (emar.event_txt); NDC dispensed for the order:
+          {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
 
 hosp/hcpcsevents:
   hcpcs:
@@ -177,7 +233,14 @@ hosp/hcpcsevents:
       # These are not all CPT codes, unfortunately
       hosp/d_hcpcs:
         short_description: $short_description
-        description: $long_description
+        # `d_hcpcs` carries a long description only for HCPCS Level II codes. For CPT codes
+        # (most of the table) MIMIC-IV distributes no description, for licensing reasons, and
+        # `short_description` names only the CPT section ("Cardiovascular system"). In
+        # `d_hcpcs` no short description is shared by rows with and without a long
+        # description, so `coalesce` leaves every existing long description as it was.
+        description: >-
+          coalesce($long_description, f"Hospital procedure billing code (HCPCS/CPT); MIMIC-IV short
+          description: {$short_description} (hosp/d_hcpcs; no long description is distributed)")
         possibly_cpt_code: $code
 
 hosp/labevents:
@@ -217,11 +280,19 @@ hosp/omr:
     code: $result_name
     text_value: $result_value
     time: '$chartdate::"%Y-%m-%d"'
+    _metadata:
+      _self:
+        description: >-
+          f"Online Medical Record (OMR) observation, mostly outpatient: {$result_name} (hosp/omr.result_name);
+          the recorded value is in text_value"
 
 hosp/patients:
   _table:
     cols:
       year_of_birth: "($anchor_year - $anchor_age)::str"
+      # Constants rendering the literal MEDS codes; see `ed_registration_code` in hosp/admissions.
+      meds_birth_code: "'MEDS_BIRTH'"
+      meds_death_code: "'MEDS_DEATH'"
     join:
       # Earliest per-subject in-hospital death time, via an aggregated join
       # (mmcdermott/MEDS_extract#65 / #98, on the 0.7 line). `min` over the fixed-width
@@ -233,16 +304,35 @@ hosp/patients:
   gender:
     code: 'f"GENDER//{$gender}"'
     time: null
+    _metadata:
+      _self:
+        description: >-
+          f"Sex of the patient: {$gender} (hosp/patients.gender, documented as genotypical sex)"
+        # The OMOP Gender vocabulary codes FEMALE and MALE as `F` and `M`, MIMIC-IV's own values.
+        # Inferred by identity; the MIMIC-IV demo in the OMOP CDM (PhysioNet, ODbL) maps them
+        # the same way (gender_source_value F/M to gender_concept_id 8532/8507).
+        parent_codes: '"Gender/F" if $gender == "F" else "Gender/M" if $gender == "M"'
   dob:
-    code: MEDS_BIRTH # This is the MEDS official code for birth.
+    code: $meds_birth_code # MEDS_BIRTH, the MEDS official code for birth.
     time: "$year_of_birth::year"
+    _metadata:
+      _self:
+        description: >-
+          'Birth (MEDS standard code). MIMIC-IV gives the year only: hosp/patients.anchor_year minus
+          anchor_age, in the shifted calendar, with ages over 89 recorded as 91'
   death:
-    code: MEDS_DEATH # This is the MEDS official code for death.
+    code: $meds_death_code # MEDS_DEATH, the MEDS official code for death.
     # `deathtime` (precise, in-hospital, joined above) takes precedence over the raw
     # date-only `dod`. The `::?` casts are lenient (null on format mismatch) so the two
     # formats coalesce cleanly; rows where both are null (living subjects) are dropped
     # by the extraction's computed-time filter.
     time: coalesce($deathtime::?"%Y-%m-%d %H:%M:%S", $dod::?"%Y-%m-%d")
+    _metadata:
+      _self:
+        description: >-
+          'Death (MEDS standard code). Time is the in-hospital death time (hosp/admissions.deathtime)
+          where recorded, else the date of death (hosp/patients.dod), which includes deaths up to one
+          year after hospital discharge from state records'
 
 hosp/pharmacy:
   _table:
@@ -297,6 +387,9 @@ hosp/pharmacy:
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
         parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
+        description: >-
+          f"Start of a pharmacy medication order: {$medication ?? 'UNK'} (hosp/pharmacy.medication,
+          starttime); NDC dispensed for the order: {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
   medication_stop:
     code: f"MEDICATION//STOP//{$medication ?? 'UNK'}//{$ndc_clean}"
     time: coalesce($stoptime::?"%Y-%m-%d %H:%M:%S", $stoptime::?"%Y-%m-%d")
@@ -322,6 +415,9 @@ hosp/pharmacy:
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
         parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
+        description: >-
+          f"End of a pharmacy medication order: {$medication ?? 'UNK'} (hosp/pharmacy.medication,
+          stoptime); NDC dispensed for the order: {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
 
 hosp/procedures_icd:
   _table:
@@ -354,6 +450,14 @@ hosp/transfers:
     code: f"TRANSFER_TO//{$eventtype}//{$careunit ?? 'UNK'}"
     time: '$intime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Transfer event: {'emergency department stay' if $eventtype == 'ED' or $eventtype == 'ed' else
+          'admission to the hospital' if $eventtype == 'admit' else 'transfer within the hospital' if
+          $eventtype == 'transfer' else 'discharge from the hospital' if $eventtype == 'discharge' else
+          $eventtype} (hosp/transfers.eventtype {$eventtype}); care unit: {$careunit ?? 'UNK'}
+          (transfers.careunit)"
 
 icu/icustays:
   icu_admission:
@@ -361,11 +465,19 @@ icu/icustays:
     time: '$intime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
+    _metadata:
+      _self:
+        description: >-
+          f"Start of an ICU stay; first ICU care unit: {$first_careunit} (icu/icustays.first_careunit)"
   icu_discharge:
     code: 'f"ICU_DISCHARGE//{$last_careunit}"'
     time: '$outtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
+    _metadata:
+      _self:
+        description: >-
+          f"End of an ICU stay; last ICU care unit: {$last_careunit} (icu/icustays.last_careunit)"
 
 icu/chartevents:
   event:
@@ -457,6 +569,10 @@ icu/procedureevents:
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
 
 icu/inputevents:
+  _table:
+    cols:
+      # Constant rendering a literal code; see `ed_registration_code` in hosp/admissions.
+      subject_weight_code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'"
   input_start:
     code: 'f"INFUSION_START//{$itemid}"'
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
@@ -505,9 +621,12 @@ icu/inputevents:
         # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   subject_weight:
-    code: '"SUBJECT_WEIGHT_AT_INFUSION//KG"'
+    code: $subject_weight_code
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $patientweight
+    _metadata:
+      _self:
+        description: "'Patient weight in kilograms, recorded with an ICU infusion (icu/inputevents.patientweight)'"
 
 icu/outputevents:
   output:
