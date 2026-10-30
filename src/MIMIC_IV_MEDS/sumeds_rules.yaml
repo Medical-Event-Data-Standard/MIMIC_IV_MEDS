@@ -1,0 +1,57 @@
+# suMEDS enrichment rules for MIMIC-IV MEDS codes (format `sumeds-rules/0.1`).
+#
+# External-ontology links are not written by this ETL: suMEDS adds them to a finished
+# `metadata/codes.parquet` from these rules, against suMEDS's versioned ontology data
+# (sumeds-ontologies, pinned release; ICD-10-CM, ICD-10-PCS, ICD-9-CM, ICD-9 procedures,
+# LOINC), fetched on demand. Here they add
+#   - `Gender//F` and `Gender//M` (OMOP Gender vocabulary) to `GENDER//F` and `GENDER//M`;
+#   - for ICD diagnosis and procedure codes, the dotted vocabulary code with `vocabulary_id`,
+#     `concept_code` and every pack ancestor (`ICD10CM//I50.23`, `ICD10CM//I50.2`, ...);
+#   - same-dataset parents: an ICD code of this table whose vocabulary code is an ancestor
+#     (`DIAGNOSIS//ICD//10//I5023` gets `DIAGNOSIS//ICD//10//I502` when both occur).
+# The ETL's own parents (ICD, LOINC, SNOMED, RxNorm, NDC, DRG from MIMIC-IV and mimic-code
+# maps) are kept: suMEDS enrichment never removes or rewrites existing parents or
+# descriptions. Run (see "Enriching code metadata with suMEDS" in the README):
+#
+#   suMEDS-enrich $MEDS_DIR/metadata/codes.parquet -o codes_enriched.parquet --rules <this file>
+schema: sumeds-rules/0.1
+
+ontology:
+  # MIMIC-IV codes `hosp/patients.gender` as F/M, the OMOP Gender vocabulary's own concept
+  # codes for FEMALE (8532) and MALE (8507). Gender has no public pack, so the code is tagged
+  # (or validated by Athena when one is configured).
+  - id: mimic-gender
+    pattern: "^GENDER//(?P<code>[FM])$"
+    vocabulary: Gender
+    validate: none
+  # `DIAGNOSIS//ICD//{icd_version}//{icd_code}` and `PROCEDURE//ICD//...` carry MIMIC-IV's
+  # undotted codes; the packs use the OMOP concept_code format, so the dot is restored.
+  - id: mimic-icd10cm-diagnoses
+    pattern: "^DIAGNOSIS//ICD//10//(?P<code>[A-Z][0-9][0-9A-Z][0-9A-Z]{0,4})$"
+    vocabulary: ICD10CM
+    normalize:
+      - { pattern: "^(...)(.+)$", replace: '\1.\2' }
+  - id: mimic-icd9cm-diagnoses
+    pattern: "^DIAGNOSIS//ICD//9//(?P<code>[0-9]{3,5}|V[0-9]{2,4}|E[0-9]{3,4})$"
+    vocabulary: ICD9CM
+    normalize:
+      - { pattern: "^(E[0-9]{3})([0-9])$", replace: '\1.\2' }
+      - { pattern: "^([0-9V][0-9]{2})([0-9]{1,2})$", replace: '\1.\2' }
+  - id: mimic-icd10pcs-procedures
+    pattern: "^PROCEDURE//ICD//10//(?P<code>[0-9A-HJ-NP-Z]{3,7})$"
+    vocabulary: ICD10PCS
+  - id: mimic-icd9-procedures
+    pattern: "^PROCEDURE//ICD//9//(?P<code>[0-9]{2,4})$"
+    vocabulary: ICD9Proc
+    normalize:
+      - { pattern: "^([0-9]{2})([0-9]{1,2})$", replace: '\1.\2' }
+
+hierarchy:
+  # Same-dataset ICD parents, from the pack hierarchy of the resolved codes (nearest only).
+  - id: mimic-icd-parents-in-dataset
+    from_ontology: true
+    rules:
+      - mimic-icd10cm-diagnoses
+      - mimic-icd9cm-diagnoses
+      - mimic-icd10pcs-procedures
+      - mimic-icd9-procedures

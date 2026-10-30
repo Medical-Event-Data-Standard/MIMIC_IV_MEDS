@@ -158,11 +158,11 @@ standard pipeline (`extract_code_metadata` reads it from the output of
 `split_and_shard_subjects`, which writes none). The constant changes nothing in the data;
 only the codes' `code_template` names the column.
 
-Two parents are inferred rather than read from a map: `GENDER//F` and `GENDER//M` carry
-`Gender/F` and `Gender/M`, the OMOP Gender vocabulary's codes for the same values, as in the
-[MIMIC-IV demo in the OMOP CDM](https://physionet.org/content/mimic-iv-demo-omop/0.9/) (ODbL).
+Every parent the ETL writes is read from MIMIC-IV's own tables or the mimic-code maps;
+links that need an external ontology (the OMOP Gender tags, the ICD pack hierarchy) come from
+suMEDS instead (next section).
 
-On the demo (2.2), 10,245 of 10,249 codes are described and 7,901 have a parent code. What
+On the demo (2.2), 10,245 of 10,249 codes are described and 7,899 have a parent code. What
 is left uncovered, and why:
 
 - **Labs missing from mimic-code's lab map.** Lab descriptions come from
@@ -176,6 +176,33 @@ is left uncovered, and why:
     CPT codes (`HCPCS//…` is keyed on MIMIC's short description, which for CPT is only the
     section name). The `DRG` parents use `MS-DRG/` and `APR-DRG/` (see [DRG](#drg)), which
     vocabulary tooling does not resolve; OMOP's own id for MS-DRGs is `DRG`.
+
+## Enriching code metadata with suMEDS
+
+External-ontology links are not written by the ETL. The package ships
+`src/MIMIC_IV_MEDS/sumeds_rules.yaml`, a [suMEDS](https://github.com/rvandewater/SumMEDS)
+rules file (`sumeds-rules/0.1`, from the `ontology-enrichment` branch, not yet released),
+which adds them to a finished `codes.parquet` from suMEDS's versioned ontology data
+(sumeds-ontologies, pinned release), fetched on demand:
+
+```bash
+suMEDS-enrich $MEDS_DIR/metadata/codes.parquet -o codes_enriched.parquet \
+	--rules "$(python -c 'from importlib.resources import files; print(files("MIMIC_IV_MEDS") / "sumeds_rules.yaml")')"
+```
+
+- `GENDER//F` and `GENDER//M` get the OMOP Gender codes `Gender//F` and `Gender//M` (a tag:
+    Gender has no public pack; with `--athena-csv` suMEDS validates them against Athena).
+- `DIAGNOSIS//ICD//{9,10}//…` and `PROCEDURE//ICD//{9,10}//…` get the dotted ICD-9-CM,
+    ICD-10-CM, ICD-9 procedure or ICD-10-PCS code with its `vocabulary_id`, `concept_code`
+    and every ancestor in the pack (`ICD10CM//I50.23`, `ICD10CM//I50.2`, `ICD10CM//I50`).
+- Same-dataset parents: an ICD code of the table becomes the parent of another when its
+    vocabulary code is the nearest ancestor present (`DIAGNOSIS//ICD//10//I5023` gets
+    `DIAGNOSIS//ICD//10//I502` when both occur).
+
+The ETL alone does not emit these: a build without suMEDS has no Gender parents, no ICD
+ancestors and no same-dataset parents. suMEDS enrichment never removes or rewrites existing
+parents or descriptions, so the ETL's own parents (`ICD10CM/…`, `LOINC/…`, `NDC/…`, RxNorm,
+SNOMED, DRG) stay as they are.
 
 ## Parallel and multi-node runs
 
