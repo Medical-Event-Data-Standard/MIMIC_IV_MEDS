@@ -182,8 +182,8 @@ is left uncovered, and why:
 External-ontology links are not written by the ETL. The package ships
 `src/MIMIC_IV_MEDS/sumeds_rules.yaml`, a [suMEDS](https://github.com/rvandewater/SumMEDS)
 rules file (`sumeds-rules/0.1`, from the `ontology-enrichment` branch, not yet released),
-which adds them to a finished `codes.parquet` from public ontology packs that suMEDS hosts
-and fetches on demand:
+which adds them to a finished `codes.parquet` from suMEDS's versioned ontology data
+(sumeds-ontologies, pinned release), fetched on demand:
 
 ```bash
 suMEDS-enrich $MEDS_DIR/metadata/codes.parquet -o codes_enriched.parquet \
@@ -200,8 +200,9 @@ suMEDS-enrich $MEDS_DIR/metadata/codes.parquet -o codes_enriched.parquet \
     `DIAGNOSIS//ICD//10//I502` when both occur).
 
 The ETL alone does not emit these: a build without suMEDS has no Gender parents, no ICD
-ancestors and no same-dataset parents. suMEDS never overwrites metadata, so the ETL's own
-parents (`ICD10CM/…`, `LOINC/…`, `NDC/…`, RxNorm, SNOMED, DRG) stay as they are.
+ancestors and no same-dataset parents. suMEDS enrichment never removes or rewrites existing
+parents or descriptions, so the ETL's own parents (`ICD10CM/…`, `LOINC/…`, `NDC/…`, RxNorm,
+SNOMED, DRG) stay as they are.
 
 ## Parallel and multi-node runs
 
