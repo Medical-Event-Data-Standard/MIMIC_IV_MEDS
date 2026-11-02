@@ -181,11 +181,12 @@ is left uncovered, and why:
 
 External-ontology links are not written by the ETL. The package ships
 `src/MIMIC_IV_MEDS/sumeds_rules.yaml`, a [suMEDS](https://github.com/rvandewater/SumMEDS)
-rules file (`sumeds-rules/0.1`, from the `ontology-enrichment` branch, not yet released),
-which adds them to a finished `codes.parquet` from suMEDS's versioned ontology data
-(sumeds-ontologies, pinned release), fetched on demand:
+rules file (`sumeds-rules/0.1`, read by suMEDS 0.4 or later), which adds them to a finished
+`codes.parquet` from suMEDS's versioned ontology data (sumeds-ontologies, pinned release),
+fetched on demand:
 
 ```bash
+pip install "sumeds>=0.4"
 suMEDS-enrich $MEDS_DIR/metadata/codes.parquet -o codes_enriched.parquet \
 	--rules "$(python -c 'from importlib.resources import files; print(files("MIMIC_IV_MEDS") / "sumeds_rules.yaml")')"
 ```
