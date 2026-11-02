@@ -39,13 +39,15 @@ dependencies = [
 # `pytest-rerunfailures` lets CI auto-retry the e2e demo download test on the
 # narrow set of network exceptions seen coming out of PhysioNet (connection
 # reset / IncompleteRead mid-stream) instead of turning a bad upstream minute
-# into a failed CI build.
+# into a failed CI build. `sumeds` (0.4 is the first release with rules) loads the
+# packaged suMEDS rules in tests/sumeds_rules_test.py.
 dev = [
     "pre-commit~=3.8",
     "ruff>=0.11,<1.0",
     "pytest~=9.0",
     "pytest-rerunfailures==16.1",
     "shfmt-py==3.12.0.2",
+    "sumeds>=0.4",
 ]
 
 [tool.setuptools_scm]

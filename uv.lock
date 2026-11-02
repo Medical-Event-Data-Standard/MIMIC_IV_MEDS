@@ -332,6 +332,7 @@ dev = [
     { name = "pytest-rerunfailures" },
     { name = "ruff" },
     { name = "shfmt-py" },
+    { name = "sumeds" },
 ]
 
 [package.metadata]
@@ -344,6 +345,7 @@ dev = [
     { name = "pytest-rerunfailures", specifier = "==16.1" },
     { name = "ruff", specifier = ">=0.11,<1.0" },
     { name = "shfmt-py", specifier = "==3.12.0.2" },
+    { name = "sumeds", specifier = ">=0.4" },
 ]
 
 [[package]]
@@ -797,12 +799,40 @@ wheels = [
 ]
 
 [[package]]
+name = "sumeds"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "meds" },
+    { name = "polars" },
+    { name = "pyarrow" },
+    { name = "pyyaml" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/19/19910cadc5b6e6b2ea281d887a5ed00ec2bfd9119a20dbfbeb75849392d1/sumeds-0.4.0.tar.gz", hash = "sha256:697e476d1c5bdc432a2f6cf9090de41082f3aff0a35c4210cd7c0f5a829dbc78", size = 43188, upload-time = "2026-11-02T22:09:06.99Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/21/4f/c55cf7b3a074cd39df391eaec314de51b2432f3c9584e682ce8fdc60bf71/sumeds-0.4.0-py3-none-any.whl", hash = "sha256:8b18652754a3dfb637052c30500bcf740be97bd7b4dc4d618a26212c56605f22", size = 47748, upload-time = "2026-11-02T22:09:05.465Z" },
+]
+
+[[package]]
 name = "tenacity"
 version = "9.1.4"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/47/c6/ee486fd809e357697ee8a44d3d69222b344920433d3b6666ccd9b374630c/tenacity-9.1.4.tar.gz", hash = "sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a", size = 49413, upload-time = "2026-02-07T10:45:33.841Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", hash = "sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55", size = 28926, upload-time = "2026-02-07T10:45:32.24Z" },
+]
+
+[[package]]
+name = "tqdm"
+version = "4.70.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0d/ea/b2a5bd54b28a324dae8211928b2d730b6547500342c7e6c6dea08bd0a485/tqdm-4.70.1.tar.gz", hash = "sha256:cefd0eca11b2a37a3aee776544d4f4ae913f02688135b5556b8788dfa474afc4", size = 171846, upload-time = "2026-09-11T07:25:16.601Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl", hash = "sha256:c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73", size = 80199, upload-time = "2026-09-11T07:25:14.599Z" },
 ]
 
 [[package]]
