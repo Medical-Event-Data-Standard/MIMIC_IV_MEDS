@@ -84,8 +84,11 @@ jobs:
         # Which drift errors and which only warns is decided in tests/regression/policy.yaml.
         # When a PR changes the output on purpose, regenerate the baseline in that same PR:
         #
-        #   meds-extract-run spec=MIMIC-IV output_dir=$OUT dataset_key=demo
-        #   extract_MEDS_summary_stats $OUT -o tests/regression/demo_summary_stats.json
+        #   scripts/summary_stats.sh demo
+        #
+        # which builds the demo with this checkout, prints how the statistics moved, and
+        # overwrites the baseline. The job below also uploads the new statistics as the
+        # `mimic-demo-summary-stats` artifact.
         #
         # The action, the package-spec, and the committed baseline are pinned together on
         # meds_summary_stats 0.0.3 (stats_schema_version 1) and must move together:

@@ -308,6 +308,35 @@ Intermediate stage outputs are retained under the output directory, which is why
 [this github issue](https://github.com/Medical-Event-Data-Standard/MEDS_transforms/issues/235) for tracking on ensuring these
 directories are automatically cleaned up in the future.
 
+## Summary statistics
+
+[`tests/regression/demo_summary_stats.json`](tests/regression/demo_summary_stats.json) is a
+[meds_summary_stats](https://github.com/Medical-Event-Data-Standard/meds_summary_stats) fingerprint of
+the MEDS dataset this ETL builds from the open MIMIC-IV demo: subject, event and measurement counts,
+digests of the code vocabulary, per-subject, value and time distributions, code-metadata coverage, the
+splits and the schema. It names no code and reports no cell of fewer than 20 subjects and no minimum or
+maximum, which is what makes it safe to publish. The Tests workflow rebuilds the demo on every pull
+request and fails when the result no longer matches the baseline, as decided by
+[`tests/regression/policy.yaml`](tests/regression/policy.yaml).
+
+`scripts/summary_stats.sh` regenerates a baseline from a build of this checkout. It prints how the
+statistics changed against the committed baseline before overwriting it, and `--compare` checks a build
+without writing anything:
+
+```bash
+# The demo: downloaded and built with this checkout
+scripts/summary_stats.sh demo
+# The full release, built from a copy on disk, or summarized from an existing build
+scripts/summary_stats.sh full --input-dir $RAW_INPUT_DIR
+scripts/summary_stats.sh full --meds-dir $MEDS_OUTPUT_DIR
+```
+
+[`tests/regression/full_summary_stats.json`](tests/regression/full_summary_stats.json) is the same
+fingerprint of the full MIMIC-IV 3.1 release. Because it is committed next to the ETL, its diff shows
+what an ETL change did to the whole credentialed release, and two ETL versions can be compared without
+access to the data. CI cannot rebuild the credentialed release, so regenerate it with
+`scripts/summary_stats.sh full` in every pull request that changes the output.
+
 ## 📚 Citing this work
 
 If you use this software in your research, please cite it! You can use the **"Cite this repository"** button on GitHub.
