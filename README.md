@@ -331,8 +331,11 @@ scripts/summary_stats.sh full --input-dir $RAW_INPUT_DIR
 scripts/summary_stats.sh full --meds-dir $MEDS_OUTPUT_DIR
 ```
 
-The full release writes `tests/regression/full_summary_stats.json`, which shows how a change moves the
-statistics of the whole credentialed release. It is not committed yet.
+[`tests/regression/full_summary_stats.json`](tests/regression/full_summary_stats.json) is the same
+fingerprint of the full MIMIC-IV 3.1 release. Because it is committed next to the ETL, its diff shows
+what an ETL change did to the whole credentialed release, and two ETL versions can be compared without
+access to the data. CI cannot rebuild the credentialed release, so regenerate it with
+`scripts/summary_stats.sh full` in every pull request that changes the output.
 
 ## 📚 Citing this work
 
