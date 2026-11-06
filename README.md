@@ -73,6 +73,14 @@ Everything the pipeline does is therefore inspectable — and modifiable — in 
 see [MEDS-Extract's documentation](https://github.com/mmcdermott/MEDS_extract) for the
 syntax.
 
+Add-on datasets that need their own PhysioNet credentials are kept out of that file, because
+MEDS-Extract fails on any configured table whose raw file is missing. Each lives in a fragment
+under [`src/MIMIC_IV_MEDS/extensions/`](src/MIMIC_IV_MEDS/extensions/), and
+`scripts/build_extension_specs.py` composes the base with it into a generated, separately
+registered spec (`event_configs_<name>.yaml`). Never edit the generated file: change the base or
+the fragment and re-run the script; `tests/extension_specs_test.py` fails if you forget. The one
+extension so far is [MIMIC-Note-Extract](#optional-extension-mimic-note-extract).
+
 ## What goes in the code, and what doesn't
 
 MIMIC carries a lot of columns that are neither the measurement nor metadata about it. Where
@@ -174,6 +182,88 @@ sharpens it.
 single `text_value` slot on `input_end` (100% of rows carry both), and `rateuom` is 44.7% null
 so promoting it would stamp `UNK` into half of all `INFUSION_START` codes. See
 [#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15).
+
+## Optional extension: MIMIC-Note-Extract
+
+[MIMIC-IV-Ext MIMIC-Note-Extract](https://physionet.org/content/mimic-iv-ext-note-extract/1.0/)
+(MNE, v1.0; [paper](https://arxiv.org/abs/2611.04685)) structures 13 sections of the MIMIC-IV-Note
+v2.2 discharge summaries into tables keyed by `hadm_id`, using rules plus an LLM. The spec
+`MIMIC-IV-MNE` is the full `MIMIC-IV` ETL plus those tables:
+
+```bash
+# Needs a PhysioNet account approved for BOTH MIMIC-IV and MIMIC-Note-Extract.
+meds-extract-run spec=MIMIC-IV-MNE output_dir=$MEDS_OUTPUT_DIR
+```
+
+With `do_download=false`, put MNE's `*.csv.gz` files at the root of `input_dir`, next to `hosp/`
+and `icu/` (that is where the download puts them). There is no demo subset of MNE, so
+`dataset_key=demo` is not available for this spec, and CI checks it with synthetic MNE rows over
+the MIMIC-IV demo (`tests/e2e_mne_synthetic_test.py`). Against the full release the extension adds
+**17.6 M events** to 137,362 subjects; the MNE tables take ~90 s and 1.4 GB to extract on their own.
+
+**What it covers.** MNE reaches 300,663 of MIMIC-IV 3.1's 546,028 admissions (55.1%) and 64.6% of
+ICU stays, but unevenly: 61–68% of admissions from ~2008–2019 and only 7% from ~2020–2022, which
+MIMIC-IV 3.x added and which have no notes. It adds what MIMIC has no structured table for — past
+medical history, home and discharge medications, allergies, the physical examination (including
+vital signs for the 78% of non-ICU admissions whose summary records them, where `hosp` has no
+inpatient vitals), chief complaint, clinician-written discharge diagnoses and condition at
+discharge.
+
+**Every event is timed at `hosp/admissions.dischtime`.** MNE has no timestamps (the note's own are
+redacted), and all of it was written down at discharge; placing any of it earlier in the stay would
+leak. This is the rule `DIAGNOSIS` and `DRG` already follow. It means a prediction made during a
+stay sees MNE only through *earlier* admissions — 45.9% of admissions and 40.0% of ICU stays have
+one. The exam's own `timepoint` (ADMISSION, DISCHARGE, INTERIM, UNKNOWN) is kept in the code.
+
+**Codes come from MNE's closed enums; free text rides in `text_value`.** MNE does not map its text to
+any vocabulary: there are 234k distinct history concepts, 257k diagnosis titles and 50k medication
+names. Rendering them into codes would split the vocabulary far more than the `DRG` descriptions
+did. Every code starts with `NOTE//`, so events extracted by an LLM (item-level accuracy 92.2–99.8%
+per section in the MNE paper) can be dropped wholesale.
+
+| Code                                                                           | Value                                                                                | Source table                                        |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| `NOTE//PAST_MEDICAL_HISTORY//{PATIENT,FAMILY}//{category}//{CURRENT,PAST,UNK}` | concept in `text_value`; `family_relation` column                                    | `past_medical_history`                              |
+| `NOTE//MEDICATION//{ON_ADMISSION,AT_DISCHARGE}`                                | drug name in `text_value`; `dose_value`, `dose_unit`, `route`, `prn`, `hold` columns | `medications_on_admission`, `discharge_medications` |
+| `NOTE//ALLERGY//{standardized allergen}`, `//UNK`, `//NONE_KNOWN`              | allergy as written in `text_value`                                                   | `allergies`                                         |
+| `NOTE//PHYSICAL_EXAM//{timepoint}//{vital}`                                    | `numeric_value` (°C, bpm, mmHg, /min, %, kg); LOINC parents                          | `physical_exam_vitals`                              |
+| `NOTE//PHYSICAL_EXAM//{timepoint}//O2_SUPPORT//{method}`                       | flow in L/min, if stated                                                             | `physical_exam_vitals`                              |
+| `NOTE//PHYSICAL_EXAM//{timepoint}//{system}//{NORMAL,ABNORMAL}`                | abnormal findings in `text_value` (a Postgres array literal)                         | `physical_exam_systems`                             |
+| `NOTE//DISCHARGE_CONDITION//{aspect}//{value}`                                 | —                                                                                    | `discharge_condition`                               |
+| `NOTE//DISCHARGE_DIAGNOSIS//{PRIMARY,SECONDARY}`                               | diagnosis in `text_value`                                                            | `discharge_diagnosis`                               |
+| `NOTE//MAJOR_PROCEDURE//{THIS_ADMISSION,PREVIOUS}`                             | procedure in `text_value`                                                            | `major_procedures`                                  |
+| `NOTE//CHIEF_COMPLAINT//{FINDING,CONTEXT}`                                     | complaint in `text_value`                                                            | `chief_complaint`                                   |
+
+The decisions behind the less obvious rows:
+
+- **`seq_num` rides on every multi-row table**, as on the `omr` blood-pressure blocks. 66k history
+    rows (1.8%) and 17k home-medication rows (0.7%) repeat within one admission except for
+    `seq_num`, and the merge stage's `unique_by: "*"` would otherwise collapse them.
+- **"No known allergies" gets its own code.** MNE stores it as an allergy row — 126k of them, 20.8%
+    of the table, one per admission — always with a null `title_std`. Read naively it is an
+    allergen. Only 2,012 real allergens lack a standardized label; they go to `NOTE//ALLERGY//UNK`.
+- **NOT_ASSESSED exam systems are not emitted** (36% of rows). They record that the summary said
+    nothing about the system, and MNE's authors warn that a missing entry is not evidence of a
+    normal finding.
+- **Temperature is taken in °C only.** `temperature_f` is present exactly when `temperature_c` is,
+    and always converts to it. Weight arrives in kg or lbs and is normalized to kg; a weight with no
+    unit is dropped.
+- **Medication doses are extension columns, not `numeric_value`.** One code covers every drug, so
+    a `numeric_value` would mix milligrams of one drug with puffs of another under the same code.
+    Mapping the names to RxNorm would let the drug enter the code; MNE does not ship that mapping.
+- **Not extracted:** `gender`, `services` and `discharge_disposition` duplicate MIMIC's own,
+    timestamped columns (MNE's gender disagrees with `hosp/patients` for 0.04% of admissions; its
+    `EXPIRED` agrees with `hospital_expire_flag` for ~97–98%). `patient_died` and `patient_left_ama`
+    are covered by `MEDS_DEATH` and `HOSPITAL_DISCHARGE//AGAINST ADVICE`. `pertinent_results`
+    repeats structured labs and microbiology for a quarter of its rows and needs array parsing for
+    the imaging, pathology and electrophysiology rest. Medication `strength` and `frequency` are
+    JSON in at least five shapes. `discharge_sections` is verbatim note text (845 MB of the
+    ~1.2 GB release). The download's `include` list skips all of these.
+
+**Known limits of the source.** 57 MNE admissions no longer exist in MIMIC-IV 3.1; their rows
+(3,522) have no discharge time and are dropped. MNE filtered 9.4% of the source summaries (331,793
+to 300,720) by criteria the paper does not spell out. Its `SHA256SUMS.txt` separates hash and path
+by one space, which `shasum -c` rejects but MEDS-Extract's downloader accepts.
 
 ## Code metadata
 
