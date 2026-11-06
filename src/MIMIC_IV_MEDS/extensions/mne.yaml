@@ -1,0 +1,476 @@
+# Extension: MIMIC-IV-Ext MIMIC-Note-Extract (MNE) v1.0
+#   https://physionet.org/content/mimic-iv-ext-note-extract/1.0/
+#
+# This is NOT a spec on its own. `scripts/build_extension_specs.py` composes it with
+# `event_configs.yaml` into the generated, registered spec `event_configs_mne.yaml`
+# (`spec=MIMIC-IV-MNE`); edit this file and the base, never the generated one. It is a separate
+# spec rather than part of `MIMIC-IV` because MEDS-Extract fails on a configured table whose raw
+# file is missing, and MNE is a separately-credentialed PhysioNet project most users do not have.
+#
+# MNE structures 13 sections of the MIMIC-IV-Note v2.2 discharge summaries into tables keyed by
+# `hadm_id`. Every table here follows the same rules; the reasoning is in "MIMIC-Note-Extract" in
+# the README:
+#
+# - **Timed at `hosp/admissions.dischtime`.** MNE carries no timestamps (the note's own are
+#   redacted) and everything in it was documented at discharge, so that is the earliest honest
+#   time — the same rule `DIAGNOSIS` and `DRG` follow. Even an ADMISSION-timepoint exam is
+#   emitted at discharge; the timepoint rides in the code. 57 MNE admissions are absent from
+#   MIMIC-IV 3.1; their join leaves `dischtime` null and the rows are dropped.
+# - **Codes from closed enums only, free text in `text_value`.** MNE's free text is not mapped to
+#   any vocabulary (234k distinct history concepts, 257k diagnosis titles, 50k medication names);
+#   rendering it into codes would fragment the vocabulary far past usefulness.
+# - **`NOTE//` prefix** on every code, so LLM-extracted events (item accuracy 92-99.8% per the
+#   MNE paper) can be filtered out wholesale.
+# - **`seq_num` on every multi-row table**, as on the `omr` blood-pressure blocks: rows that repeat
+#   within an admission (1.8% of history rows) would otherwise collapse at the merge stage.
+#
+# Not extracted: `gender`, `services` and `discharge_disposition` duplicate MIMIC's own structured
+# (and timestamped) columns; `discharge_sections` is verbatim note text; `pertinent_results`
+# repeats structured labs/microbiology for a quarter of its rows and needs array parsing for the rest;
+# `admissions` is only the hub. The download `include` list below therefore skips them too
+# (`discharge_sections.csv.gz` alone is 845 MB).
+
+etl:
+  dataset_name: MIMIC-IV-MNE
+
+allergies:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+    cols:
+      # "No known allergies" is stored as an allergy row: 126k rows, one per admission, every one
+      # with a null `title_std`. Routed to its own code so it is never read as an allergen. Only
+      # rows without a standardized label are tested, so a standardized allergen can never match.
+      none_known: '($title_std ?? "") == "" and /(?i)no known|nkda|\bnka\b|no allerg/ in ($title ?? "")'
+      allergy_label: "'NONE_KNOWN' if $none_known else ($title_std ?? 'UNK')"
+  allergy:
+    code: f"NOTE//ALLERGY//{$allergy_label}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    text_value: "$title if not $none_known"
+    seq_num: $seq_num
+    _metadata:
+      _self:
+        description: >-
+          "No known allergies, as stated in the discharge summary (MIMIC-Note-Extract allergies.title)"
+          if $allergy_label == "NONE_KNOWN"
+          else f"Allergy listed in the discharge summary, standardized allergen {$allergy_label}
+          (MIMIC-Note-Extract allergies.title_std; UNK if not standardized); the allergy as written is in
+          text_value"
+
+chief_complaint:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+  chief_complaint:
+    code: f"NOTE//CHIEF_COMPLAINT//{$category}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    text_value: $text
+    seq_num: $seq_num
+    _metadata:
+      _self:
+        description: >-
+          f"Chief complaint from the discharge summary, entry of kind {$category}
+          (MIMIC-Note-Extract chief_complaint.category: FINDING or CONTEXT); the complaint is in text_value"
+
+past_medical_history:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+  past_medical_history:
+    code: f"NOTE//PAST_MEDICAL_HISTORY//{$subject}//{$category}//{$temporal_status ?? 'UNK'}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    text_value: $concept_name
+    family_relation: $family_relation
+    seq_num: $seq_num
+    _metadata:
+      _self:
+        description: >-
+          f"Past medical history from the discharge summary: a {$category} of the {$subject}
+          (MIMIC-Note-Extract past_medical_history.category, .subject), {$temporal_status ?? 'UNK'}
+          (.temporal_status); the concept is in text_value and, for family history, the relative in
+          family_relation"
+
+medications_on_admission:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+    cols:
+      # Constant code component; see `ed_registration_code` in the base config.
+      medication_list: "'ON_ADMISSION'"
+  medication:
+    code: f"NOTE//MEDICATION//{$medication_list}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    # The drug name is free text (50k distinct), so it rides in text_value; the dose cannot go in
+    # numeric_value because one code would then mix every drug and unit.
+    text_value: $name
+    dose_value: $dose_value
+    dose_unit: $dose_unit
+    route: $route
+    prn: $prn
+    hold: $hold
+    seq_num: $seq_num
+    _metadata:
+      _self:
+        description: >-
+          'Medication the patient was taking on admission (home medication), from the discharge summary
+          (MIMIC-Note-Extract medications_on_admission); the drug name is in text_value and the dose, unit,
+          route, PRN and hold flags are in extension columns'
+
+discharge_medications:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+    cols:
+      medication_list: "'AT_DISCHARGE'"
+  medication:
+    code: f"NOTE//MEDICATION//{$medication_list}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    text_value: $name
+    dose_value: $dose_value
+    dose_unit: $dose_unit
+    route: $route
+    prn: $prn
+    hold: $hold
+    seq_num: $seq_num
+    _metadata:
+      _self:
+        description: >-
+          'Medication prescribed at discharge, from the discharge summary
+          (MIMIC-Note-Extract discharge_medications); the drug name is in text_value and the dose, unit,
+          route, PRN and hold flags are in extension columns'
+
+discharge_diagnosis:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+    cols:
+      diagnosis_rank: "'PRIMARY' if $is_primary else 'SECONDARY'"
+  diagnosis:
+    code: f"NOTE//DISCHARGE_DIAGNOSIS//{$diagnosis_rank}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    text_value: $title
+    seq_num: $seq_num
+    _metadata:
+      _self:
+        description: >-
+          f"Clinician-written {$diagnosis_rank} discharge diagnosis from the discharge summary
+          (MIMIC-Note-Extract discharge_diagnosis.is_primary); the diagnosis is in text_value"
+
+major_procedures:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+    cols:
+      procedure_when: "'PREVIOUS' if $is_previous else 'THIS_ADMISSION'"
+  procedure:
+    code: f"NOTE//MAJOR_PROCEDURE//{$procedure_when}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    text_value: $title
+    seq_num: $seq_num
+    _metadata:
+      _self:
+        description: >-
+          f"Major surgical or invasive procedure listed in the discharge summary, performed
+          {'during an earlier admission' if $procedure_when == 'PREVIOUS' else 'during this admission'}
+          (MIMIC-Note-Extract major_procedures.is_previous); the procedure is in text_value"
+
+# One row per (admission, timepoint), each vital in its own column: one event per filled column.
+# A null value must emit no event, and dftly has no null test, so each code is conditional on the
+# value coalesced to -1 (every vital here is non-negative). `temperature_f` is skipped: it is
+# present exactly when `temperature_c` is and always converts to it.
+physical_exam_vitals:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+  temperature:
+    code: 'f"NOTE//PHYSICAL_EXAM//{$timepoint}//TEMPERATURE_C" if ($temperature_c ?? -1) >= 0'
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    numeric_value: $temperature_c
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8310-5'"
+        description: >-
+          f"Body temperature in degrees Celsius from the {$timepoint} physical examination in the discharge
+          summary (MIMIC-Note-Extract physical_exam_vitals.temperature_c, .timepoint)"
+  heart_rate:
+    code: 'f"NOTE//PHYSICAL_EXAM//{$timepoint}//HEART_RATE" if ($heart_rate ?? -1) >= 0'
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    numeric_value: $heart_rate
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8867-4'"
+        description: >-
+          f"Heart rate in beats per minute from the {$timepoint} physical examination in the discharge summary
+          (MIMIC-Note-Extract physical_exam_vitals.heart_rate, .timepoint)"
+  bp_systolic:
+    code: 'f"NOTE//PHYSICAL_EXAM//{$timepoint}//BP_SYSTOLIC" if ($bp_systolic ?? -1) >= 0'
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    numeric_value: $bp_systolic
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8480-6'"
+        description: >-
+          f"Systolic blood pressure in mmHg from the {$timepoint} physical examination in the discharge summary
+          (MIMIC-Note-Extract physical_exam_vitals.bp_systolic, .timepoint)"
+  bp_diastolic:
+    code: 'f"NOTE//PHYSICAL_EXAM//{$timepoint}//BP_DIASTOLIC" if ($bp_diastolic ?? -1) >= 0'
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    numeric_value: $bp_diastolic
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8462-4'"
+        description: >-
+          f"Diastolic blood pressure in mmHg from the {$timepoint} physical examination in the discharge summary
+          (MIMIC-Note-Extract physical_exam_vitals.bp_diastolic, .timepoint)"
+  respiratory_rate:
+    code: 'f"NOTE//PHYSICAL_EXAM//{$timepoint}//RESPIRATORY_RATE" if ($respiratory_rate ?? -1) >= 0'
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    numeric_value: $respiratory_rate
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/9279-1'"
+        description: >-
+          f"Respiratory rate in breaths per minute from the {$timepoint} physical examination in the discharge
+          summary (MIMIC-Note-Extract physical_exam_vitals.respiratory_rate, .timepoint)"
+  o2_saturation:
+    code: 'f"NOTE//PHYSICAL_EXAM//{$timepoint}//O2_SATURATION" if ($o2_saturation ?? -1) >= 0'
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    numeric_value: $o2_saturation
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/59408-5'"
+        description: >-
+          f"Oxygen saturation by pulse oximetry in percent from the {$timepoint} physical examination in the
+          discharge summary (MIMIC-Note-Extract physical_exam_vitals.o2_saturation, .timepoint)"
+  # Weight is written in kg or lbs; normalized to kg. A weight without a unit is not emitted.
+  weight:
+    code: >-
+      f"NOTE//PHYSICAL_EXAM//{$timepoint}//WEIGHT_KG"
+      if ($weight_value ?? -1) >= 0 and (($weight_unit ?? "") == "kg" or ($weight_unit ?? "") == "lbs")
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    numeric_value: '$weight_value * 0.45359237 if $weight_unit == "lbs" else $weight_value'
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/29463-7'"
+        description: >-
+          f"Body weight in kilograms from the {$timepoint} physical examination in the discharge summary
+          (MIMIC-Note-Extract physical_exam_vitals.weight_value, converted from weight_unit lbs where needed)"
+  # The method is a closed enum and part of the code; the flow (L/min), when given, is the value.
+  # A null method leaves a null code component, which drops the row.
+  o2_support:
+    code: f"NOTE//PHYSICAL_EXAM//{$timepoint}//O2_SUPPORT//{$o2_support_method}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    numeric_value: $o2_support_lpm
+    _metadata:
+      _self:
+        description: >-
+          f"Oxygen support {$o2_support_method} at the {$timepoint} physical examination in the discharge summary
+          (MIMIC-Note-Extract physical_exam_vitals.o2_support_method); the flow in L/min, if stated, is in
+          numeric_value"
+
+physical_exam_systems:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+  # NOT_ASSESSED (36% of rows) records that the summary says nothing about the system, which MNE's
+  # authors warn is not evidence of a normal finding; it is not emitted.
+  exam:
+    code: >-
+      f"NOTE//PHYSICAL_EXAM//{$timepoint}//{$system}//{$status}" if ($status ?? "NOT_ASSESSED") != "NOT_ASSESSED"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    # A Postgres array literal (`{a,"b c"}`), kept verbatim; only ABNORMAL findings carry content.
+    text_value: '$abnormal_findings if $status == "ABNORMAL"'
+    _metadata:
+      _self:
+        description: >-
+          f"{$status} finding for organ system {$system} at the {$timepoint} physical examination in the
+          discharge summary (MIMIC-Note-Extract physical_exam_systems.system, .status); for ABNORMAL, the
+          findings are in text_value as a Postgres array literal"
+
+# One row per admission, one closed-enum column per aspect of the patient's condition at discharge:
+# one event per filled column (a null column is a null code component, which drops the row).
+# `patient_died` and `patient_left_ama` are not emitted: MIMIC already records both (MEDS_DEATH,
+# HOSPITAL_DISCHARGE//AGAINST ADVICE) with timestamps.
+discharge_condition:
+  _table:
+    join:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
+  mental_status:
+    code: f"NOTE//DISCHARGE_CONDITION//MENTAL_STATUS//{$mental_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Mental status at discharge: {$mental_status} (MIMIC-Note-Extract discharge_condition.mental_status)"
+  level_of_consciousness:
+    code: f"NOTE//DISCHARGE_CONDITION//LEVEL_OF_CONSCIOUSNESS//{$level_of_consciousness}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Level of consciousness at discharge: {$level_of_consciousness}
+          (MIMIC-Note-Extract discharge_condition.level_of_consciousness)"
+  activity_status:
+    code: f"NOTE//DISCHARGE_CONDITION//ACTIVITY_STATUS//{$activity_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Activity status at discharge: {$activity_status} (MIMIC-Note-Extract discharge_condition.activity_status)"
+  general_condition:
+    code: f"NOTE//DISCHARGE_CONDITION//GENERAL_CONDITION//{$general_condition}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"General condition at discharge: {$general_condition}
+          (MIMIC-Note-Extract discharge_condition.general_condition)"
+  pain_status:
+    code: f"NOTE//DISCHARGE_CONDITION//PAIN_STATUS//{$pain_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Pain status at discharge: {$pain_status} (MIMIC-Note-Extract discharge_condition.pain_status)"
+  cardiovascular_status:
+    code: f"NOTE//DISCHARGE_CONDITION//CARDIOVASCULAR_STATUS//{$cardiovascular_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Cardiovascular status at discharge: {$cardiovascular_status}
+          (MIMIC-Note-Extract discharge_condition.cardiovascular_status)"
+  vital_signs_status:
+    code: f"NOTE//DISCHARGE_CONDITION//VITAL_SIGNS_STATUS//{$vital_signs_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Vital signs status at discharge: {$vital_signs_status}
+          (MIMIC-Note-Extract discharge_condition.vital_signs_status)"
+  fever_status:
+    code: f"NOTE//DISCHARGE_CONDITION//FEVER_STATUS//{$fever_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Fever status at discharge: {$fever_status} (MIMIC-Note-Extract discharge_condition.fever_status)"
+  nutrition_status:
+    code: f"NOTE//DISCHARGE_CONDITION//NUTRITION_STATUS//{$nutrition_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Nutrition status at discharge: {$nutrition_status}
+          (MIMIC-Note-Extract discharge_condition.nutrition_status)"
+  wound_presence:
+    code: f"NOTE//DISCHARGE_CONDITION//WOUND_PRESENCE//{$wound_presence}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Wound presence at discharge: {$wound_presence} (MIMIC-Note-Extract discharge_condition.wound_presence)"
+  wound_infection_status:
+    code: f"NOTE//DISCHARGE_CONDITION//WOUND_INFECTION_STATUS//{$wound_infection_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Wound infection status at discharge: {$wound_infection_status}
+          (MIMIC-Note-Extract discharge_condition.wound_infection_status)"
+  respiratory_status:
+    code: f"NOTE//DISCHARGE_CONDITION//RESPIRATORY_STATUS//{$respiratory_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Respiratory status at discharge: {$respiratory_status}
+          (MIMIC-Note-Extract discharge_condition.respiratory_status)"
+  orientation_status:
+    code: f"NOTE//DISCHARGE_CONDITION//ORIENTATION_STATUS//{$orientation_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Orientation status at discharge: {$orientation_status}
+          (MIMIC-Note-Extract discharge_condition.orientation_status)"
+  neurological_status:
+    code: f"NOTE//DISCHARGE_CONDITION//NEUROLOGICAL_STATUS//{$neurological_status}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"Neurological status at discharge: {$neurological_status}
+          (MIMIC-Note-Extract discharge_condition.neurological_status)"
+
+# Merged into the base `sources:` by the build script: each bucket named here is appended to the
+# base bucket of the same name, and base buckets not named here (`demo`: MNE has no demo) are
+# dropped from the composed spec. The include list fetches only the tables above (~210 MB of the
+# ~1.2 GB release) and keeps MNE's own LICENSE/README from colliding with MIMIC-IV's.
+sources:
+  dataset:
+    - type: physionet
+      base_url: https://physionet.org/files/mimic-iv-ext-note-extract/1.0
+      username: ${oc.env:DATASET_DOWNLOAD_USERNAME}
+      password: ${oc.env:DATASET_DOWNLOAD_PASSWORD}
+      include:
+        - allergies.csv.gz
+        - chief_complaint.csv.gz
+        - discharge_condition.csv.gz
+        - discharge_diagnosis.csv.gz
+        - discharge_medications.csv.gz
+        - major_procedures.csv.gz
+        - medications_on_admission.csv.gz
+        - past_medical_history.csv.gz
+        - physical_exam_systems.csv.gz
+        - physical_exam_vitals.csv.gz

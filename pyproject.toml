@@ -52,6 +52,9 @@ dev = [
 
 [project.entry-points."MEDS_extract.pipelines"]
 MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
+# MIMIC-IV plus the separately-credentialed MIMIC-Note-Extract tables. Generated from the base
+# and `extensions/mne.yaml` by `scripts/build_extension_specs.py`; see the README.
+MIMIC-IV-MNE = "MIMIC_IV_MEDS:event_configs_mne.yaml"
 
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"
