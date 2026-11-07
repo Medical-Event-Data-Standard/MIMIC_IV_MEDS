@@ -338,7 +338,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "meds-extract", extras = ["download"], specifier = ">=0.8.0,<0.9" },
-    { name = "sumeds", specifier = ">=0.6,<0.7" },
+    { name = "sumeds", specifier = ">=0.6.1,<0.7" },
 ]
 
 [package.metadata.requires-dev]
@@ -802,7 +802,7 @@ wheels = [
 
 [[package]]
 name = "sumeds"
-version = "0.6.0"
+version = "0.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "meds" },
@@ -811,9 +811,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/1a/9c00dda2fb5ba5fdc8ba1ccf7d2d2474c120380b803b0bdf3f38f97869d2/sumeds-0.6.0.tar.gz", hash = "sha256:3f3aaa244b509ee78a0d6993a44d918ad27abe5b3cb16bbceb9a5641811e3ad2", size = 48326, upload-time = "2026-11-07T17:54:18.608Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/8d/3ebfcd8f09e1b6a6b5d2075701b0af3dd96cb381c7475f58b6e233257279/sumeds-0.6.1.tar.gz", hash = "sha256:cda78eaaa3bca2a1fc872e71865ecf37af6550423e84d9a87ce55c1a172c33be", size = 53834, upload-time = "2026-11-07T18:55:57.245Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/5a/0d9ea34b131eb068b47eddca9f261312ccaf85c995fd8ffdd2716a57cc73/sumeds-0.6.0-py3-none-any.whl", hash = "sha256:4a0badfbfdfa66d7dbf8cfffc1d134ea4318a04aac998a9db69220d0d6a7d5c9", size = 53432, upload-time = "2026-11-07T17:54:17.415Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/c2/4f2d8e14480ed21b61986d91ebcae201a313966936bbfb7c15b45345ffce/sumeds-0.6.1-py3-none-any.whl", hash = "sha256:d86be01c56e7082542222a7af1b419f66bc0f18b9bca3c9686e26991122df57e", size = 59222, upload-time = "2026-11-07T18:55:55.758Z" },
 ]
 
 [[package]]

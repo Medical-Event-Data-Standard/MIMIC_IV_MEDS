@@ -205,12 +205,21 @@ suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR -- --athena-csv /path/t
 suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR -- --offline
 ```
 
-Running it again on an existing output skips the pipeline stages that are already done and
-enriches again. To enrich the `codes.parquet` of an existing build instead:
+Enrichment is on by default, and a failed enrichment (for example, on a server without internet
+access) does not fail the ETL: `metadata/codes.parquet` is left as the ETL wrote it, a warning gives
+the command to enrich it later, and the exit code is still 0. Whether a build was enriched is recorded
+in `metadata/dataset.json`, under `sumeds_enrichment.enriched`. To enrich a build afterwards, with
+the same rules and options as `suMEDS-extract`:
 
 ```bash
-suMEDS-enrich "$MEDS_OUTPUT_DIR/metadata/codes.parquet" -o "$MEDS_OUTPUT_DIR/metadata/codes.parquet" --rules MIMIC-IV
+suMEDS-enrich $MEDS_OUTPUT_DIR
+# Without internet access, from a copy of the sumeds-ontologies packs directory:
+suMEDS-enrich $MEDS_OUTPUT_DIR --ontology-source /path/to/sumeds-ontologies/ontologies --offline
 ```
+
+To make a failed enrichment an error instead, add `-- --strict`; to skip enrichment, run
+`meds-extract-run spec=MIMIC-IV ...` instead. Running `suMEDS-extract` again on an existing output
+skips the pipeline stages that are already done and enriches again.
 
 For MIMIC-IV, the rules add:
 

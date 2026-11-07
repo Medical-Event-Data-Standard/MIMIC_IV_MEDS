@@ -6,13 +6,16 @@ the raw demo files that the `demo_cohort` build of `conftest.py` downloaded (`do
 that build is the plain-ETL baseline the enriched output is compared with. The ontology source is a tiny
 pack repository in suMEDS's `sumeds-ontologies/0.1` layout, built here with made-up titles for a few ICD
 codes of the demo and their ancestors, so the test reads nothing over the network and does not depend on
-the published packs.
+the published packs. With an empty pack source instead, the enrichment fails without failing the ETL: the
+plain `codes.parquet` is kept, the failure is recorded in `metadata/dataset.json`, and `suMEDS-enrich` on
+the output enriches it later.
 """
 
 import csv
 import hashlib
 import io
 import json
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -20,7 +23,7 @@ import polars as pl
 import pyarrow.parquet as pq
 import pytest
 from conftest import SPEC, run_script
-from meds import CodeMetadataSchema
+from meds import CodeMetadataSchema, DatasetMetadataSchema
 
 #: vocabulary -> code -> parent (None for a top-level category). Each vocabulary needs a pack, as every
 #: ICD rule validates its codes against one; codes of the demo that are not listed stay unenriched.
@@ -98,8 +101,7 @@ def ontology_source(tmp_path_factory) -> Path:
     return root
 
 
-@pytest.fixture(scope="module")
-def enriched_cohort(demo_raw_dir: Path, ontology_source: Path):
+def _run_with_enrichment(raw_dir: Path, ontology_source: Path):
     with TemporaryDirectory() as temp_dir:
         out = Path(temp_dir) / "MEDS_cohort"
         run_script(
@@ -108,13 +110,31 @@ def enriched_cohort(demo_raw_dir: Path, ontology_source: Path):
             f"output_dir={out}",
             "dataset_key=demo",
             "do_download=false",
-            f"input_dir={demo_raw_dir}",
+            f"input_dir={raw_dir}",
             "--",
             "--ontology-source",
             str(ontology_source),
             "--offline",
         )
         yield out
+
+
+@pytest.fixture(scope="module")
+def enriched_cohort(demo_raw_dir: Path, ontology_source: Path):
+    yield from _run_with_enrichment(demo_raw_dir, ontology_source)
+
+
+@pytest.fixture(scope="module")
+def soft_failed_cohort(demo_raw_dir: Path, tmp_path_factory):
+    """The same run with an empty pack source, as on a site that cannot reach the packs."""
+    yield from _run_with_enrichment(demo_raw_dir, tmp_path_factory.mktemp("no_packs"))
+
+
+def _enrichment_record(cohort: Path) -> dict:
+    """The `sumeds_enrichment` record of the cohort's `dataset.json`, which must stay valid MEDS."""
+    metadata = json.loads((cohort / "metadata" / "dataset.json").read_text())
+    DatasetMetadataSchema.validate(metadata)
+    return metadata["sumeds_enrichment"]
 
 
 def _codes(cohort: Path) -> dict[str, dict]:
@@ -217,3 +237,31 @@ def test_codes_missing_from_the_packs_are_left_alone(plain_codes, enriched_codes
 def test_gender_is_tagged_with_the_omop_gender_code(plain_codes, enriched_codes, gender):
     assert not plain_codes[f"GENDER//{gender}"]["parent_codes"]
     assert enriched_codes[f"GENDER//{gender}"]["parent_codes"] == [f"Gender//{gender}"]
+
+
+def test_dataset_json_records_the_enrichment(enriched_cohort: Path):
+    record = _enrichment_record(enriched_cohort)
+    assert record["enriched"] is True
+    assert record["rules"] == SPEC
+    coverage = record["coverage"]
+    assert coverage["with_parent_codes"][1] > coverage["with_parent_codes"][0]
+
+
+def test_failed_enrichment_keeps_the_plain_etl_output(demo_cohort: Path, soft_failed_cohort: Path):
+    codes = Path("metadata", "codes.parquet")
+    assert (soft_failed_cohort / codes).read_bytes() == (demo_cohort / codes).read_bytes()
+    record = _enrichment_record(soft_failed_cohort)
+    assert record["enriched"] is False
+    # The pack directory is not recorded, so the retry asks for it again.
+    assert record["retry"] == "suMEDS-enrich <MEDS_ROOT> --ontology-source <PACKS_DIR>"
+
+
+def test_failed_enrichment_can_be_retried(
+    soft_failed_cohort: Path, ontology_source: Path, enriched_cohort: Path, tmp_path: Path
+):
+    out = tmp_path / "MEDS_cohort"
+    shutil.copytree(soft_failed_cohort / "metadata", out / "metadata")
+    run_script("suMEDS-enrich", str(out), "--ontology-source", str(ontology_source), "--offline")
+    assert _enrichment_record(out)["enriched"] is True
+    codes = Path("metadata", "codes.parquet")
+    assert pq.read_table(out / codes).equals(pq.read_table(enriched_cohort / codes))

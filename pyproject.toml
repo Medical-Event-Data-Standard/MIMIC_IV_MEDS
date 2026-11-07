@@ -32,11 +32,13 @@ classifiers = [
 #
 # suMEDS provides `suMEDS-extract`, which runs this ETL with `meds-extract-run` and then
 # enriches its code metadata with the rules registered below; installing it changes nothing
-# for `meds-extract-run`. 0.6 writes the `*_names` columns as code-to-name maps. It is capped
-# below the next minor for the same reason (its rules format and CLI are still 0.x).
+# for `meds-extract-run`. 0.6 writes the `*_names` columns as code-to-name maps. 0.6.1 makes a
+# failed enrichment a warning that keeps the ETL output, and records the enrichment in
+# `metadata/dataset.json`. It is capped below the next minor for the same reason (its rules
+# format and CLI are still 0.x).
 dependencies = [
     "meds-extract[download]>=0.8.0,<0.9",
-    "sumeds>=0.6,<0.7",
+    "sumeds>=0.6.1,<0.7",
 ]
 
 [dependency-groups]
