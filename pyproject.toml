@@ -20,15 +20,25 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 # This package ships no Python: the whole ETL is `event_configs.yaml`, run by
-# MEDS-Extract's own `meds-extract-run`. So there is exactly one dependency — the
-# `[download]` extra adds `meds-extract-download` (httpx + tenacity), which the runner
-# spawns to stage the raw data. MEDS-transforms, polars and hydra all arrive through it
-# at the versions it fences; duplicating those pins here would only create drift.
+# MEDS-Extract's own `meds-extract-run`. The `[download]` extra adds
+# `meds-extract-download` (httpx + tenacity), which the runner spawns to stage the raw
+# data. MEDS-transforms, polars and hydra all arrive through it at the versions it fences;
+# duplicating those pins here would only create drift.
 #
-# The floor is 0.7.0, not 0.6.x: this config uses `_self` metadata blocks and composite
-# join keys, neither of which exists before 0.7.
+# The floor is 0.8.0: this config names its joins `_table.joins`, which 0.8 renamed from
+# `_table.join` (and rejects the old name). It also relies on `_self` metadata blocks and
+# composite join keys from 0.7. MEDS-Extract 0.x minors are breaking (MESSY syntax, runner
+# CLI), so the ceiling is raised deliberately when migrating.
+#
+# suMEDS provides `suMEDS-extract`, which runs this ETL with `meds-extract-run` and then
+# enriches its code metadata with the rules registered below; installing it changes nothing
+# for `meds-extract-run`. 0.6 writes the `*_names` columns as code-to-name maps. 0.6.1 makes a
+# failed enrichment a warning that keeps the ETL output, and records the enrichment in
+# `metadata/dataset.json`. It is capped below the next minor for the same reason (its rules
+# format and CLI are still 0.x).
 dependencies = [
-    "meds-extract[download]>=0.7.0,<0.8",
+    "meds-extract[download]>=0.8.0,<0.9",
+    "sumeds>=0.6.1,<0.7",
 ]
 
 [dependency-groups]
@@ -39,21 +49,24 @@ dependencies = [
 # `pytest-rerunfailures` lets CI auto-retry the e2e demo download test on the
 # narrow set of network exceptions seen coming out of PhysioNet (connection
 # reset / IncompleteRead mid-stream) instead of turning a bad upstream minute
-# into a failed CI build. `sumeds` (0.4 is the first release with rules) loads the
-# packaged suMEDS rules in tests/sumeds_rules_test.py.
+# into a failed CI build.
 dev = [
     "pre-commit~=3.8",
     "ruff>=0.11,<1.0",
     "pytest~=9.0",
     "pytest-rerunfailures==16.1",
     "shfmt-py==3.12.0.2",
-    "sumeds>=0.4",
 ]
 
 [tool.setuptools_scm]
 
 [project.entry-points."MEDS_extract.pipelines"]
 MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
+
+# Registers the suMEDS rules under the same name, so `suMEDS-extract spec=MIMIC-IV` and
+# `--rules MIMIC-IV` find them.
+[project.entry-points."sumeds.rules"]
+MIMIC-IV = "MIMIC_IV_MEDS:sumeds_rules.yaml"
 
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"

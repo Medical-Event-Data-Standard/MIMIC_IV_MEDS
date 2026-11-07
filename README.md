@@ -17,8 +17,15 @@ This pipeline extracts the MIMIC-IV dataset (from PhysioNet) into the MEDS forma
 pip install MIMIC_IV_MEDS
 export DATASET_DOWNLOAD_USERNAME=$PHYSIONET_USERNAME
 export DATASET_DOWNLOAD_PASSWORD=$PHYSIONET_PASSWORD
-meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
+suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
 ```
+
+[suMEDS](https://github.com/rvandewater/SumMEDS)' `suMEDS-extract` (installed with this package)
+runs the ETL with `meds-extract-run spec=MIMIC-IV`, then adds external-ontology links to
+`metadata/codes.parquet` (see
+[Enriching code metadata with suMEDS](#enriching-code-metadata-with-sumeds)). Arguments before a
+`--` go to `meds-extract-run`, and arguments after it go to `suMEDS-enrich`. For the plain ETL, run
+`meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR` with the same arguments.
 
 When you run this, the program will:
 
@@ -31,21 +38,23 @@ When you run this, the program will:
     joins, and metadata extraction are declared in
     `src/MIMIC_IV_MEDS/event_configs.yaml` — and write it to `$MEDS_OUTPUT_DIR`
     (`data/` and `metadata/`, alongside the run's intermediate stage outputs).
+3. Enrich `metadata/codes.parquet` in place with the suMEDS rules this package ships.
 
 To run over the publicly available, fully open MIMIC-IV demo dataset (v2.2, no credentials
 required):
 
 ```bash
-meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
 ```
 
 If you already have the raw MIMIC-IV files on disk, skip the download entirely:
 
 ```bash
-meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
+suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
 ```
 
-Run `meds-extract-run --help` for the full set of arguments and options.
+Run `meds-extract-run --help` for the full set of arguments and options, and `suMEDS-enrich --help`
+for the options after the `--`.
 
 Budget for the download rather than the extraction: the raw release is 41 files and 9.9 GiB
 from PhysioNet, which rate-limits each connection to roughly 50 KB/s, while the extraction
@@ -180,30 +189,59 @@ is left uncovered, and why:
 ## Enriching code metadata with suMEDS
 
 External-ontology links are not written by the ETL. The package ships
-`src/MIMIC_IV_MEDS/sumeds_rules.yaml`, a [suMEDS](https://github.com/rvandewater/SumMEDS)
-rules file (`sumeds-rules/0.1`, read by suMEDS 0.4 or later), which adds them to a finished
-`codes.parquet` from suMEDS's versioned ontology data (sumeds-ontologies, pinned release),
-fetched on demand:
+[`src/MIMIC_IV_MEDS/sumeds_rules.yaml`](src/MIMIC_IV_MEDS/sumeds_rules.yaml), a
+[suMEDS](https://github.com/rvandewater/SumMEDS) rules file registered in suMEDS's `sumeds.rules`
+entry-point group under the same name as the MEDS-Extract spec, `MIMIC-IV`. That is how
+`suMEDS-extract spec=MIMIC-IV` finds them, and `--rules MIMIC-IV` works for any suMEDS command.
+`suMEDS-extract` replaces `metadata/codes.parquet` only once the enriched table is complete, and it
+stays valid MEDS code metadata. The ontology data comes from suMEDS's versioned ontology packs
+(sumeds-ontologies, pinned release), fetched from GitHub on first use and cached; no Athena download
+is needed. suMEDS options go after a `--`:
 
 ```bash
-pip install "sumeds>=0.4"
-suMEDS-enrich $MEDS_DIR/metadata/codes.parquet -o codes_enriched.parquet \
-	--rules "$(python -c 'from importlib.resources import files; print(files("MIMIC_IV_MEDS") / "sumeds_rules.yaml")')"
+# Also look codes up in your own OHDSI Athena download (this validates the Gender tags too):
+suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR -- --athena-csv /path/to/athena
+# Use only already cached packs (no network):
+suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR -- --offline
 ```
+
+Enrichment is on by default, and a failed enrichment (for example, on a server without internet
+access) does not fail the ETL: `metadata/codes.parquet` is left as the ETL wrote it, a warning gives
+the command to enrich it later, and the exit code is still 0. Whether a build was enriched is recorded
+in `metadata/dataset.json`, under `sumeds_enrichment.enriched`. To enrich a build afterwards, with
+the same rules and options as `suMEDS-extract`:
+
+```bash
+suMEDS-enrich $MEDS_OUTPUT_DIR
+# Without internet access, from a copy of the sumeds-ontologies packs directory:
+suMEDS-enrich $MEDS_OUTPUT_DIR --ontology-source /path/to/sumeds-ontologies/ontologies --offline
+```
+
+To make a failed enrichment an error instead, add `-- --strict`; to skip enrichment, run
+`meds-extract-run spec=MIMIC-IV ...` instead. Running `suMEDS-extract` again on an existing output
+skips the pipeline stages that are already done and enriches again.
+
+For MIMIC-IV, the rules add:
 
 - `GENDER//F` and `GENDER//M` get the OMOP Gender codes `Gender//F` and `Gender//M` (a tag:
     Gender has no public pack; with `--athena-csv` suMEDS validates them against Athena).
-- `DIAGNOSIS//ICD//{9,10}//…` and `PROCEDURE//ICD//{9,10}//…` get the dotted ICD-9-CM,
-    ICD-10-CM, ICD-9 procedure or ICD-10-PCS code with its `vocabulary_id`, `concept_code`
-    and every ancestor in the pack (`ICD10CM//I50.23`, `ICD10CM//I50.2`, `ICD10CM//I50`).
+- `DIAGNOSIS//ICD//{9,10}//…` and `PROCEDURE//ICD//{9,10}//…` are matched to the dotted ICD-9-CM,
+    ICD-10-CM, ICD-9 procedure or ICD-10-PCS code, which fills `vocabulary_id` and `concept_code`.
+    The ETL's own reference (`ICD10CM/I50.23`) stays first in `parent_codes`, and every ancestor
+    in the pack follows it (`ICD10CM//I50.2`, `ICD10CM//I50`).
 - Same-dataset parents: an ICD code of the table becomes the parent of another when its
     vocabulary code is the nearest ancestor present (`DIAGNOSIS//ICD//10//I5023` gets
     `DIAGNOSIS//ICD//10//I502` when both occur).
+- `parent_names` maps each vocabulary code in `parent_codes` that a pack knows to its official
+    name, including the ETL's own references. Lab and fluid-output codes whose parent is a
+    LOINC code (`LOINC/2160-0`) also get `vocabulary_id` `LOINC` and the `concept_code`.
 
-The ETL alone does not emit these: a build without suMEDS has no Gender parents, no ICD
-ancestors and no same-dataset parents. suMEDS enrichment never removes or rewrites existing
-parents or descriptions, so the ETL's own parents (`ICD10CM/…`, `LOINC/…`, `NDC/…`, RxNorm,
-SNOMED, DRG) stay as they are.
+On the demo (2.2), the published packs add parents to 1,779 codes (1,777 of its 1,826 ICD codes, 4
+of them with a same-dataset parent, and both Gender codes) and names to 3,222 codes. The ETL alone
+does not emit any of this: a plain `meds-extract-run` build has no Gender parents, no ICD ancestors,
+no same-dataset parents and no names. suMEDS enrichment never removes or rewrites existing parents
+or descriptions, so the ETL's own parents (`ICD10CM/…`, `LOINC/…`, `NDC/…`, RxNorm, SNOMED, DRG) and
+its descriptions from MIMIC-IV's dictionary tables stay as they are.
 
 ## Parallel and multi-node runs
 
@@ -226,6 +264,8 @@ parallelize:
   launcher: joblib
 YAML
 MEDS_transform-pipeline $MEDS_OUTPUT_DIR/.meds_extract_run/pipeline.yaml
+# Then enrich the code metadata, as `suMEDS-extract` would.
+suMEDS-enrich "$MEDS_OUTPUT_DIR/metadata/codes.parquet" -o "$MEDS_OUTPUT_DIR/metadata/codes.parquet" --rules MIMIC-IV
 ```
 
 That file is self-contained (every path and version inlined), so it is also the place to
@@ -238,7 +278,7 @@ several connections give a near-linear speedup:
 
 ```bash
 meds-extract-download spec=MIMIC-IV output_dir=$RAW_INPUT_DIR key=dataset concurrency=8
-meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
+suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
 ```
 
 ## Expected runtime and compute needs
