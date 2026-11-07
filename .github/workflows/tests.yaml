@@ -5,11 +5,13 @@ name: Tests
 # answered by building the public demo cohort:
 #
 #   1. does the ETL still run?          -> tests/e2e_demo_test.py
+#      and does suMEDS enrich it?       -> tests/run_with_enrichment_test.py
 #   2. did its output change?           -> the summary-stats regression step
 #
 # The extraction is the expensive, flaky part: it downloads from PhysioNet and takes
 # minutes. It therefore happens ONCE, on ONE Python version, and both checks read the same
 # cohort — the test writes it to $MEDS_DEMO_OUTPUT_DIR and the stats step reads from there.
+# The enrichment test reruns the ETL offline from the raw files that build downloaded.
 # A Python-version matrix would multiply PhysioNet downloads for no signal about a package
 # that contains no Python.
 

@@ -11,7 +11,7 @@ from importlib.resources import files
 
 import pytest
 import yaml
-from sumeds import load_rules
+from sumeds import load_rules, registered_rules
 
 RULES_FP = files("MIMIC_IV_MEDS").joinpath("sumeds_rules.yaml")
 CONFIG = yaml.safe_load(files("MIMIC_IV_MEDS").joinpath("event_configs.yaml").read_text())
@@ -62,6 +62,12 @@ def test_rules_load_in_sumeds():
     """The rules load in suMEDS, which rejects any malformed rule."""
     rules = load_rules(RULES_FP)
     assert rules.ontology and rules.hierarchy
+
+
+def test_rules_are_registered_under_the_spec_name():
+    """`suMEDS-extract spec=MIMIC-IV` and `--rules MIMIC-IV` find the rules by this entry point."""
+    assert registered_rules()["MIMIC-IV"] == "MIMIC_IV_MEDS:sumeds_rules.yaml"
+    assert load_rules("MIMIC-IV") == load_rules(RULES_FP)
 
 
 def test_rules_target_the_configured_events():
