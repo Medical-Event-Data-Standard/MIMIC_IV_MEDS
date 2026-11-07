@@ -25,10 +25,12 @@ classifiers = [
 # spawns to stage the raw data. MEDS-transforms, polars and hydra all arrive through it
 # at the versions it fences; duplicating those pins here would only create drift.
 #
-# The floor is 0.7.0, not 0.6.x: this config uses `_self` metadata blocks and composite
-# join keys, neither of which exists before 0.7.
+# The floor is 0.8.0: this config names its joins `_table.joins`, which 0.8 renamed from
+# `_table.join` (and rejects the old name). It also relies on `_self` metadata blocks and
+# composite join keys from 0.7. MEDS-Extract 0.x minors are breaking (MESSY syntax, runner
+# CLI), so the ceiling is raised deliberately when migrating.
 dependencies = [
-    "meds-extract[download]>=0.7.0,<0.8",
+    "meds-extract[download]>=0.8.0,<0.9",
 ]
 
 [dependency-groups]

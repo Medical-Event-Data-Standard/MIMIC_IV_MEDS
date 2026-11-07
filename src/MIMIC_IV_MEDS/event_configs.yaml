@@ -107,11 +107,11 @@ hosp/admissions:
           f"Hospital discharge; disposition after leaving the hospital: {$discharge_location ?? 'UNK'}
           (hosp/admissions.discharge_location)"
   # We omit the death event here: `deathtime` is joined into hosp/patients via that
-  # table's aggregated `_table.join`, and the death event is emitted there.
+  # table's aggregated `_table.joins`, and the death event is emitted there.
 
 hosp/diagnoses_icd:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -140,7 +140,7 @@ hosp/diagnoses_icd:
 
 hosp/drgcodes:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -183,7 +183,7 @@ hosp/emar:
       # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
       # it) and an unmatched join leaves it null -- both collapse to UNK.
       ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
-    join:
+    joins:
       hosp/prescriptions:
         left_on: [pharmacy_id, drug_type]
         right_on: [pharmacy_id, drug_type]
@@ -205,7 +205,7 @@ hosp/emar:
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
       # NDC attached is exactly the one dispensed for this order.
       # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
-      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # the `_table.joins` above, so the parent is a row-wise expression over the event's own
       # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
       # `extract_code_metadata` re-scan that whole table and join it against every observed
       # code -- a full-data materialization for a column we already have.
@@ -293,7 +293,7 @@ hosp/patients:
       # Constants rendering the literal MEDS codes; see `ed_registration_code` in hosp/admissions.
       meds_birth_code: "'MEDS_BIRTH'"
       meds_death_code: "'MEDS_DEATH'"
-    join:
+    joins:
       # Earliest per-subject in-hospital death time, via an aggregated join
       # (mmcdermott/MEDS_extract#65 / #98, on the 0.7 line). `min` over the fixed-width
       # "%Y-%m-%d %H:%M:%S" strings is chronological. This replaces the last
@@ -350,7 +350,7 @@ hosp/pharmacy:
       # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
       # it) and an unmatched join leaves it null -- both collapse to UNK.
       ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
-    join:
+    joins:
       hosp/prescriptions:
         left_on: [pharmacy_id, drug_type]
         right_on: [pharmacy_id, drug_type]
@@ -371,7 +371,7 @@ hosp/pharmacy:
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
       # NDC attached is exactly the one dispensed for this order.
       # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
-      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # the `_table.joins` above, so the parent is a row-wise expression over the event's own
       # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
       # `extract_code_metadata` re-scan that whole table and join it against every observed
       # code -- a full-data materialization for a column we already have.
@@ -399,7 +399,7 @@ hosp/pharmacy:
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
       # NDC attached is exactly the one dispensed for this order.
       # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
-      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # the `_table.joins` above, so the parent is a row-wise expression over the event's own
       # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
       # `extract_code_metadata` re-scan that whole table and join it against every observed
       # code -- a full-data materialization for a column we already have.
@@ -419,7 +419,7 @@ hosp/pharmacy:
 
 hosp/procedures_icd:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
