@@ -253,7 +253,7 @@ wheels = [
 
 [[package]]
 name = "meds-extract"
-version = "0.8.0"
+version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dftly" },
@@ -267,9 +267,9 @@ dependencies = [
     { name = "universal-pathlib" },
     { name = "yaml-to-disk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/48/4c/e6711d90fdf7e598da495ff6c48880fea9a74d4811dbafaa3a130c9d49c6/meds_extract-0.8.0.tar.gz", hash = "sha256:aa945b4940e9e6e83e06a4c07d4bb7e07d7749125e1e950babbf50d9b3e2a072", size = 462542, upload-time = "2026-11-02T15:35:17.518Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ec/f1/85c06540cfec557edc355a9f430a776a5d6f29a539103a5fcf99d55d055f/meds_extract-0.8.1.tar.gz", hash = "sha256:d77c12bb48840fba4c72f05c536465b2b66b470354f8779aba89a909cfcd311b", size = 490265, upload-time = "2026-11-07T23:55:52.805Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/20/90/0adc92dc00d6d1aa785fd7ddc9974bb20897fbfbab4a8fc5866d6bcb1ad0/meds_extract-0.8.0-py3-none-any.whl", hash = "sha256:c8dbc26fd4a7e11d56d7998f2658a369c5c7f19380afef912c4cead5f2af3b2d", size = 229365, upload-time = "2026-11-02T15:35:15.412Z" },
+    { url = "https://files.pythonhosted.org/packages/02/e2/a3a1e5c65185ae21c9e55a9b9d8cfb1593a38f0e1e9366aa002c6d738949/meds_extract-0.8.1-py3-none-any.whl", hash = "sha256:d0102d5e8d0bee3790ba26b7554f57c90cdaeb5a91ee72927ff8e37d15dce1c1", size = 243733, upload-time = "2026-11-07T23:55:51.198Z" },
 ]
 
 [package.optional-dependencies]
@@ -337,8 +337,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "meds-extract", extras = ["download"], specifier = ">=0.8.0,<0.9" },
-    { name = "sumeds", specifier = ">=0.6.1,<0.7" },
+    { name = "meds-extract", extras = ["download"], specifier = ">=0.8.1,<0.9" },
+    { name = "sumeds", specifier = ">=0.6.2,<0.7" },
 ]
 
 [package.metadata.requires-dev]
@@ -802,7 +802,7 @@ wheels = [
 
 [[package]]
 name = "sumeds"
-version = "0.6.1"
+version = "0.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "meds" },
@@ -811,9 +811,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/74/8d/3ebfcd8f09e1b6a6b5d2075701b0af3dd96cb381c7475f58b6e233257279/sumeds-0.6.1.tar.gz", hash = "sha256:cda78eaaa3bca2a1fc872e71865ecf37af6550423e84d9a87ce55c1a172c33be", size = 53834, upload-time = "2026-11-07T18:55:57.245Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/43/74717496da6e704477ffedfade5558b6329e23a0efc4982faece967033b4/sumeds-0.6.2.tar.gz", hash = "sha256:44cf6b0cb4b935499c5263b522c7ea215f7710e0b6f8f86c5b2a028849001644", size = 57058, upload-time = "2026-11-07T19:28:58.079Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cf/c2/4f2d8e14480ed21b61986d91ebcae201a313966936bbfb7c15b45345ffce/sumeds-0.6.1-py3-none-any.whl", hash = "sha256:d86be01c56e7082542222a7af1b419f66bc0f18b9bca3c9686e26991122df57e", size = 59222, upload-time = "2026-11-07T18:55:55.758Z" },
+    { url = "https://files.pythonhosted.org/packages/33/7d/d2590682d381b58002ee2812bf5c3e620d7a01e4c95b61c0328c17b2e65c/sumeds-0.6.2-py3-none-any.whl", hash = "sha256:bcebdd34292136b4a97c8e3ddaab6ae999d39d03839d4d7a00a369ba3ca38672", size = 62832, upload-time = "2026-11-07T19:28:56.911Z" },
 ]
 
 [[package]]

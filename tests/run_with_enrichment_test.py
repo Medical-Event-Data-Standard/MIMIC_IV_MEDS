@@ -1,14 +1,14 @@
-"""`suMEDS-extract spec=MIMIC-IV` runs the ETL and then suMEDS enrichment, offline.
+"""`meds-extract-run spec=MIMIC-IV` runs the ETL and then suMEDS enrichment, offline.
 
-This package registers its suMEDS rules in suMEDS's `sumeds.rules` entry-point group under the same name
-as its MEDS-Extract spec, so `suMEDS-extract` finds them from `spec=MIMIC-IV` alone. The ETL runs from
-the raw demo files that the `demo_cohort` build of `conftest.py` downloaded (`do_download=false`), and
-that build is the plain-ETL baseline the enriched output is compared with. The ontology source is a tiny
-pack repository in suMEDS's `sumeds-ontologies/0.1` layout, built here with made-up titles for a few ICD
-codes of the demo and their ancestors, so the test reads nothing over the network and does not depend on
-the published packs. With an empty pack source instead, the enrichment fails without failing the ETL: the
-plain `codes.parquet` is kept, the failure is recorded in `metadata/dataset.json`, and `suMEDS-enrich` on
-the output enriches it later.
+The spec declares suMEDS's `sumeds_enrich` stage in `etl.post_stages`, with the rules this package
+registers in suMEDS's `sumeds.rules` entry-point group under the same name. The ETL runs from the raw demo
+files that the `demo_cohort` build of `conftest.py` downloaded (`do_download=false`), and that build, which
+skips the stage, is the plain-ETL baseline the enriched output is compared with. The ontology source is a
+tiny pack repository in suMEDS's `sumeds-ontologies/0.1` layout, built here with made-up titles for a few
+ICD codes of the demo and their ancestors, and passed to the stage as a run-time override, so the test
+reads nothing over the network and does not depend on the published packs. With an empty pack source
+instead, the enrichment fails without failing the ETL: the plain `codes.parquet` is kept, the failure is
+recorded in `metadata/dataset.json`, and `suMEDS-enrich` on the output enriches it later.
 """
 
 import csv
@@ -105,16 +105,15 @@ def _run_with_enrichment(raw_dir: Path, ontology_source: Path):
     with TemporaryDirectory() as temp_dir:
         out = Path(temp_dir) / "MEDS_cohort"
         run_script(
-            "suMEDS-extract",
+            "meds-extract-run",
             f"spec={SPEC}",
             f"output_dir={out}",
             "dataset_key=demo",
             "do_download=false",
             f"input_dir={raw_dir}",
-            "--",
-            "--ontology-source",
-            str(ontology_source),
-            "--offline",
+            # Options of the `sumeds_enrich` stage. Overrides reach every stage of the pipeline, so
+            # `++` adds the key where a stage does not have it.
+            f"overrides=['++stage_cfg.ontology_source={ontology_source}','++stage_cfg.offline=true']",
         )
         yield out
 
@@ -157,6 +156,14 @@ def plain_codes(demo_cohort: Path) -> dict[str, dict]:
 @pytest.fixture(scope="module")
 def enriched_codes(enriched_cohort: Path) -> dict[str, dict]:
     return _codes(enriched_cohort)
+
+
+def test_the_plain_build_records_no_enrichment(demo_cohort: Path):
+    """`skip_stages=[sumeds_enrich]` leaves the stage out, so the plain build records no enrichment.
+
+    Its codes are the ones a failed enrichment keeps (`test_failed_enrichment_keeps_the_plain_etl_output`).
+    """
+    assert "sumeds_enrichment" not in json.loads((demo_cohort / "metadata" / "dataset.json").read_text())
 
 
 def test_codes_parquet_is_replaced_by_valid_meds_metadata(demo_cohort: Path, enriched_cohort: Path):

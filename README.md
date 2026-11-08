@@ -17,15 +17,13 @@ This pipeline extracts the MIMIC-IV dataset (from PhysioNet) into the MEDS forma
 pip install MIMIC_IV_MEDS
 export DATASET_DOWNLOAD_USERNAME=$PHYSIONET_USERNAME
 export DATASET_DOWNLOAD_PASSWORD=$PHYSIONET_PASSWORD
-suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
 ```
 
-[suMEDS](https://github.com/rvandewater/SumMEDS)' `suMEDS-extract` (installed with this package)
-runs the ETL with `meds-extract-run spec=MIMIC-IV`, then adds external-ontology links to
-`metadata/codes.parquet` (see
-[Enriching code metadata with suMEDS](#enriching-code-metadata-with-sumeds)). Arguments before a
-`--` go to `meds-extract-run`, and arguments after it go to `suMEDS-enrich`. For the plain ETL, run
-`meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR` with the same arguments.
+This one command runs the ETL and then, as its last step, adds external-ontology links to
+`metadata/codes.parquet` with [suMEDS](https://github.com/rvandewater/SumMEDS) (installed with this
+package; see [Enriching code metadata with suMEDS](#enriching-code-metadata-with-sumeds)). For the
+plain ETL, add `skip_stages=[sumeds_enrich]`.
 
 When you run this, the program will:
 
@@ -38,23 +36,23 @@ When you run this, the program will:
     joins, and metadata extraction are declared in
     `src/MIMIC_IV_MEDS/event_configs.yaml` — and write it to `$MEDS_OUTPUT_DIR`
     (`data/` and `metadata/`, alongside the run's intermediate stage outputs).
-3. Enrich `metadata/codes.parquet` in place with the suMEDS rules this package ships.
+3. Enrich `metadata/codes.parquet` in place with the suMEDS rules this package ships, and record
+    the enrichment in `metadata/dataset.json`.
 
 To run over the publicly available, fully open MIMIC-IV demo dataset (v2.2, no credentials
 required):
 
 ```bash
-suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
 ```
 
 If you already have the raw MIMIC-IV files on disk, skip the download entirely:
 
 ```bash
-suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
 ```
 
-Run `meds-extract-run --help` for the full set of arguments and options, and `suMEDS-enrich --help`
-for the options after the `--`.
+Run `meds-extract-run --help` for the full set of arguments and options.
 
 Budget for the download rather than the extraction: the raw release is 41 files and 9.9 GiB
 from PhysioNet, which rate-limits each connection to roughly 50 KB/s, while the extraction
@@ -70,7 +68,8 @@ There is no Python in this package. The entire ETL is one file —
 - a `sources:` block declaring the release versions and where to fetch the raw data
     (PhysioNet for MIMIC-IV itself, checksum-pinned GitHub URLs for the
     [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps);
-- an `etl:` block with the run's few knobs;
+- an `etl:` block with the run's few knobs, the roles of the extension columns for
+    `metadata/dataset.json`, and the suMEDS enrichment that runs after the pipeline;
 - one block per raw table describing the events extracted from it, including joins,
     derived columns, and the code-metadata programs that attach descriptions and parent
     vocabulary codes.
@@ -191,25 +190,21 @@ is left uncovered, and why:
 External-ontology links are not written by the ETL. The package ships
 [`src/MIMIC_IV_MEDS/sumeds_rules.yaml`](src/MIMIC_IV_MEDS/sumeds_rules.yaml), a
 [suMEDS](https://github.com/rvandewater/SumMEDS) rules file registered in suMEDS's `sumeds.rules`
-entry-point group under the same name as the MEDS-Extract spec, `MIMIC-IV`. That is how
-`suMEDS-extract spec=MIMIC-IV` finds them, and `--rules MIMIC-IV` works for any suMEDS command.
-`suMEDS-extract` replaces `metadata/codes.parquet` only once the enriched table is complete, and it
-stays valid MEDS code metadata. The ontology data comes from suMEDS's versioned ontology packs
-(sumeds-ontologies, pinned release), fetched from GitHub on first use and cached; no Athena download
-is needed. suMEDS options go after a `--`:
+entry-point group under the same name as the MEDS-Extract spec, `MIMIC-IV`. The spec declares
+suMEDS's `sumeds_enrich` stage after the canonical pipeline (`etl.post_stages`), so
+`meds-extract-run spec=MIMIC-IV` enriches the finished `metadata/codes.parquet` in place, and it
+stays valid MEDS code metadata. `--rules MIMIC-IV` works for any suMEDS command. The ontology data
+comes from suMEDS's versioned ontology packs (sumeds-ontologies, pinned release), fetched from GitHub
+on first use and cached; no Athena download is needed.
 
-```bash
-# Also look codes up in your own OHDSI Athena download (this validates the Gender tags too):
-suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR -- --athena-csv /path/to/athena
-# Use only already cached packs (no network):
-suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR -- --offline
-```
-
-Enrichment is on by default, and a failed enrichment (for example, on a server without internet
-access) does not fail the ETL: `metadata/codes.parquet` is left as the ETL wrote it, a warning gives
-the command to enrich it later, and the exit code is still 0. Whether a build was enriched is recorded
-in `metadata/dataset.json`, under `sumeds_enrichment.enriched`. To enrich a build afterwards, with
-the same rules and options as `suMEDS-extract`:
+Whether a build was enriched is recorded in `metadata/dataset.json`, under
+`sumeds_enrichment.enriched`, with the rules, the suMEDS version and the coverage. Enrichment is on
+by default, and a failed enrichment (for example, on a server without internet access) does not fail
+the ETL: `metadata/codes.parquet` is left as the ETL wrote it, `dataset.json` records
+`"enriched": false` with the error, and the exit code is still 0. The warning, with the command that
+finishes the enrichment, is in `$MEDS_OUTPUT_DIR/.logs/pipeline.log`. Running `meds-extract-run`
+again does not retry it (the stage is marked done); enrich the build afterwards, with the same rules
+and options, with:
 
 ```bash
 suMEDS-enrich $MEDS_OUTPUT_DIR
@@ -217,9 +212,28 @@ suMEDS-enrich $MEDS_OUTPUT_DIR
 suMEDS-enrich $MEDS_OUTPUT_DIR --ontology-source /path/to/sumeds-ontologies/ontologies --offline
 ```
 
-To make a failed enrichment an error instead, add `-- --strict`; to skip enrichment, run
-`meds-extract-run spec=MIMIC-IV ...` instead. Running `suMEDS-extract` again on an existing output
-skips the pipeline stages that are already done and enriches again.
+The stage's options are set at run time through `overrides=`, with `++` because the overrides reach
+every stage of the pipeline:
+
+```bash
+# Without enrichment:
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR skip_stages=[sumeds_enrich]
+# Make a failed enrichment fail the run (exit code 1):
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR "overrides=['++stage_cfg.strict=true']"
+# Also look codes up in your own OHDSI Athena download (this validates the Gender tags too):
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR "overrides=['++stage_cfg.athena_csv=/path/to/athena']"
+```
+
+On a cluster whose compute nodes have no internet access, fill a cache on shared storage once from a
+login node, then run offline on the compute nodes with the same cache:
+
+```bash
+export XDG_CACHE_HOME=/shared/project/cache
+# On a login node:
+suMEDS-enrich --prefetch --rules MIMIC-IV
+# On a compute node:
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR "overrides=['++stage_cfg.offline=true']"
+```
 
 For MIMIC-IV, the rules add:
 
@@ -264,9 +278,9 @@ parallelize:
   launcher: joblib
 YAML
 MEDS_transform-pipeline $MEDS_OUTPUT_DIR/.meds_extract_run/pipeline.yaml
-# Then enrich the code metadata, as `suMEDS-extract` would.
-suMEDS-enrich "$MEDS_OUTPUT_DIR/metadata/codes.parquet" -o "$MEDS_OUTPUT_DIR/metadata/codes.parquet" --rules MIMIC-IV
 ```
+
+The pipeline config lists the `sumeds_enrich` stage too, so this also enriches the code metadata.
 
 That file is self-contained (every path and version inlined), so it is also the place to
 change the stage sequence, point a run at different directories, or add
@@ -278,7 +292,7 @@ several connections give a near-linear speedup:
 
 ```bash
 meds-extract-download spec=MIMIC-IV output_dir=$RAW_INPUT_DIR key=dataset concurrency=8
-suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false input_dir=$RAW_INPUT_DIR
 ```
 
 ## Expected runtime and compute needs
@@ -376,6 +390,9 @@ fingerprint of the full MIMIC-IV 3.1 release. Because it is committed next to th
 what an ETL change did to the whole credentialed release, and two ETL versions can be compared without
 access to the data. CI cannot rebuild the credentialed release, so regenerate it with
 `scripts/summary_stats.sh full` in every pull request that changes the output.
+
+Both baselines are built with `skip_stages=[sumeds_enrich]`: they fingerprint what the ETL writes, which
+does not depend on network access or on the suMEDS pack release. Summarize a build made the same way.
 
 ## 📚 Citing this work
 

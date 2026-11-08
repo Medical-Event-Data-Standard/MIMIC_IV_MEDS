@@ -26,6 +26,20 @@ etl:
   # removed the knob and always infers CSV schemas from the full file, which is exactly
   # what the huge value was emulating.
   n_subjects_per_shard: 1000
+  # Extension columns that dataset.json lists by role (MEDS DatasetMetadataSchema). Every
+  # other extension column is listed under `other_extension_columns` automatically. There is
+  # no `license` or `description_uri`: this one spec builds both the credentialed release
+  # and the open demo (`dataset_key=demo`), whose licenses and PhysioNet pages differ.
+  raw_source_id_columns:
+    [hadm_id, icustay_id, emar_id, poe_id, order_id, link_order_id]
+  code_modifier_columns: [unit]
+  # After the canonical pipeline, suMEDS (a dependency of this package) enriches
+  # metadata/codes.parquet with the rules registered as MIMIC-IV (sumeds_rules.yaml) and
+  # records it in metadata/dataset.json. A failed enrichment (e.g. without internet access)
+  # keeps codes.parquet as the ETL wrote it and does not fail the run; `suMEDS-enrich
+  # OUTPUT_DIR` finishes it later. `skip_stages=[sumeds_enrich]` leaves it out of a run.
+  post_stages:
+    - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:
   _table:

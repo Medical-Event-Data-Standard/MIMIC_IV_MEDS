@@ -13,10 +13,11 @@
 # The ETL's own parents (ICD, LOINC, SNOMED, RxNorm, NDC, DRG from MIMIC-IV and mimic-code
 # maps) are kept: suMEDS enrichment never removes or rewrites existing parents or
 # descriptions. `pyproject.toml` registers this file in suMEDS's `sumeds.rules` group under the
-# spec's name, so it runs with the ETL (see "Enriching code metadata with suMEDS" in the README):
+# spec's name, and the spec's `sumeds_enrich` post-stage runs it with the ETL (see "Enriching
+# code metadata with suMEDS" in the README):
 #
-#   suMEDS-extract spec=MIMIC-IV output_dir=$MEDS_DIR
-#   suMEDS-enrich $MEDS_DIR/metadata/codes.parquet -o $MEDS_DIR/metadata/codes.parquet --rules MIMIC-IV
+#   meds-extract-run spec=MIMIC-IV output_dir=$MEDS_DIR
+#   suMEDS-enrich $MEDS_DIR --rules MIMIC-IV   # an existing build
 schema: sumeds-rules/0.1
 
 ontology:

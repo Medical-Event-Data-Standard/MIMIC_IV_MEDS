@@ -3,8 +3,10 @@
 `meds-extract-run spec=MIMIC-IV dataset_key=demo` downloads the public MIMIC-IV demo from PhysioNet (no
 credentials needed) and takes minutes, so it runs exactly once: `e2e_demo_test.py` checks the cohort it
 leaves behind, and `run_with_enrichment_test.py` runs the ETL again, offline, from the raw files this
-build staged. Setting `MEDS_DEMO_OUTPUT_DIR` is how CI asks for the cohort to be left behind for the
-summary-stats check; unset (the local default) it goes to a temporary directory and is cleaned up.
+build staged. This build skips the spec's `sumeds_enrich` post-stage, so it is the plain ETL output, the
+same with or without network access. Setting `MEDS_DEMO_OUTPUT_DIR` is how CI asks for the cohort to be
+left behind for the summary-stats check; unset (the local default) it goes to a temporary directory and is
+cleaned up.
 """
 
 import os
@@ -63,7 +65,13 @@ def demo_cohort():
         # re-entering a partly-filled directory is exactly the resumable case the runner
         # already handles — the downloader skips files it can verify and the pipeline skips
         # stages whose outputs exist.
-        run_script("meds-extract-run", f"spec={SPEC}", f"output_dir={out.resolve()!s}", "dataset_key=demo")
+        run_script(
+            "meds-extract-run",
+            f"spec={SPEC}",
+            f"output_dir={out.resolve()!s}",
+            "dataset_key=demo",
+            "skip_stages=[sumeds_enrich]",
+        )
         yield out
 
 
