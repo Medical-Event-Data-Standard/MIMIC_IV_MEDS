@@ -91,15 +91,15 @@ jobs:
         # `mimic-demo-summary-stats` artifact.
         #
         # The action, the package-spec, and the committed baseline are pinned together on
-        # meds_summary_stats 0.0.3 (stats_schema_version 1) and must move together:
+        # meds_summary_stats 0.0.4 (stats_schema_version 2) and must move together:
         # comparison refuses to diff across schema versions, so bumping one without the
         # others fails the job with a precondition error rather than a useful diff.
-        uses: Medical-Event-Data-Standard/meds_summary_stats@0.0.3
+        uses: Medical-Event-Data-Standard/meds_summary_stats@0.0.4
         with:
           meds-dir: ${{ env.MEDS_DEMO_OUTPUT_DIR }}/MEDS_cohort
           baseline: tests/regression/demo_summary_stats.json
           policy: tests/regression/policy.yaml
-          package-spec: meds_summary_stats==0.0.3
+          package-spec: meds_summary_stats==0.0.4
           # Passed explicitly because the action sends `--fail-on` on every invocation and
           # the CLI flag overrides the policy file. Leaving it unset does not defer to the
           # policy, it silently applies the action's own default; this must match the
