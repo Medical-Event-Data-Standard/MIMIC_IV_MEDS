@@ -338,7 +338,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "meds-extract", extras = ["download"], specifier = ">=0.8.1,<0.9" },
-    { name = "sumeds", specifier = ">=0.6.2,<0.7" },
+    { name = "sumeds", specifier = ">=0.6.3,<0.7" },
 ]
 
 [package.metadata.requires-dev]

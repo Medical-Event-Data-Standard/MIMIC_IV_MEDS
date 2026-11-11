@@ -34,11 +34,13 @@ classifiers = [
 # suMEDS 0.6.2 registers the `sumeds_enrich` stage that the config declares as a post-stage,
 # which enriches the code metadata with the rules registered below. A failed enrichment is a
 # warning that keeps the ETL output, and `metadata/dataset.json` records whether the build was
-# enriched. 0.6 writes the `*_names` columns as code-to-name maps. It is capped below the next
+# enriched. 0.6 writes the `*_names` columns as code-to-name maps. 0.6.3 summarizes code metadata
+# keyed by `code` alone, as MEDS-Extract writes it, although the config declares `unit` as a code
+# modifier (0.6.2 fails with `unable to find column "unit"`). It is capped below the next
 # minor for the same reason (its rules format and CLI are still 0.x).
 dependencies = [
     "meds-extract[download]>=0.8.1,<0.9",
-    "sumeds>=0.6.2,<0.7",
+    "sumeds>=0.6.3,<0.7",
 ]
 
 [dependency-groups]
