@@ -17,7 +17,7 @@
 set -euo pipefail
 
 # Pinned together with the committed baselines: comparison refuses to diff across stats_schema_version.
-STATS_SPEC="meds_summary_stats==0.0.3"
+STATS_SPEC="meds_summary_stats==0.0.4"
 KINDS="full demo"
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 REGRESSION_DIR="$REPO_ROOT/tests/regression"

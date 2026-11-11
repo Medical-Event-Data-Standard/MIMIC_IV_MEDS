@@ -286,35 +286,13 @@
     }
   },
   "dataset": {
-    "code_modifier_columns": [
-      "unit"
-    ],
-    "created_at": "2026-11-08T03:22:51.368696+00:00",
+    "created_at": "2026-11-10T22:44:53.013681+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "3.1:0.2.1.dev17+g45fe90713",
+    "dataset_version": "3.1:0.2.1",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.0",
     "meds_version": "0.4.1",
-    "other_extension_columns": [
-      "source_block",
-      "drg_severity",
-      "drg_mortality",
-      "emar_seq",
-      "route",
-      "frequency",
-      "doses_per_24_hrs",
-      "ordercategorydescription",
-      "statusdescription"
-    ],
-    "present": true,
-    "raw_source_id_columns": [
-      "hadm_id",
-      "icustay_id",
-      "emar_id",
-      "poe_id",
-      "order_id",
-      "link_order_id"
-    ]
+    "present": true
   },
   "dataset_digest": {
     "by_file": null,
@@ -324,12 +302,12 @@
       "digest": "sha256:ad12e2a6b37c8a60c0da157ade98bf0a794056167857917ef2e047f30b4d1131",
       "n_files": 366
     },
-    "dataset_metadata": "sha256:718133bf5a9366856dbcaa29b52b8d2613fb690be03056b8fb5a46828f47245b",
+    "dataset_metadata": "sha256:b2ccc2f3aa219b7890c4dbe77292f1646e739667d9e3327532ce2dbb468ba2de",
     "method": "files",
     "n_files": 369,
     "subject_splits": "sha256:f064a8cdf85c4f67df31864baef2c65150c0a12e3914fc710c5013233d84911d"
   },
-  "extracted_at": "2026-11-08T03:26:52.276432",
+  "extracted_at": "2026-11-10T22:48:15.118481",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
@@ -412,8 +390,22 @@
     "shard_names": null,
     "shard_names_digest": "sha256:48b6bf01358c38e07771704bbe8c66b451b4df5b12f43ece6434ef71362cbe7c"
   },
-  "meds_summary_stats_version": "0.0.3",
+  "meds_summary_stats_version": "0.0.4",
   "per_subject": {
+    "measurements_per_day": {
+      "mean": 131.809,
+      "n": 333640,
+      "quantiles": {
+        "p1": 0.017637,
+        "p25": 0.60486,
+        "p5": 0.116978,
+        "p50": 4.70208,
+        "p75": 87.2555,
+        "p95": 791.688,
+        "p99": 1505.38
+      },
+      "std": 305.492
+    },
     "n_events": {
       "mean": 263.194,
       "n": 364627,
@@ -491,7 +483,7 @@
     "n_subjects_in_splits_without_data": 0,
     "present": true
   },
-  "stats_schema_version": 1,
+  "stats_schema_version": 2,
   "time": {
     "by_year": {
       "2019": {
