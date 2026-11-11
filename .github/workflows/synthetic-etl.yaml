@@ -1,0 +1,62 @@
+name: Synthetic ETL for MESSY files using MESSY_synth
+
+# Generates raw files straight from the shipped MESSY config with MESSY-synth and runs the ETL over
+# them. MESSY-synth validates that every event block yields events and fails the job otherwise, so
+# this catches expressions that only work on the dtypes of one particular release. It complements
+# the demo build in tests.yaml, which needs a PhysioNet download and checks the real output.
+#
+# Every stage runs: there is no pre-MEDS step, so `meds-extract-run` reads the generated hosp/,
+# icu/ and concept-map CSVs exactly as it reads the downloaded release. Only the download is
+# skipped. The `sumeds_enrich` post-stage fetches its ontology files over the network; if that
+# fails it warns and keeps the ETL output, so it cannot fail this job on its own.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, "release/*", "dev"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-etl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      matrix:
+        # MESSY-synth requires Python >= 3.12; this package allows up to 3.13.
+        python-version: ["3.12", "3.13"]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          uv sync --locked
+          # This config uses MEDS-Extract 0.8's `_table.joins`, which no MESSY_synth release
+          # supports yet. Pin the upstream commit that does until it is released.
+          uv pip install "MESSY_synth @ git+https://github.com/mmcdermott/MESSY_synth@ee5b15856971ebea472272b5d6b8457237caaf6c"
+
+      - name: Generate and extract synthetic data
+        run: |
+          uv run --no-sync MESSY-synth ./src/MIMIC_IV_MEDS/event_configs.yaml -o raw_synthetic/ --explain
+          uv run --no-sync meds-extract-run spec=MIMIC-IV output_dir=./MIMIC_IV_meds_synth \
+            input_dir=raw_synthetic do_download=false
+          for f in dataset.json codes.parquet subject_splits.parquet; do
+            test -f "MIMIC_IV_meds_synth/metadata/$f"
+          done
