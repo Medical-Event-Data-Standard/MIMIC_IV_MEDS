@@ -24,6 +24,13 @@ SPEC = "MIMIC-IV"
 #: Set by CI to a path that outlives the test, so the summary-stats step can read the cohort.
 OUTPUT_DIR_ENV_VAR = "MEDS_DEMO_OUTPUT_DIR"
 
+#: Set by CI to a cached directory for the raw demo download, passed to the runner as
+#: `download_dest_dir`. The downloader verifies every file against PhysioNet's `SHA256SUMS.txt`
+#: and skips the ones that match, so a restored cache turns the download into a manifest fetch
+#: while a stale or partial one is repaired rather than trusted. Unset, the raw data lands
+#: inside the output tree as before.
+DOWNLOAD_DIR_ENV_VAR = "MEDS_DEMO_DOWNLOAD_DIR"
+
 
 def run_script(name: str, *args: str) -> None:
     """Run the console script `name` installed in this environment, failing with its output on error.
@@ -65,19 +72,23 @@ def demo_cohort():
         # re-entering a partly-filled directory is exactly the resumable case the runner
         # already handles — the downloader skips files it can verify and the pipeline skips
         # stages whose outputs exist.
-        run_script(
-            "meds-extract-run",
+        args = [
             f"spec={SPEC}",
             f"output_dir={out.resolve()!s}",
             "dataset_key=demo",
             "skip_stages=[sumeds_enrich]",
-        )
+        ]
+        if download_dir := os.environ.get(DOWNLOAD_DIR_ENV_VAR):
+            args.append(f"download_dest_dir={Path(download_dir).resolve()!s}")
+        run_script("meds-extract-run", *args)
         yield out
 
 
 @pytest.fixture(scope="session")
 def demo_raw_dir(demo_cohort: Path) -> Path:
-    """The raw demo files the build downloaded, where the runner stages them by default."""
-    raw = demo_cohort / ".meds_extract_run" / "raw_input"
+    """The raw demo files the build downloaded: the cached download dir if CI set one, else where the
+    runner stages them by default."""
+    download_dir = os.environ.get(DOWNLOAD_DIR_ENV_VAR)
+    raw = Path(download_dir).resolve() if download_dir else demo_cohort / ".meds_extract_run" / "raw_input"
     assert (raw / "hosp").is_dir(), f"no raw demo files staged under {raw}"
     return raw
