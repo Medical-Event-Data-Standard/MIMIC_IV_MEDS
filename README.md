@@ -438,6 +438,39 @@ access to the data. CI cannot rebuild the credentialed release, so regenerate it
 Both baselines are built with `skip_stages=[sumeds_enrich]`: they fingerprint what the ETL writes, which
 does not depend on network access or on the suMEDS pack release. Summarize a build made the same way.
 
+## Reproducing a cohort built with an older version
+
+A cohort records the version that built it in `metadata/dataset.json`: `dataset_version` is
+`<MIMIC-IV release>:<this package's version>`. Releases before 0.2.0 stamp `3.1` as the release even on
+a demo build, so for those the part after the colon is the reliable one.
+
+Seven early releases allowed newer minor releases of their upstream, so a plain install of them can pull
+a MEDS-Transforms or MEDS-Extract release their configuration does not run on (see
+[#66](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/66)). A published release's
+dependencies cannot be changed, so each was republished next to it with identical ETL code and the
+upstream capped at the next minor
+([#70](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/70)). To rebuild a cohort made
+with one of them, install its replacement:
+
+| Built with | Install instead |
+| ---------- | --------------- |
+| 0.0.1      | 0.0.1.1         |
+| 0.0.2      | 0.0.2.1         |
+| 0.0.3      | 0.0.3.1         |
+| 0.0.4      | 0.0.4.1         |
+| 0.1.0      | 0.1.0.1         |
+| 0.1.1      | 0.1.1.1         |
+| 0.1.2      | 0.1.3           |
+
+0.0.5 to 0.0.7 cap MEDS-Transforms below 0.3, and 0.2.0 onward cap MEDS-Extract below its next minor,
+so they were not affected. Releases before 0.2.0 have their own command instead of `meds-extract-run`;
+the replacements were checked on Python 3.12:
+
+```bash
+pip install "MIMIC-IV-MEDS==0.1.3"
+MEDS_extract-MIMIC_IV root_output_dir=$MEDS_OUTPUT_DIR # add do_demo=True for the open demo
+```
+
 ## 📚 Citing this work
 
 If you use this software in your research, please cite it! You can use the **"Cite this repository"** button on GitHub.
