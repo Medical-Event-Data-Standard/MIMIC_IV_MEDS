@@ -129,21 +129,30 @@ same hooks on changed files.
 
 ## Documentation
 
-This site is built with [MkDocs](https://www.mkdocs.org/) and
-[Material for MkDocs](https://squidfunk.github.io/mkdocs-material/), from `mkdocs.yml` and `docs/`.
+This site is built with [Zensical](https://zensical.org/), the successor to Material for MkDocs,
+from `zensical.toml` and `docs/`.
 
 ```bash
 uv sync --group docs
-uv run mkdocs serve          # live preview at http://127.0.0.1:8000
-uv run mkdocs build --strict # what CI and Read the Docs run; warnings are errors
+uv run --group docs zensical serve          # live preview at http://localhost:8000
+uv run --group docs zensical build --strict # what CI and Read the Docs run; warnings are errors
 ```
 
-- **Navigation is generated** by [mkdocs-awesome-nav](https://lukasgeiter.github.io/mkdocs-awesome-nav/)
-    from the `docs/` tree. `docs/.nav.yml` orders the top level. `docs/extensions/.nav.yml` puts the
-    overview first and globs every other page. A new page in `docs/extensions/` appears
-    automatically, titled by its first `#` heading. Do not add a `nav:` key to `mkdocs.yml`.
+The build writes the site to `site/` and a cache to `.cache/`; both are git-ignored. In strict mode a
+broken link or a missing anchor fails the build.
+
+- **Navigation is generated** from the `docs/` tree by Zensical's built-in support for
+    [mkdocs-awesome-nav](https://lukasgeiter.github.io/mkdocs-awesome-nav/) `.nav.yml` files (enabled
+    by `[project.plugins.awesome-nav]` in `zensical.toml`; the MkDocs plugin itself is not installed).
+    `docs/.nav.yml` orders the top level. `docs/extensions/.nav.yml` puts the overview first and
+    globs every other page. A new page in `docs/extensions/` appears automatically, titled by its
+    first `#` heading. Do not add a `nav` key to `zensical.toml`.
+- **A new top-level page must be listed in `docs/.nav.yml`.** Otherwise it is built but left out of
+    the navigation, and the build does not warn about it.
 - **Extension pages** follow the template of [MIMIC-IV-MNE](extensions/mne.md): summary, source,
     how to run, tables → events, ETL decisions, caveats and limitations, not extracted, validation.
 - **Never put row-level data from credentialed datasets in the docs**, even as an example. Use
     aggregate figures only. The public demo is fine to inspect.
-- **Read the Docs** builds from `.readthedocs.yaml`, using the `docs` dependency group.
+- **Read the Docs** builds from `.readthedocs.yaml`, with custom build jobs that install the `docs`
+    dependency group with uv, run `zensical build --strict` and copy `site/` to RTD's output
+    directory.

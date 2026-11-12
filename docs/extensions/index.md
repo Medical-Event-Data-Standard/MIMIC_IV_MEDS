@@ -118,7 +118,7 @@ MIMIC-IV-MNE = "MIMIC_IV_MEDS:event_configs_mne.yaml"
 5. **Document it:** add `docs/extensions/<name>.md` with the eight-section template used by
     [MIMIC-IV-MNE](mne.md), add a row to the table above, and add the dataset to
     [Sources and citations](../sources.md). The page appears in the site navigation automatically.
-    No `mkdocs.yml` edit is needed.
+    No config edit is needed.
 6. Run `uv run pytest tests/` and `uv run pre-commit run --all-files`.
 
 Whenever `event_configs.yaml` changes later, re-run the generator in the same change. The freshness

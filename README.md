@@ -80,7 +80,7 @@ place for the ETL's design and for the extensions:
 - [Contributing](https://mimic-iv-meds.readthedocs.io/en/latest/contributing/): tests, the
     summary-statistics baselines, the synthetic-data CI and the generated specs.
 
-The site's source is in [`docs/`](docs/); preview it with `uv run --group docs mkdocs serve`.
+The site's source is in [`docs/`](docs/); preview it with `uv run --group docs zensical serve`.
 
 ## How this ETL is defined
 

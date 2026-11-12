@@ -1,8 +1,8 @@
 name: Docs
 
-# Builds the documentation site the way Read the Docs will (`.readthedocs.yaml`), with
-# `--strict` so that a broken link, a missing anchor or a page left out of the navigation fails the
-# PR instead of the RTD build. Nothing is deployed from here; Read the Docs builds and hosts the site.
+# Builds the documentation site with Zensical the way Read the Docs will (`.readthedocs.yaml`), with
+# `--strict` so that a broken link or a missing anchor fails the PR instead of the RTD build. Nothing
+# is deployed from here; Read the Docs builds and hosts the site.
 #
 # The build needs no data and takes seconds, so it runs on every PR rather than behind a path
 # filter.
@@ -39,4 +39,4 @@ jobs:
           group: docs
 
       - name: Build the site
-        run: uv run --group docs mkdocs build --strict
+        run: uv run --group docs zensical build --strict

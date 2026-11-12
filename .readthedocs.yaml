@@ -1,9 +1,12 @@
-# Read the Docs build for the documentation site (mkdocs.yml, docs/).
-# https://docs.readthedocs.com/platform/stable/config-file/v2.html
+# Read the Docs build for the documentation site (zensical.toml, docs/).
+# https://docs.readthedocs.com/platform/stable/intro/zensical.html
 #
-# Dependencies come from the `docs` dependency group in pyproject.toml, installed with
-# `uv sync --group docs` against the committed uv.lock, so RTD builds with the same versions as
-# CI and a local `uv run mkdocs build --strict`.
+# RTD has no built-in Zensical builder, so the build is a set of custom jobs: with neither a
+# `sphinx` nor an `mkdocs` key, RTD runs only the jobs declared here. Zensical comes from the `docs`
+# dependency group, installed with uv against the committed uv.lock (`--only-group` leaves out the
+# package itself and its ETL dependencies), so RTD builds with the same version as CI and a local
+# `uv run --group docs zensical build --strict`. `--strict` fails the build on any warning, such as
+# a broken link or anchor. RTD publishes whatever lands in $READTHEDOCS_OUTPUT/html.
 version: 2
 
 build:
@@ -11,15 +14,13 @@ build:
   tools:
     # Within the package's requires-python (>=3.11.4,<3.14); the same version CI uses.
     python: "3.12"
-
-python:
-  install:
-    - method: uv
-      command: sync
-      groups:
-        - docs
-
-mkdocs:
-  configuration: mkdocs.yml
-  # The equivalent of `mkdocs build --strict`: any warning (a broken link or anchor) fails the build.
-  fail_on_warning: true
+  jobs:
+    install:
+      - pip install uv
+      - uv sync --frozen --only-group docs
+    build:
+      html:
+        - uv run --frozen --only-group docs zensical build --strict
+    post_build:
+      - mkdir -p $READTHEDOCS_OUTPUT/html/
+      - cp --recursive site/* $READTHEDOCS_OUTPUT/html/
