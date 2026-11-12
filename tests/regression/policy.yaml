@@ -7,8 +7,11 @@
 #
 # When a PR changes the output on purpose, regenerate the baseline in that same PR:
 #
-#   meds-extract-run spec=MIMIC-IV output_dir=$OUT dataset_key=demo
-#   extract_MEDS_summary_stats $OUT -o tests/regression/demo_summary_stats.json
+#   scripts/summary_stats.sh demo
+#
+# which builds the demo with this checkout, prints how the statistics moved, and
+# overwrites the baseline. The regression check in the Tests workflow also uploads the new
+# statistics as the `mimic-demo-summary-stats` artifact.
 #
 # NOTE: the GitHub action always passes `--fail-on`, and the CLI flag overrides this file.
 # The action input and this value must agree; both are `error`.

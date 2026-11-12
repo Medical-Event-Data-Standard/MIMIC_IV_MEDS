@@ -5,11 +5,13 @@ name: Tests
 # answered by building the public demo cohort:
 #
 #   1. does the ETL still run?          -> tests/e2e_demo_test.py
+#      and does suMEDS enrich it?       -> tests/run_with_enrichment_test.py
 #   2. did its output change?           -> the summary-stats regression step
 #
 # The extraction is the expensive, flaky part: it downloads from PhysioNet and takes
 # minutes. It therefore happens ONCE, on ONE Python version, and both checks read the same
 # cohort — the test writes it to $MEDS_DEMO_OUTPUT_DIR and the stats step reads from there.
+# The enrichment test reruns the ETL offline from the raw files that build downloaded.
 # A Python-version matrix would multiply PhysioNet downloads for no signal about a package
 # that contains no Python.
 
@@ -28,10 +30,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Read by tests/e2e_demo_test.py (which builds the cohort here instead of in a temp dir)
+  # Read by tests/conftest.py (which builds the cohort here instead of in a temp dir)
   # and by the summary-stats step below.
   MEDS_DEMO_OUTPUT_DIR: ${{ github.workspace }}/.demo-cohort
-  # Read by tests/e2e_demo_test.py and passed to the runner as `download_dest_dir`, so the raw
+  # Read by tests/conftest.py and passed to the runner as `download_dest_dir`, so the raw
   # demo download lives outside the cohort tree and can be cached between runs (see below).
   MEDS_DEMO_DOWNLOAD_DIR: ${{ github.workspace }}/.demo-raw
 
@@ -101,19 +103,22 @@ jobs:
         # Which drift errors and which only warns is decided in tests/regression/policy.yaml.
         # When a PR changes the output on purpose, regenerate the baseline in that same PR:
         #
-        #   meds-extract-run spec=MIMIC-IV output_dir=$OUT dataset_key=demo
-        #   extract_MEDS_summary_stats $OUT -o tests/regression/demo_summary_stats.json
+        #   scripts/summary_stats.sh demo
+        #
+        # which builds the demo with this checkout, prints how the statistics moved, and
+        # overwrites the baseline. The job below also uploads the new statistics as the
+        # `mimic-demo-summary-stats` artifact.
         #
         # The action, the package-spec, and the committed baseline are pinned together on
-        # meds_summary_stats 0.0.2 (stats_schema_version 1) and must move together:
+        # meds_summary_stats 0.0.4 (stats_schema_version 2) and must move together:
         # comparison refuses to diff across schema versions, so bumping one without the
         # others fails the job with a precondition error rather than a useful diff.
-        uses: Medical-Event-Data-Standard/meds_summary_stats@0.0.2
+        uses: Medical-Event-Data-Standard/meds_summary_stats@0.0.4
         with:
           meds-dir: ${{ env.MEDS_DEMO_OUTPUT_DIR }}/MEDS_cohort
           baseline: tests/regression/demo_summary_stats.json
           policy: tests/regression/policy.yaml
-          package-spec: meds_summary_stats==0.0.2
+          package-spec: meds_summary_stats==0.0.4
           # Passed explicitly because the action sends `--fail-on` on every invocation and
           # the CLI flag overrides the policy file. Leaving it unset does not defer to the
           # policy, it silently applies the action's own default; this must match the
