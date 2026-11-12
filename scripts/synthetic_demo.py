@@ -1238,9 +1238,9 @@ NONE_KNOWN_PATTERN = re.compile(r"(?i)no known|nkda|\bnka\b|no allerg")
 def mne_tables(seed: int, demo: Demo) -> dict[str, Table]:
     """MNE's tables, extracted from the simulated discharge summaries' structured content.
 
-    MNE structures the sections of MIMIC-IV-Note discharge summaries; here it structures the simulated
-    ones, so every MNE row is what the matching simulated note says. One summary for an admission that
-    is not in MIMIC-IV is added, as MNE has such rows (they must be dropped).
+    MNE structures the sections of MIMIC-IV-Note discharge summaries; here it structures the simulated ones,
+    so every MNE row is what the matching simulated note says. One summary for an admission that is not in
+    MIMIC-IV is added, as MNE has such rows (they must be dropped).
     """
     adm_by_hadm = {a["hadm_id"]: a for a in demo.admissions}
     summaries = [
