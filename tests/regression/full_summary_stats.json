@@ -286,13 +286,35 @@
     }
   },
   "dataset": {
-    "created_at": "2026-11-10T22:44:53.013681+00:00",
+    "code_modifier_columns": [
+      "unit"
+    ],
+    "created_at": "2026-11-12T02:06:52.256036+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "3.1:0.2.1",
+    "dataset_version": "3.1:0.3.0",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.0",
     "meds_version": "0.4.1",
-    "present": true
+    "other_extension_columns": [
+      "source_block",
+      "drg_severity",
+      "drg_mortality",
+      "emar_seq",
+      "route",
+      "frequency",
+      "doses_per_24_hrs",
+      "ordercategorydescription",
+      "statusdescription"
+    ],
+    "present": true,
+    "raw_source_id_columns": [
+      "hadm_id",
+      "icustay_id",
+      "emar_id",
+      "poe_id",
+      "order_id",
+      "link_order_id"
+    ]
   },
   "dataset_digest": {
     "by_file": null,
@@ -302,12 +324,12 @@
       "digest": "sha256:ad12e2a6b37c8a60c0da157ade98bf0a794056167857917ef2e047f30b4d1131",
       "n_files": 366
     },
-    "dataset_metadata": "sha256:b2ccc2f3aa219b7890c4dbe77292f1646e739667d9e3327532ce2dbb468ba2de",
+    "dataset_metadata": "sha256:a28b8f1e17bbebb81a27257df9d8f8ca15f6322fc6467d22523fc3d5a24ff062",
     "method": "files",
     "n_files": 369,
     "subject_splits": "sha256:f064a8cdf85c4f67df31864baef2c65150c0a12e3914fc710c5013233d84911d"
   },
-  "extracted_at": "2026-11-10T22:48:15.118481",
+  "extracted_at": "2026-11-12T02:09:46.143246",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
