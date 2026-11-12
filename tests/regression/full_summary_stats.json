@@ -1,8 +1,8 @@
 {
   "code_metadata": {
     "description_length": {
-      "mean": 147.196,
-      "n": 148045,
+      "mean": 147.207,
+      "n": 148051,
       "quantiles": {
         "p1": 13.0,
         "p25": 72.0,
@@ -12,12 +12,12 @@
         "p95": 230.0,
         "p99": 243.0
       },
-      "std": 71.4761
+      "std": 71.4815
     },
-    "n_codes": 148193,
+    "n_codes": 148199,
     "n_data_codes_missing_from_metadata": 0,
     "n_metadata_codes_absent_from_data": 0,
-    "n_with_description": 148045,
+    "n_with_description": 148051,
     "n_with_parent_codes": 118357,
     "ontology": {
       "by_vocabulary": {
@@ -118,13 +118,13 @@
         }
       },
       "coverage": {
-        "frac_measurements_mapped": 0.594223,
-        "frac_observed_codes_with_parents": 0.798668,
+        "frac_measurements_mapped": 0.592305,
+        "frac_observed_codes_with_parents": 0.798636,
         "n_measurements_mapped": 523748532,
-        "n_measurements_unmapped": 357651543,
-        "n_observed_codes": 148193,
+        "n_measurements_unmapped": 360505903,
+        "n_observed_codes": 148199,
         "n_observed_codes_with_parents": 118357,
-        "n_observed_codes_without_parents": 29836
+        "n_observed_codes_without_parents": 29842
       },
       "n_codes_in_multiple_vocabularies": 0,
       "n_codes_with_parents": 118357,
@@ -134,8 +134,8 @@
       "n_vocabularies": 10,
       "n_vocabularies_recognized": 8,
       "parents_per_code": {
-        "mean": 0.79887,
-        "n": 148193,
+        "mean": 0.798838,
+        "n": 148199,
         "quantiles": {
           "p1": 0.0,
           "p25": 1.0,
@@ -145,12 +145,12 @@
           "p95": 1.0,
           "p99": 1.0
         },
-        "std": 0.401351
+        "std": 0.401375
       },
       "present": true,
       "vocabularies_per_code": {
-        "mean": 0.798668,
-        "n": 148193,
+        "mean": 0.798636,
+        "n": 148199,
         "quantiles": {
           "p1": 0.0,
           "p25": 1.0,
@@ -160,80 +160,80 @@
           "p95": 1.0,
           "p99": 1.0
         },
-        "std": 0.400997
+        "std": 0.401021
       }
     },
     "present": true,
-    "vocabulary_digest": "sha256:24460fa38e760ce78b8897fb206303a46d612808fe396a546c353546cf88d116"
+    "vocabulary_digest": "sha256:8239a4136740ec3f21cedb7f1faa6e2f77c27f5f6d553203bf867080e129d22d"
   },
   "codes": {
     "concentration": {
-      "frac_measurements_in_top_10": 0.0864562,
-      "frac_measurements_in_top_100": 0.360352,
-      "frac_measurements_in_top_1000": 0.865052,
+      "frac_measurements_in_top_10": 0.0861771,
+      "frac_measurements_in_top_100": 0.360214,
+      "frac_measurements_in_top_1000": 0.865348,
       "n_codes_covering_50pct": 185,
-      "n_codes_covering_90pct": 1393,
-      "n_codes_covering_99pct": 10282
+      "n_codes_covering_90pct": 1389,
+      "n_codes_covering_99pct": 10268
     },
     "digests": {
-      "alphabetical": "sha256:24460fa38e760ce78b8897fb206303a46d612808fe396a546c353546cf88d116",
-      "by_measurement_frequency": "sha256:7e3577a88e32e5cf5b070f21a7323d33dbd47d3c4da34325a69fe82e1c474cb5",
-      "by_subject_frequency": "sha256:b8a268c676dcf098557c1c433037dcc77be66261f57cc650e64a2e939df6aee6",
+      "alphabetical": "sha256:8239a4136740ec3f21cedb7f1faa6e2f77c27f5f6d553203bf867080e129d22d",
+      "by_measurement_frequency": "sha256:bdfeae4f90ed386380f84118b66775afee7b5bedd0ede3a23814f6fe5d8ba942",
+      "by_subject_frequency": "sha256:67ffbeccdee7934a35b14f9a202c30be81025bcb1c0f9b1bbb18b87ecd4205f4",
       "numeric_moments": {
-        "digest": "sha256:327c1f48c2d70fda6521e015d272f1d4a12dcba75fc4453cf4967279947a49d0",
-        "n_codes": 1864
+        "digest": "sha256:005f0132dad380e87c9307af004d415dcfcc3903c0b5e5372ddb5d0971fefdb3",
+        "n_codes": 1883
       },
       "thresholded": {
         "100": {
-          "alphabetical": "sha256:0004139b788987b9024a7cec97dc45f8b5c3ed3dead299a77c0c758808f5e2f1",
-          "by_measurement_frequency": "sha256:ef0b5bb0e30301f23bffc70cd3851b209266e62350186684ed76d61c8db0c11b",
-          "by_subject_frequency": "sha256:02366ff3d5688cc9e4a2364f1a3caeade61ef20234ebd8dc210b322b9b0aa31e",
-          "n_codes": 23128
+          "alphabetical": "sha256:0817cb13ba6751754085879399642d9f6d9f47c83a2523e6755d5de3a611fe75",
+          "by_measurement_frequency": "sha256:29f86e9e4961b243539506fcc349d8fe3f23bb16b0bd66f7ff8c02f90e1159e7",
+          "by_subject_frequency": "sha256:8a815acd17c76b2c6ee3801a17ca2c940c8a77cd745dfca49ba20ab957996ba1",
+          "n_codes": 23134
         },
         "1000": {
-          "alphabetical": "sha256:122d997b530f9f6e4764352d9ac3deed1d338fee832a4ed276ea0205330abcc1",
-          "by_measurement_frequency": "sha256:88e665e1237aa54b773a3826724e618749dc56e9fd8efe01f582acd39dceb29f",
-          "by_subject_frequency": "sha256:0062313bb9120ce9a7ac64394e88a74379f4efa3bbd5cba8cae98062db49a4f9",
-          "n_codes": 8104
+          "alphabetical": "sha256:60677aaba1b36a9927b2cabfbac001e7f4cd91aab1b60167a5e2b3010aad51a2",
+          "by_measurement_frequency": "sha256:0208955a7a61b3595f3991f15eaab796c885686d97f71e770aab9f4a688274dc",
+          "by_subject_frequency": "sha256:2c4a8b5ae884490f00645709d0060b48c9dc94a51b4587584d22d979a039c58c",
+          "n_codes": 8108
         },
         "20": {
-          "alphabetical": "sha256:f2a587a54b702102a90df3ab93233a0c0276114a70bf78f742d358696ff0fae2",
-          "by_measurement_frequency": "sha256:ef1697edb4a1d78a0784d694ddf82ec362925bb1d2f08b46a0530420ed2955d1",
-          "by_subject_frequency": "sha256:a334764e89f68bea97fd5db901e934bed4e88944141d6ea82748214b6c421a56",
-          "n_codes": 41240
+          "alphabetical": "sha256:bbaf1c14e7e3b28d9a27525bf2fcaa00d854fde78b2f708997916a1b37fe678b",
+          "by_measurement_frequency": "sha256:322204635ee804181bba4b26702c8eba4abf017f88c97d74b88e6b5c84305462",
+          "by_subject_frequency": "sha256:9b4086b108a5edcc02d1a8f083ed4ec0fdecba68cb32149c6c863ab2d48562eb",
+          "n_codes": 41246
         }
       }
     },
     "n_codes_below_min_cell_size": 106953,
-    "n_unique_codes": 148193,
+    "n_unique_codes": 148199,
     "occurrence": {
       "n_measurements": {
-        "mean": 5947.65,
-        "n": 148193,
+        "mean": 5966.67,
+        "n": 148199,
         "quantiles": {
           "p1": 1.0,
           "p25": 1.0,
           "p5": 1.0,
           "p50": 4.0,
           "p75": 41.0,
-          "p95": 2824.2,
-          "p99": 49791.0
+          "p95": 2827.1,
+          "p99": 49826.2
         },
-        "std": 107438.0
+        "std": 107688.0
       },
       "n_subjects": {
-        "mean": 751.88,
-        "n": 148193,
+        "mean": 753.045,
+        "n": 148199,
         "quantiles": {
           "p1": 1.0,
           "p25": 1.0,
           "p5": 1.0,
           "p50": 3.0,
           "p75": 27.0,
-          "p95": 1158.0,
-          "p99": 12775.0
+          "p95": 1159.0,
+          "p99": 12786.0
         },
-        "std": 8314.1
+        "std": 8325.13
       }
     }
   },
@@ -262,22 +262,22 @@
   },
   "counts": {
     "n_events": 95967753,
-    "n_measurements": 881400075,
+    "n_measurements": 884254435,
     "n_static_measurements": 364627,
     "n_subjects": 364627,
     "n_subjects_with_birth": 364627,
     "n_subjects_with_death": 38301,
     "n_subjects_with_static": 364627,
-    "n_unique_codes": 148193,
+    "n_unique_codes": 148199,
     "numeric": {
-      "mean": 81.8195,
-      "n_finite": 334656240,
+      "mean": 83.0094,
+      "n_finite": 345142939,
       "n_infinite": 0,
       "n_nan": 0,
       "n_negative": 2320329,
-      "n_present": 334656240,
-      "n_zero": 18491853,
-      "std": 12232.6
+      "n_present": 345142939,
+      "n_zero": 18493002,
+      "std": 16528.5
     },
     "quality": {
       "n_empty_code": 0,
@@ -289,9 +289,9 @@
     "code_modifier_columns": [
       "unit"
     ],
-    "created_at": "2026-11-12T02:06:52.256036+00:00",
+    "created_at": "2026-11-12T21:53:48.692675+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "3.1:0.3.0",
+    "dataset_version": "3.1:0.2.1.dev13+gca0b06662.d20261112",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.0",
     "meds_version": "0.4.1",
@@ -300,6 +300,7 @@
       "drg_severity",
       "drg_mortality",
       "emar_seq",
+      "seq_num",
       "route",
       "frequency",
       "doses_per_24_hrs",
@@ -318,18 +319,18 @@
   },
   "dataset_digest": {
     "by_file": null,
-    "code_metadata": "sha256:8b870df79929e943bb8cb85526242aa91e4c1b49333f0cf46ac9d17dd2bd2aeb",
-    "combined": "sha256:f700d8d0988c84f0e6faaef35b2187ea8b36db38fe660d6f80c0100d248e39ff",
+    "code_metadata": "sha256:7a8c24477a7c9a6b1141c81e38d431c359355e2e685281183a32ba312bbfc979",
+    "combined": "sha256:5fd54e84283a9ceef0e7832921087f02999b8b87c2b56d2f41fb696766cd5a90",
     "data": {
-      "digest": "sha256:ad12e2a6b37c8a60c0da157ade98bf0a794056167857917ef2e047f30b4d1131",
+      "digest": "sha256:5ae56a755589fe56f9ed0cd3cd04cb6b50474d4fecb7ed7c0c449087627f5c58",
       "n_files": 366
     },
-    "dataset_metadata": "sha256:a28b8f1e17bbebb81a27257df9d8f8ca15f6322fc6467d22523fc3d5a24ff062",
+    "dataset_metadata": "sha256:f03291ed9c410cf6e54670bcab6df3d776c44a0a401f288129ef99d1db0739b1",
     "method": "files",
     "n_files": 369,
     "subject_splits": "sha256:f064a8cdf85c4f67df31864baef2c65150c0a12e3914fc710c5013233d84911d"
   },
-  "extracted_at": "2026-11-12T02:09:46.143246",
+  "extracted_at": "2026-11-12T21:56:58.808853",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
@@ -355,6 +356,7 @@
       "ordercategorydescription": 366,
       "poe_id": 366,
       "route": 366,
+      "seq_num": 366,
       "source_block": 366,
       "statusdescription": 366,
       "subject_id": 366,
@@ -378,6 +380,7 @@
       "ordercategorydescription": "String",
       "poe_id": "String",
       "route": "String",
+      "seq_num": "Int64",
       "source_block": "String",
       "statusdescription": "String",
       "subject_id": "Int64",
@@ -399,6 +402,7 @@
       "ordercategorydescription",
       "poe_id",
       "route",
+      "seq_num",
       "source_block",
       "statusdescription",
       "text_value",
@@ -415,18 +419,18 @@
   "meds_summary_stats_version": "0.0.4",
   "per_subject": {
     "measurements_per_day": {
-      "mean": 131.809,
+      "mean": 131.821,
       "n": 333640,
       "quantiles": {
-        "p1": 0.017637,
-        "p25": 0.60486,
-        "p5": 0.116978,
-        "p50": 4.70208,
-        "p75": 87.2555,
+        "p1": 0.0198585,
+        "p25": 0.615754,
+        "p5": 0.12093,
+        "p50": 4.72622,
+        "p75": 87.2651,
         "p95": 791.688,
         "p99": 1505.38
       },
-      "std": 305.492
+      "std": 305.488
     },
     "n_events": {
       "mean": 263.194,
@@ -443,32 +447,32 @@
       "std": 722.759
     },
     "n_measurements": {
-      "mean": 2417.26,
+      "mean": 2425.09,
       "n": 364627,
       "quantiles": {
         "p1": 3.0,
-        "p25": 89.0,
+        "p25": 90.0,
         "p5": 3.0,
-        "p50": 306.0,
-        "p75": 1477.0,
-        "p95": 10856.7,
-        "p99": 35610.7
+        "p50": 309.0,
+        "p75": 1493.0,
+        "p95": 10887.0,
+        "p99": 35637.5
       },
-      "std": 8022.4
+      "std": 8027.82
     },
     "n_unique_codes": {
-      "mean": 305.582,
+      "mean": 306.068,
       "n": 364627,
       "quantiles": {
         "p1": 3.0,
         "p25": 83.0,
         "p5": 3.0,
-        "p50": 184.0,
-        "p75": 394.0,
-        "p95": 1028.0,
-        "p99": 1600.0
+        "p50": 185.0,
+        "p75": 395.0,
+        "p95": 1029.0,
+        "p99": 1601.74
       },
-      "std": 352.513
+      "std": 352.724
     },
     "span_days": {
       "mean": 18715.1,
@@ -488,15 +492,15 @@
   "splits": {
     "by_split": {
       "held_out": {
-        "n_measurements": 87131383,
+        "n_measurements": 87415562,
         "n_subjects": 36462
       },
       "train": {
-        "n_measurements": 706451552,
+        "n_measurements": 708730148,
         "n_subjects": 291702
       },
       "tuning": {
-        "n_measurements": 87817140,
+        "n_measurements": 88108725,
         "n_subjects": 36463
       }
     },
@@ -853,451 +857,451 @@
         "n_subjects": 4345
       },
       "2105": {
-        "n_measurements": 5353,
+        "n_measurements": 5358,
         "n_subjects": 4385
       },
       "2106": {
-        "n_measurements": 4703,
+        "n_measurements": 4707,
         "n_subjects": 4316
       },
       "2107": {
-        "n_measurements": 4394,
+        "n_measurements": 4398,
         "n_subjects": 4289
       },
       "2108": {
-        "n_measurements": 4464,
+        "n_measurements": 4466,
         "n_subjects": 4337
       },
       "2109": {
-        "n_measurements": 54126,
+        "n_measurements": 54948,
         "n_subjects": 4716
       },
       "2110": {
-        "n_measurements": 4717347,
+        "n_measurements": 4723747,
         "n_subjects": 8482
       },
       "2111": {
-        "n_measurements": 6203555,
+        "n_measurements": 6213875,
         "n_subjects": 9829
       },
       "2112": {
-        "n_measurements": 7342289,
+        "n_measurements": 7354530,
         "n_subjects": 10599
       },
       "2113": {
-        "n_measurements": 6964304,
+        "n_measurements": 6978520,
         "n_subjects": 11127
       },
       "2114": {
-        "n_measurements": 7969629,
+        "n_measurements": 7984871,
         "n_subjects": 11299
       },
       "2115": {
-        "n_measurements": 8157095,
+        "n_measurements": 8173791,
         "n_subjects": 11557
       },
       "2116": {
-        "n_measurements": 7507841,
+        "n_measurements": 7526120,
         "n_subjects": 11801
       },
       "2117": {
-        "n_measurements": 7681994,
+        "n_measurements": 7700835,
         "n_subjects": 12064
       },
       "2118": {
-        "n_measurements": 8429235,
+        "n_measurements": 8450068,
         "n_subjects": 12269
       },
       "2119": {
-        "n_measurements": 8220236,
+        "n_measurements": 8241690,
         "n_subjects": 12535
       },
       "2120": {
-        "n_measurements": 8365840,
+        "n_measurements": 8387276,
         "n_subjects": 12893
       },
       "2121": {
-        "n_measurements": 9801677,
+        "n_measurements": 9824357,
         "n_subjects": 13077
       },
       "2122": {
-        "n_measurements": 9100713,
+        "n_measurements": 9125083,
         "n_subjects": 13574
       },
       "2123": {
-        "n_measurements": 9320071,
+        "n_measurements": 9345913,
         "n_subjects": 13624
       },
       "2124": {
-        "n_measurements": 9858218,
+        "n_measurements": 9885429,
         "n_subjects": 14036
       },
       "2125": {
-        "n_measurements": 10062484,
+        "n_measurements": 10090743,
         "n_subjects": 14136
       },
       "2126": {
-        "n_measurements": 9846108,
+        "n_measurements": 9876748,
         "n_subjects": 14281
       },
       "2127": {
-        "n_measurements": 9959839,
+        "n_measurements": 9990971,
         "n_subjects": 14469
       },
       "2128": {
-        "n_measurements": 10679773,
+        "n_measurements": 10711754,
         "n_subjects": 14725
       },
       "2129": {
-        "n_measurements": 10734551,
+        "n_measurements": 10767813,
         "n_subjects": 14783
       },
       "2130": {
-        "n_measurements": 11700978,
+        "n_measurements": 11735530,
         "n_subjects": 14884
       },
       "2131": {
-        "n_measurements": 10362301,
+        "n_measurements": 10396581,
         "n_subjects": 14884
       },
       "2132": {
-        "n_measurements": 10155300,
+        "n_measurements": 10190133,
         "n_subjects": 15020
       },
       "2133": {
-        "n_measurements": 10839722,
+        "n_measurements": 10874368,
         "n_subjects": 14941
       },
       "2134": {
-        "n_measurements": 10851052,
+        "n_measurements": 10886615,
         "n_subjects": 14892
       },
       "2135": {
-        "n_measurements": 11462036,
+        "n_measurements": 11496621,
         "n_subjects": 14864
       },
       "2136": {
-        "n_measurements": 10765883,
+        "n_measurements": 10801477,
         "n_subjects": 14840
       },
       "2137": {
-        "n_measurements": 11214780,
+        "n_measurements": 11250283,
         "n_subjects": 14594
       },
       "2138": {
-        "n_measurements": 11511219,
+        "n_measurements": 11546649,
         "n_subjects": 14493
       },
       "2139": {
-        "n_measurements": 11482724,
+        "n_measurements": 11517402,
         "n_subjects": 14345
       },
       "2140": {
-        "n_measurements": 11255099,
+        "n_measurements": 11290202,
         "n_subjects": 14357
       },
       "2141": {
-        "n_measurements": 11534409,
+        "n_measurements": 11570086,
         "n_subjects": 14292
       },
       "2142": {
-        "n_measurements": 10544441,
+        "n_measurements": 10579895,
         "n_subjects": 14365
       },
       "2143": {
-        "n_measurements": 11107774,
+        "n_measurements": 11142624,
         "n_subjects": 14222
       },
       "2144": {
-        "n_measurements": 11098922,
+        "n_measurements": 11134618,
         "n_subjects": 14251
       },
       "2145": {
-        "n_measurements": 10844441,
+        "n_measurements": 10880394,
         "n_subjects": 14073
       },
       "2146": {
-        "n_measurements": 11166608,
+        "n_measurements": 11202802,
         "n_subjects": 14202
       },
       "2147": {
-        "n_measurements": 11668985,
+        "n_measurements": 11704844,
         "n_subjects": 14051
       },
       "2148": {
-        "n_measurements": 10466370,
+        "n_measurements": 10502594,
         "n_subjects": 14076
       },
       "2149": {
-        "n_measurements": 12170814,
+        "n_measurements": 12207752,
         "n_subjects": 13820
       },
       "2150": {
-        "n_measurements": 10494474,
+        "n_measurements": 10528872,
         "n_subjects": 13792
       },
       "2151": {
-        "n_measurements": 11178836,
+        "n_measurements": 11215313,
         "n_subjects": 13862
       },
       "2152": {
-        "n_measurements": 11147188,
+        "n_measurements": 11182938,
         "n_subjects": 13574
       },
       "2153": {
-        "n_measurements": 10764870,
+        "n_measurements": 10799718,
         "n_subjects": 13600
       },
       "2154": {
-        "n_measurements": 11147402,
+        "n_measurements": 11182929,
         "n_subjects": 13601
       },
       "2155": {
-        "n_measurements": 11532934,
+        "n_measurements": 11568437,
         "n_subjects": 13552
       },
       "2156": {
-        "n_measurements": 11668107,
+        "n_measurements": 11703932,
         "n_subjects": 13584
       },
       "2157": {
-        "n_measurements": 10691694,
+        "n_measurements": 10726179,
         "n_subjects": 13262
       },
       "2158": {
-        "n_measurements": 10256703,
+        "n_measurements": 10291271,
         "n_subjects": 13209
       },
       "2159": {
-        "n_measurements": 10970993,
+        "n_measurements": 11006443,
         "n_subjects": 13155
       },
       "2160": {
-        "n_measurements": 11180530,
+        "n_measurements": 11215641,
         "n_subjects": 13267
       },
       "2161": {
-        "n_measurements": 10709947,
+        "n_measurements": 10745699,
         "n_subjects": 12988
       },
       "2162": {
-        "n_measurements": 10461682,
+        "n_measurements": 10498211,
         "n_subjects": 12912
       },
       "2163": {
-        "n_measurements": 11989519,
+        "n_measurements": 12024959,
         "n_subjects": 12881
       },
       "2164": {
-        "n_measurements": 10809505,
+        "n_measurements": 10844428,
         "n_subjects": 12714
       },
       "2165": {
-        "n_measurements": 10527060,
+        "n_measurements": 10562437,
         "n_subjects": 12763
       },
       "2166": {
-        "n_measurements": 11092329,
+        "n_measurements": 11127746,
         "n_subjects": 12602
       },
       "2167": {
-        "n_measurements": 10852866,
+        "n_measurements": 10888209,
         "n_subjects": 12528
       },
       "2168": {
-        "n_measurements": 10270333,
+        "n_measurements": 10305253,
         "n_subjects": 12389
       },
       "2169": {
-        "n_measurements": 10632403,
+        "n_measurements": 10667940,
         "n_subjects": 12253
       },
       "2170": {
-        "n_measurements": 10255275,
+        "n_measurements": 10291605,
         "n_subjects": 12085
       },
       "2171": {
-        "n_measurements": 10520405,
+        "n_measurements": 10557541,
         "n_subjects": 11952
       },
       "2172": {
-        "n_measurements": 10948633,
+        "n_measurements": 10984918,
         "n_subjects": 11989
       },
       "2173": {
-        "n_measurements": 10950173,
+        "n_measurements": 10986454,
         "n_subjects": 11949
       },
       "2174": {
-        "n_measurements": 10909330,
+        "n_measurements": 10946245,
         "n_subjects": 12035
       },
       "2175": {
-        "n_measurements": 11463997,
+        "n_measurements": 11500373,
         "n_subjects": 12126
       },
       "2176": {
-        "n_measurements": 10615062,
+        "n_measurements": 10651499,
         "n_subjects": 12075
       },
       "2177": {
-        "n_measurements": 10950562,
+        "n_measurements": 10987545,
         "n_subjects": 12127
       },
       "2178": {
-        "n_measurements": 10458043,
+        "n_measurements": 10494139,
         "n_subjects": 12091
       },
       "2179": {
-        "n_measurements": 10872805,
+        "n_measurements": 10908776,
         "n_subjects": 11956
       },
       "2180": {
-        "n_measurements": 11271706,
+        "n_measurements": 11308122,
         "n_subjects": 12178
       },
       "2181": {
-        "n_measurements": 10904831,
+        "n_measurements": 10941796,
         "n_subjects": 12006
       },
       "2182": {
-        "n_measurements": 10974355,
+        "n_measurements": 11009435,
         "n_subjects": 12100
       },
       "2183": {
-        "n_measurements": 11373257,
+        "n_measurements": 11408676,
         "n_subjects": 11922
       },
       "2184": {
-        "n_measurements": 10641972,
+        "n_measurements": 10678168,
         "n_subjects": 12032
       },
       "2185": {
-        "n_measurements": 11581327,
+        "n_measurements": 11616307,
         "n_subjects": 11974
       },
       "2186": {
-        "n_measurements": 11076466,
+        "n_measurements": 11112365,
         "n_subjects": 11948
       },
       "2187": {
-        "n_measurements": 10904104,
+        "n_measurements": 10939321,
         "n_subjects": 12016
       },
       "2188": {
-        "n_measurements": 10683960,
+        "n_measurements": 10719296,
         "n_subjects": 11783
       },
       "2189": {
-        "n_measurements": 10789030,
+        "n_measurements": 10822677,
         "n_subjects": 11310
       },
       "2190": {
-        "n_measurements": 6164340,
+        "n_measurements": 6192970,
         "n_subjects": 7579
       },
       "2191": {
-        "n_measurements": 4871612,
+        "n_measurements": 4897062,
         "n_subjects": 6382
       },
       "2192": {
-        "n_measurements": 4498603,
+        "n_measurements": 4522071,
         "n_subjects": 5713
       },
       "2193": {
-        "n_measurements": 3779607,
+        "n_measurements": 3801479,
         "n_subjects": 5314
       },
       "2194": {
-        "n_measurements": 3571183,
+        "n_measurements": 3591418,
         "n_subjects": 4805
       },
       "2195": {
-        "n_measurements": 3311281,
+        "n_measurements": 3330689,
         "n_subjects": 4364
       },
       "2196": {
-        "n_measurements": 3634414,
+        "n_measurements": 3652641,
         "n_subjects": 4091
       },
       "2197": {
-        "n_measurements": 2817787,
+        "n_measurements": 2834439,
         "n_subjects": 3740
       },
       "2198": {
-        "n_measurements": 2581918,
+        "n_measurements": 2597602,
         "n_subjects": 3402
       },
       "2199": {
-        "n_measurements": 2390033,
+        "n_measurements": 2404363,
         "n_subjects": 3063
       },
       "2200": {
-        "n_measurements": 2409394,
+        "n_measurements": 2422561,
         "n_subjects": 2759
       },
       "2201": {
-        "n_measurements": 1853818,
+        "n_measurements": 1866209,
         "n_subjects": 2440
       },
       "2202": {
-        "n_measurements": 1751713,
+        "n_measurements": 1763043,
         "n_subjects": 2147
       },
       "2203": {
-        "n_measurements": 1529894,
+        "n_measurements": 1539892,
         "n_subjects": 1836
       },
       "2204": {
-        "n_measurements": 1099127,
+        "n_measurements": 1107656,
         "n_subjects": 1539
       },
       "2205": {
-        "n_measurements": 1080349,
+        "n_measurements": 1087604,
         "n_subjects": 1271
       },
       "2206": {
-        "n_measurements": 988809,
+        "n_measurements": 994691,
         "n_subjects": 1040
       },
       "2207": {
-        "n_measurements": 733422,
+        "n_measurements": 737922,
         "n_subjects": 791
       },
       "2208": {
-        "n_measurements": 741552,
+        "n_measurements": 744959,
         "n_subjects": 615
       },
       "2209": {
-        "n_measurements": 483027,
+        "n_measurements": 485644,
         "n_subjects": 444
       },
       "2210": {
-        "n_measurements": 301303,
+        "n_measurements": 303153,
         "n_subjects": 297
       },
       "2211": {
-        "n_measurements": 255630,
+        "n_measurements": 256885,
         "n_subjects": 208
       },
       "2212": {
-        "n_measurements": 149300,
+        "n_measurements": 149923,
         "n_subjects": 119
       },
       "2213": {
-        "n_measurements": 65951,
+        "n_measurements": 66395,
         "n_subjects": 70
       },
       "2214": {
-        "n_measurements": 53602,
+        "n_measurements": 53812,
         "n_subjects": 36
       },
       "<suppressed>": {
-        "n_measurements": 368,
+        "n_measurements": 385,
         "n_years": 4
       }
     },
-    "n_measurements_with_time": 881035448,
+    "n_measurements_with_time": 883889808,
     "n_years_observed": 200
   }
 }
