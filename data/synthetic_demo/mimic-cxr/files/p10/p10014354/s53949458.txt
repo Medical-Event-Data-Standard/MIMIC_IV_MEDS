@@ -1,0 +1,17 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PORTABLE AP)
+
+INDICATION: ___ Synthetic indication for icu imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+Possible consolidation, cannot be excluded.
+Possible lung opacity, cannot be excluded.
+No pleural other.
+
+IMPRESSION:
+Synthetic impression: see findings.

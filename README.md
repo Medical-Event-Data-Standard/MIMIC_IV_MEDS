@@ -59,6 +59,25 @@ from PhysioNet, which rate-limits each connection to roughly 50 KB/s, while the 
 itself is ~32 minutes and ~20 GB of RAM. Raise `download_concurrency` and keep the raw data
 with `download_dest_dir`; see [Expected runtime and compute needs](#expected-runtime-and-compute-needs).
 
+## Simulated demo data for modules without a public demo
+
+> [!WARNING]
+> The files under [`data/synthetic_demo/`](data/synthetic_demo/README.md) are **synthetic**. They are
+> for testing pipelines and for tutorials only, are not real patient data, and must not be used for
+> research.
+
+MIMIC-IV-Note 2.2, MIMIC-CXR 2.1.0, MIMIC-CXR-JPG 2.1.0 and MIMIC-IV-ECHO 0.1 are credentialed and
+have no public demo. ED, ECG and the waveform database do have a public release. So that
+`dataset_key=demo` can cover those four modules too, `scripts/synthetic_demo.py` simulates them for
+the public demo's 100 subjects. It reuses their real ids and admission, ED and ICU times, and writes
+each module in its release's exact layout. The modules agree with each other: each chest X-ray study
+has the report text and the timing of a radiology note, and each admission has a discharge summary
+at its discharge time. No value comes from a credentialed dataset; the free text is templated
+("Synthetic ..."). [`data/synthetic_demo/sources.yaml`](data/synthetic_demo/sources.yaml) pins
+every file at a commit of this repository, with its SHA-256, as a ready-made `demo` source.
+Provenance, the public schema behind each table, and what the public docs leave open are in
+[`data/synthetic_demo/README.md`](data/synthetic_demo/README.md).
+
 ## How this ETL is defined
 
 There is no Python in this package. The entire ETL is one file —
