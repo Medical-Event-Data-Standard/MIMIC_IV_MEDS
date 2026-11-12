@@ -35,7 +35,7 @@ etl:
 
 allergies:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -62,7 +62,7 @@ allergies:
 
 chief_complaint:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -80,7 +80,7 @@ chief_complaint:
 
 past_medical_history:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -101,7 +101,7 @@ past_medical_history:
 
 medications_on_admission:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -130,7 +130,7 @@ medications_on_admission:
 
 discharge_medications:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -156,7 +156,7 @@ discharge_medications:
 
 discharge_diagnosis:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -176,7 +176,7 @@ discharge_diagnosis:
 
 major_procedures:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -201,7 +201,7 @@ major_procedures:
 # present exactly when `temperature_c` is and always converts to it.
 physical_exam_vitals:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -301,7 +301,7 @@ physical_exam_vitals:
 
 physical_exam_systems:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -327,7 +327,7 @@ physical_exam_systems:
 # HOSPITAL_DISCHARGE//AGAINST ADVICE) with timestamps.
 discharge_condition:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
