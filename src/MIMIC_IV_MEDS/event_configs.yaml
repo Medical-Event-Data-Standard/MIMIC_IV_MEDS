@@ -239,10 +239,23 @@ hosp/emar:
           {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
 
 hosp/hcpcsevents:
+  # Timed at the admission's discharge, like the other billing codes (DIAGNOSIS, DRG,
+  # PROCEDURE//ICD; #25), not at `chartdate`. `chartdate` is a bare date, which parses to
+  # midnight: on the demo it put 58 of 61 rows before the admission's own `admittime`.
+  # It approximates the day the billed service happened, not when the code was assigned
+  # (#65), so discharge is the leakage-safe time; see "Event timing" in the README. The
+  # service date is kept in the `chartdate` extension column, which also keeps one code
+  # billed on two days of a stay as two events through the merge stage's de-duplication.
+  _table:
+    joins:
+      hosp/admissions:
+        key: hadm_id
+        cols: [dischtime]
   hcpcs:
     code: f"HCPCS//{$short_description ?? 'UNK'}"
     hadm_id: $hadm_id
-    time: '$chartdate::"%Y-%m-%d"'
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    chartdate: '$chartdate::"%Y-%m-%d"'
     _metadata:
       # These are not all CPT codes, unfortunately
       hosp/d_hcpcs:
@@ -294,7 +307,8 @@ hosp/omr:
   # the two blood-pressure blocks, everything else only to `omr`, so each shard logs three
   # "dropped N/M rows with null code" warnings for this table (expected, not a data loss).
   # The row classes are computed once in `_table.cols` so the blocks cannot drift apart.
-  # See "OMR" in the README.
+  # See "OMR" in the README. `chartdate` is a bare date and still parses to midnight; moving
+  # date-only events to end of day is an open follow-up (see "Event timing" in the README).
   _table:
     cols:
       is_number: '/^[-+]?[0-9]+(\.[0-9]+)?$/ in ($result_value ?? "")'
@@ -370,7 +384,8 @@ hosp/patients:
     # `deathtime` (precise, in-hospital, joined above) takes precedence over the raw
     # date-only `dod`. The `::?` casts are lenient (null on format mismatch) so the two
     # formats coalesce cleanly; rows where both are null (living subjects) are dropped
-    # by the extraction's computed-time filter.
+    # by the extraction's computed-time filter. A `dod`-only death lands at midnight; see
+    # "Event timing" in the README.
     time: coalesce($deathtime::?"%Y-%m-%d %H:%M:%S", $dod::?"%Y-%m-%d")
     _metadata:
       _self:
