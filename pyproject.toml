@@ -67,6 +67,9 @@ MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
 # MIMIC-IV plus the separately-credentialed MIMIC-Note-Extract tables. Generated from the base
 # and `extensions/mne.yaml` by `scripts/build_extension_specs.py`; see the README.
 MIMIC-IV-MNE = "MIMIC_IV_MEDS:event_configs_mne.yaml"
+# MIMIC-IV plus the separately-credentialed MIMIC-IV-ED tables (the demo works too: it adds the
+# public MIMIC-IV-ED demo). Generated from the base and `extensions/ed.yaml`; see docs/extensions/ed.md.
+MIMIC-IV-ED = "MIMIC_IV_MEDS:event_configs_ed.yaml"
 
 # Registers the suMEDS rules under the same name, so the config's `sumeds_enrich: {rules: MIMIC-IV}`
 # and `--rules MIMIC-IV` find them.

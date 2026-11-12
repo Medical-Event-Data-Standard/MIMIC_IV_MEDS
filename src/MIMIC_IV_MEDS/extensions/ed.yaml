@@ -1,0 +1,399 @@
+# Extension: MIMIC-IV-ED v2.2
+#   https://physionet.org/content/mimic-iv-ed/2.2/ (demo: https://physionet.org/content/mimic-iv-ed-demo/2.2/)
+#
+# This is NOT a spec on its own. `scripts/build_extension_specs.py` composes it with
+# `event_configs.yaml` into the generated, registered spec `event_configs_ed.yaml`
+# (`spec=MIMIC-IV-ED`); edit this file and the base, never the generated one. It is a separate
+# spec rather than part of `MIMIC-IV` because MEDS-Extract fails on a configured table whose raw
+# file is missing, MIMIC-IV-ED is a separately-credentialed PhysioNet project, and adding ED events
+# changes cohorts and event counts, so it must stay opt-in. Unlike MNE it has a public demo, so
+# `dataset_key=demo` works: the demo bucket is the MIMIC-IV demo plus the MIMIC-IV-ED demo.
+#
+# MIMIC-IV-ED holds ~425k emergency department stays (2011-2019), keyed by `stay_id` (which is
+# `hosp/transfers.transfer_id` of the stay's ED transfer). The reasoning behind the rules below is
+# in docs/extensions/ed.md:
+#
+# - **Every code starts with `ED//`.** The base already marks ED visits (`TRANSFER_TO//ED//...` for
+#   every ED stay 2008-2022, `ED_REGISTRATION`/`ED_OUT` for admitted ones), so `ED//ARRIVAL` and
+#   `ED//DISPOSITION` are not visit markers: they carry what the base lacks (arrival transport,
+#   disposition). The prefix keeps the vocabulary apart from the base's (a shared code would get
+#   two descriptions, which MEDS-Extract joins with a newline) and lets the module be dropped
+#   wholesale, which matters because ED detail exists only for 2011-2019.
+# - **Leakage-safe times.** Arrival, triage and chief complaint at `edstays.intime` (triage has no
+#   timestamp of its own and happens on arrival); diagnoses and disposition at `edstays.outtime`,
+#   since both are assigned at or after ED discharge; vital signs, medication reconciliation and
+#   Pyxis dispensations at their own `charttime`.
+# - **Numbers in `numeric_value`, free text in `text_value`.** Vitals and the ESI acuity are numeric,
+#   as recorded (temperature in °F, no outlier cleaning, as for `icu/chartevents`); `pain` is parsed
+#   as a number where it is one and kept as text otherwise, under the same code (the `omr` rule);
+#   `chiefcomplaint` and `rhythm` are free text in `text_value`.
+# - **One event per medication, not per vocabulary row.** `medrecon` repeats a medication once per
+#   ETC class (`etc_rn`) and `pyxis` once per GSN (`gsn_rn`); only the first row of each is emitted.
+#   Codes follow the base's medication convention (drug name in the code; the NDC too, with an
+#   `NDC/` parent, where there is one). GSN has no public vocabulary, so it is an extension column.
+# - **Extension columns:** `ed_stay_id` (the ED `stay_id`) on every event and `hadm_id` where the
+#   stay led to an admission; `seq_num` on diagnoses; `med_rn` and `gsn` on Pyxis rows.
+#   `dataset.json` lists `ed_stay_id` under `other_extension_columns`, not the base's
+#   `raw_source_id_columns`: a fragment sets only `etl.dataset_name`, and the base cannot name a
+#   column its own output lacks (MEDS-Extract rejects that).
+#
+# Not extracted: `edstays.gender` and `edstays.race` (in `hosp/patients` and `hosp/admissions`;
+# reusing `RACE//...` would give those codes a second description), medrecon's ETC classes
+# (proprietary FDB classes, multi-valued for 14% of medications, no public vocabulary).
+
+etl:
+  dataset_name: MIMIC-IV-ED
+
+ed/edstays:
+  arrival:
+    code: f"ED//ARRIVAL//{$arrival_transport ?? 'UNK'}"
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    _metadata:
+      _self:
+        description: >-
+          f"Arrival in the emergency department (MIMIC-IV-ED edstays.intime), by {$arrival_transport ?? 'UNK'}
+          (edstays.arrival_transport). Not a visit marker: TRANSFER_TO//ED marks every ED stay"
+  disposition:
+    code: f"ED//DISPOSITION//{$disposition ?? 'UNK'}"
+    time: '$outtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    _metadata:
+      _self:
+        description: >-
+          f"Departure from the emergency department with disposition {$disposition ?? 'UNK'}
+          (MIMIC-IV-ED edstays.disposition, at edstays.outtime)"
+
+# One row per ED stay, each measurement in its own column: one event per filled column. A null
+# value must emit no event, and dftly has no null test, so each code is conditional on the value
+# coalesced to -1 (no value here is negative); see `physical_exam_vitals` in extensions/mne.yaml.
+# `context` is a constant code component, as `ed_registration_code` in the base: it gives the codes
+# something to attach metadata through, and makes this block and `ed/vitalsign` read alike.
+ed/triage:
+  _table:
+    joins:
+      ed/edstays:
+        key: stay_id
+        cols: [intime, hadm_id]
+    cols:
+      context: "'TRIAGE'"
+      # `pain` is a string: a 0-10 score, or text such as "unable" or "sleeping". A number
+      # (whitespace allowed) goes to numeric_value, anything else to text_value.
+      pain_number: 'extract group 1 of /^\s*([0-9]+(?:\.[0-9]+)?)\s*$/ from $pain'
+  temperature:
+    code: 'f"ED//{$context}//TEMPERATURE_F" if ($temperature ?? -1) >= 0'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $temperature
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8310-5'"
+        description: >-
+          'Body temperature in degrees Fahrenheit at ED triage (MIMIC-IV-ED triage.temperature, timed at
+          edstays.intime), as recorded'
+  heart_rate:
+    code: 'f"ED//{$context}//HEART_RATE" if ($heartrate ?? -1) >= 0'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $heartrate
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8867-4'"
+        description: >-
+          'Heart rate in beats per minute at ED triage (MIMIC-IV-ED triage.heartrate, timed at edstays.intime)'
+  respiratory_rate:
+    code: 'f"ED//{$context}//RESPIRATORY_RATE" if ($resprate ?? -1) >= 0'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $resprate
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/9279-1'"
+        description: >-
+          'Respiratory rate in breaths per minute at ED triage (MIMIC-IV-ED triage.resprate, timed at
+          edstays.intime)'
+  o2_saturation:
+    code: 'f"ED//{$context}//O2_SATURATION" if ($o2sat ?? -1) >= 0'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $o2sat
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/59408-5'"
+        description: >-
+          'Oxygen saturation by pulse oximetry in percent at ED triage (MIMIC-IV-ED triage.o2sat, timed at
+          edstays.intime)'
+  bp_systolic:
+    code: 'f"ED//{$context}//BP_SYSTOLIC" if ($sbp ?? -1) >= 0'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $sbp
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8480-6'"
+        description: >-
+          'Systolic blood pressure in mmHg at ED triage (MIMIC-IV-ED triage.sbp, timed at edstays.intime)'
+  bp_diastolic:
+    code: 'f"ED//{$context}//BP_DIASTOLIC" if ($dbp ?? -1) >= 0'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $dbp
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8462-4'"
+        description: >-
+          'Diastolic blood pressure in mmHg at ED triage (MIMIC-IV-ED triage.dbp, timed at edstays.intime)'
+  pain:
+    code: 'f"ED//{$context}//PAIN" if ($pain ?? "") != ""'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: "$pain_number::?float"
+    text_value: '$pain if ($pain_number ?? "") == ""'
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/72514-3'"
+        description: >-
+          'Self-reported pain at ED triage (MIMIC-IV-ED triage.pain, timed at edstays.intime): a 0-10 score in
+          numeric_value, or the entry as written in text_value when it is not a number'
+  # The Emergency Severity Index, 1 (most urgent) to 5. Ordinal, so a number, like the pain score.
+  # No parent: LOINC has no ESI term (its triage-level codes are NAMCS survey items).
+  acuity:
+    code: 'f"ED//{$context}//ACUITY" if ($acuity ?? -1) >= 0'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $acuity
+    _metadata:
+      _self:
+        description: >-
+          'Emergency Severity Index (ESI) triage acuity, 1 (most urgent) to 5, assigned at ED triage
+          (MIMIC-IV-ED triage.acuity, timed at edstays.intime)'
+  chief_complaint:
+    code: 'f"ED//{$context}//CHIEF_COMPLAINT" if ($chiefcomplaint ?? "") != ""'
+    time: '$intime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    text_value: $chiefcomplaint
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/10154-3'"
+        description: >-
+          'Chief complaint recorded at ED triage, free text in text_value (MIMIC-IV-ED triage.chiefcomplaint,
+          timed at edstays.intime)'
+
+# One row per (stay, charttime), each measurement in its own column; the same idiom as `ed/triage`.
+# (stay_id, charttime) is unique, so no sequence column is needed.
+ed/vitalsign:
+  _table:
+    joins:
+      ed/edstays:
+        key: stay_id
+        cols: [hadm_id]
+    cols:
+      context: "'VITALSIGN'"
+      pain_number: 'extract group 1 of /^\s*([0-9]+(?:\.[0-9]+)?)\s*$/ from $pain'
+  temperature:
+    code: 'f"ED//{$context}//TEMPERATURE_F" if ($temperature ?? -1) >= 0'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $temperature
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8310-5'"
+        description: >-
+          'Body temperature in degrees Fahrenheit charted during the ED stay (MIMIC-IV-ED vitalsign.temperature),
+          as recorded'
+  heart_rate:
+    code: 'f"ED//{$context}//HEART_RATE" if ($heartrate ?? -1) >= 0'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $heartrate
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8867-4'"
+        description: >-
+          'Heart rate in beats per minute charted during the ED stay (MIMIC-IV-ED vitalsign.heartrate)'
+  respiratory_rate:
+    code: 'f"ED//{$context}//RESPIRATORY_RATE" if ($resprate ?? -1) >= 0'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $resprate
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/9279-1'"
+        description: >-
+          'Respiratory rate in breaths per minute charted during the ED stay (MIMIC-IV-ED vitalsign.resprate)'
+  o2_saturation:
+    code: 'f"ED//{$context}//O2_SATURATION" if ($o2sat ?? -1) >= 0'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $o2sat
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/59408-5'"
+        description: >-
+          'Oxygen saturation by pulse oximetry in percent charted during the ED stay (MIMIC-IV-ED vitalsign.o2sat)'
+  bp_systolic:
+    code: 'f"ED//{$context}//BP_SYSTOLIC" if ($sbp ?? -1) >= 0'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $sbp
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8480-6'"
+        description: >-
+          'Systolic blood pressure in mmHg charted during the ED stay (MIMIC-IV-ED vitalsign.sbp)'
+  bp_diastolic:
+    code: 'f"ED//{$context}//BP_DIASTOLIC" if ($dbp ?? -1) >= 0'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: $dbp
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/8462-4'"
+        description: >-
+          'Diastolic blood pressure in mmHg charted during the ED stay (MIMIC-IV-ED vitalsign.dbp)'
+  pain:
+    code: 'f"ED//{$context}//PAIN" if ($pain ?? "") != ""'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    numeric_value: "$pain_number::?float"
+    text_value: '$pain if ($pain_number ?? "") == ""'
+    _metadata:
+      _self:
+        parent_codes: "'LOINC/72514-3'"
+        description: >-
+          'Self-reported pain charted during the ED stay (MIMIC-IV-ED vitalsign.pain): a 0-10 score in
+          numeric_value, or the entry as written in text_value when it is not a number'
+  rhythm:
+    code: 'f"ED//{$context}//RHYTHM" if ($rhythm ?? "") != ""'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    text_value: $rhythm
+    _metadata:
+      _self:
+        description: >-
+          'Heart rhythm charted during the ED stay, free text in text_value (MIMIC-IV-ED vitalsign.rhythm)'
+
+# ED billing diagnoses, up to 9 per stay, ranked by `seq_num`. Timed at ED departure: they are
+# assigned at or after it. The code mirrors the base's `DIAGNOSIS//ICD//...` under the `ED//` prefix,
+# and the metadata block is the base's, so both carry the same description and ICD parent.
+ed/diagnosis:
+  _table:
+    joins:
+      ed/edstays:
+        key: stay_id
+        cols: [outtime, hadm_id]
+  diagnosis:
+    code: 'f"ED//DIAGNOSIS//ICD//{$icd_version}//{$icd_code}"'
+    time: '$outtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    seq_num: $seq_num
+    _metadata:
+      hosp/d_icd_diagnoses:
+        icd_version: $icd_version
+        icd_code: $icd_code
+        description: $long_title
+        parent_codes: >-
+          f"ICD{$icd_version}CM/{$icd_code[0:4]}.{$icd_code[4:]}"
+          if $icd_version == "9" and $icd_code[0:1] == "E" and len_chars($icd_code) > 4
+          else f"ICD{$icd_version}CM/{$icd_code}"
+          if $icd_version == "9" and $icd_code[0:1] == "E"
+          else f"ICD{$icd_version}CM/{$icd_code[0:3]}.{$icd_code[3:]}"
+          if len_chars($icd_code) > 3
+          else f"ICD{$icd_version}CM/{$icd_code}"
+
+# Medication reconciliation: what the patient was taking before the visit, documented at `charttime`.
+# One row per (medication, ETC class); `etc_rn == 1` keeps one event per medication. The code
+# follows `hosp/pharmacy`'s `MEDICATION//START//{name}//{ndc}`: the name keeps it readable and the
+# NDC carries the `NDC/` parent. The NDC is stored as an integer, so its leading zeros are restored
+# (NDCs are 11 digits); 0 means none and renders UNK.
+ed/medrecon:
+  _table:
+    joins:
+      ed/edstays:
+        key: stay_id
+        cols: [hadm_id]
+    cols:
+      ndc_clean: "'UNK' if ($ndc ?? 0) == 0 else f'00000000000{$ndc}'[-11:]"
+  medication:
+    code: 'f"ED//MEDRECON//{$name}//{$ndc_clean}" if $etc_rn == 1'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    gsn: "$gsn if ($gsn ?? 0) != 0"
+    _metadata:
+      _self:
+        parent_codes: 'f"NDC/{$ndc_clean}" if $ndc_clean != "UNK"'
+        description: >-
+          f"Medication the patient was taking before the ED visit, from the ED medication reconciliation:
+          {$name} (MIMIC-IV-ED medrecon.name); NDC {$ndc_clean} (medrecon.ndc, UNK if none)"
+
+# Dispensations from the ED's automated dispensing cabinets. One row per (dispensation, GSN);
+# `gsn_rn == 1` keeps one event per dispensation. Pyxis names come from the cabinet formulary
+# (about 1.1k distinct), so the name is the code. `med_rn` numbers the dispensations of a stay and
+# keeps two same-minute dispensations of one drug apart at the merge stage.
+ed/pyxis:
+  _table:
+    joins:
+      ed/edstays:
+        key: stay_id
+        cols: [hadm_id]
+  dispensation:
+    code: 'f"ED//PYXIS//{$name}" if $gsn_rn == 1'
+    time: '$charttime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    ed_stay_id: $stay_id
+    med_rn: $med_rn
+    gsn: $gsn
+    _metadata:
+      _self:
+        description: >-
+          f"Medication dispensed in the emergency department from an automated dispensing cabinet (Pyxis): {$name}
+          (MIMIC-IV-ED pyxis.name)"
+
+# Merged into the base `sources:` by the build script: each bucket named here is appended to the
+# base bucket of the same name. Both buckets are named, so `dataset_key=demo` runs on the MIMIC-IV
+# demo plus the MIMIC-IV-ED demo. The include lists fetch only the six tables and keep the ED
+# release's own LICENSE/README/SHA256SUMS from colliding with MIMIC-IV's at the root.
+sources:
+  dataset:
+    - type: physionet
+      base_url: https://physionet.org/files/mimic-iv-ed/2.2
+      username: ${oc.env:DATASET_DOWNLOAD_USERNAME}
+      password: ${oc.env:DATASET_DOWNLOAD_PASSWORD}
+      include:
+        - ed/diagnosis.csv.gz
+        - ed/edstays.csv.gz
+        - ed/medrecon.csv.gz
+        - ed/pyxis.csv.gz
+        - ed/triage.csv.gz
+        - ed/vitalsign.csv.gz
+  demo:
+    - type: physionet
+      base_url: https://physionet.org/files/mimic-iv-ed-demo/2.2
+      include:
+        - ed/diagnosis.csv.gz
+        - ed/edstays.csv.gz
+        - ed/medrecon.csv.gz
+        - ed/pyxis.csv.gz
+        - ed/triage.csv.gz
+        - ed/vitalsign.csv.gz

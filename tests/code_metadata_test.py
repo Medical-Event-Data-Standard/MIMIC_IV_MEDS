@@ -2,7 +2,8 @@
 
 This reads the spec files only and needs no data, so it runs in milliseconds. Whether the
 descriptions actually land in `metadata/codes.parquet` is checked on built cohorts by
-`e2e_demo_test.py` (the base spec) and `e2e_mne_synthetic_test.py` (the MNE extension).
+`e2e_demo_test.py` (the base spec), `e2e_mne_synthetic_test.py` (the MNE extension) and
+`e2e_ed_demo_test.py` (the ED extension).
 """
 
 from importlib.resources import files
@@ -12,7 +13,7 @@ import yaml
 
 #: Every registered spec. The extension specs are generated from the base plus a fragment, so
 #: checking them checks the fragments' events.
-SPECS = ["event_configs.yaml", "event_configs_mne.yaml"]
+SPECS = ["event_configs.yaml", "event_configs_mne.yaml", "event_configs_ed.yaml"]
 
 #: Top-level keys of the MESSY file that are not raw tables.
 RESERVED_KEYS = {"etl", "sources", "_defaults"}

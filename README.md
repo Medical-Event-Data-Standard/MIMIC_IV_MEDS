@@ -86,8 +86,9 @@ MEDS-Extract fails on any configured table whose raw file is missing. Each lives
 under [`src/MIMIC_IV_MEDS/extensions/`](src/MIMIC_IV_MEDS/extensions/), and
 `scripts/build_extension_specs.py` composes the base with it into a generated, separately
 registered spec (`event_configs_<name>.yaml`). Never edit the generated file: change the base or
-the fragment and re-run the script; `tests/extension_specs_test.py` fails if you forget. The one
-extension so far is [MIMIC-Note-Extract](#optional-extension-mimic-note-extract).
+the fragment and re-run the script; `tests/extension_specs_test.py` fails if you forget. The
+extensions so far are [MIMIC-Note-Extract](#optional-extension-mimic-note-extract) and
+[MIMIC-IV-ED](#optional-extension-mimic-iv-ed).
 
 ## What goes in the code, and what doesn't
 
@@ -272,6 +273,30 @@ The decisions behind the less obvious rows:
 (3,522) have no discharge time and are dropped. MNE filtered 9.4% of the source summaries (331,793
 to 300,720) by criteria the paper does not spell out. Its `SHA256SUMS.txt` separates hash and path
 by one space, which `shasum -c` rejects but MEDS-Extract's downloader accepts.
+
+## Optional extension: MIMIC-IV-ED
+
+[MIMIC-IV-ED v2.2](https://physionet.org/content/mimic-iv-ed/2.2/) holds about 425k emergency
+department stays from 2011 to 2019: arrival and disposition, triage, vital signs charted during
+the stay, ED diagnoses, the medication reconciliation, and Pyxis dispensations. The spec
+`MIMIC-IV-ED` is the full `MIMIC-IV` ETL plus those tables. Unlike MNE it has a public demo, so
+`dataset_key=demo` works:
+
+```bash
+# Needs a PhysioNet account approved for BOTH MIMIC-IV and MIMIC-IV-ED.
+meds-extract-run spec=MIMIC-IV-ED output_dir=$MEDS_OUTPUT_DIR
+# The open MIMIC-IV demo plus the open MIMIC-IV-ED demo; no credentials needed.
+meds-extract-run spec=MIMIC-IV-ED output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+Every code starts with `ED//`. Triage events are timed at ED arrival; diagnoses and disposition at
+ED departure, so they cannot leak into the stay. Against the full release the extension adds
+**18.8 M events** to 205,504 subjects. 79,370 of the 141,175 subjects without any hospital
+admission gain ED events. The ED tables take ~5 min and under 1 GB to extract on their own.
+
+ED detail exists only for 2011–2019, so its presence is a proxy for calendar period. Count ED
+visits with the base's `TRANSFER_TO//ED//…`, not with `ED//ARRIVAL`. The modelling decisions,
+caveats and validation are in [`docs/extensions/ed.md`](docs/extensions/ed.md).
 
 ## Code metadata
 
