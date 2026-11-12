@@ -164,7 +164,7 @@
       }
     },
     "present": true,
-    "vocabulary_digest": "sha256:4b8dff72077df67fe9346a6306bb9d1b40658d241d92c8fb13da09643f5302c0"
+    "vocabulary_digest": "sha256:67d3b332fa86004faeb29739cc54624dcc13a9e291528031398c17af898f309c"
   },
   "codes": {
     "concentration": {
@@ -176,18 +176,18 @@
       "n_codes_covering_99pct": 4523
     },
     "digests": {
-      "alphabetical": "sha256:4b8dff72077df67fe9346a6306bb9d1b40658d241d92c8fb13da09643f5302c0",
-      "by_measurement_frequency": "sha256:be3b31481b38a47b8f131ed4dabd4ca56889db9bd9e8902cf5ab94dfcc94093e",
-      "by_subject_frequency": "sha256:9d25cd00fa1b3062e8f2ff404a46209b931d169a7e1797acb734d778fcdccff3",
+      "alphabetical": "sha256:67d3b332fa86004faeb29739cc54624dcc13a9e291528031398c17af898f309c",
+      "by_measurement_frequency": "sha256:a8871f086a62dbf3732733153f8a231f7a8ab7b618a1304e94060e3fc2bb438b",
+      "by_subject_frequency": "sha256:ad133d0b321095bb13fc37908ec4715c36dfa3e740d573d26ef0cfe9c93de393",
       "numeric_moments": {
-        "digest": "sha256:f4d74613f04c5b218bc90228d32378c383bea10e349dce22a06291941fd331d8",
+        "digest": "sha256:191e3e721a0287255591f7cfc401baafce5530d971ca5183001a9c40c3380fbb",
         "n_codes": 393
       },
       "thresholded": {
         "100": {
-          "alphabetical": "sha256:96b4691809043202e421f93c09539b18cc39e4c27d2d5f9d61eedb9d150bcae1",
-          "by_measurement_frequency": "sha256:7efc9a37a6c51c0d07c9db308d6c2288364da47de908ea65753d096ae04b54df",
-          "by_subject_frequency": "sha256:96b4691809043202e421f93c09539b18cc39e4c27d2d5f9d61eedb9d150bcae1",
+          "alphabetical": "sha256:f946082321db17082bf84c9d281a92de0f80406f24b6e555394842a73a573f85",
+          "by_measurement_frequency": "sha256:ddee4bea1cc309f9a450ff06d25bd8de28817301bd1ec6c789a938a433edd32b",
+          "by_subject_frequency": "sha256:f946082321db17082bf84c9d281a92de0f80406f24b6e555394842a73a573f85",
           "n_codes": 70
         },
         "1000": {
@@ -197,9 +197,9 @@
           "n_codes": 0
         },
         "20": {
-          "alphabetical": "sha256:698a0b18fac6ff4ada944aa0716c7cfa26fb98b1ff8a3582ec303d58f3a22c33",
-          "by_measurement_frequency": "sha256:2c63cb30a4369dc5eccac2fdedd1030d904e74f975df376b6996ebb493222cd4",
-          "by_subject_frequency": "sha256:853826a2a01139915dc96c5c88b4bb0d1282657a5b98dc823cd5f492c5baa50b",
+          "alphabetical": "sha256:5143f20cf589aa92a20fad7610a2a60178ee0d3b6d88e9f86fa9e5165a4fdcd0",
+          "by_measurement_frequency": "sha256:de33ff28a3cfc89fa5c584c728922e77ddb27014ef6c2b0122e0475f71986ca7",
+          "by_subject_frequency": "sha256:ad579abfce1ae50c873fa7dcf20a46d881a871a2e666f0c92e8372cc39caa123",
           "n_codes": 1129
         }
       }
@@ -289,9 +289,9 @@
     "code_modifier_columns": [
       "unit"
     ],
-    "created_at": "2026-11-12T21:14:10.428471+00:00",
+    "created_at": "2026-11-12T21:35:55.268943+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.2.1.dev13+gca0b06662.d20261112",
+    "dataset_version": "2.2:0.3.1.dev13+g5b97eb008",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.0",
     "meds_version": "0.4.1",
@@ -319,25 +319,25 @@
   },
   "dataset_digest": {
     "by_file": {
-      "data/held_out/0.parquet": "sha256:5d193b7a92d9a0bd50515ddd55170d8cd535cfb852a69fb2c2f265024ab0cf0d",
-      "data/train/0.parquet": "sha256:cca5f2fde08ec7fc1da98bbb9d205d3aea65c00a50494efb535ba8cfe05d9778",
-      "data/tuning/0.parquet": "sha256:94b5676a828dd369d52230db7fcb86ac7478bc4efe527cd0a1a48d0235cd7ae5",
-      "metadata/codes.parquet": "sha256:e1a3483dbed2cbd03afeb4dace75f74e9c21a4a4c41cc7f77a1ad37887a57698",
-      "metadata/dataset.json": "sha256:46eae5305ba86a2dedb4bfa88895d3fd3ced1ec3c3e6e8935978558a7262f964",
+      "data/held_out/0.parquet": "sha256:4b3e90ac46bcbab741d6594e87ac3a1e9c68ff8ca3a19a0ccc0e7ea324284aaa",
+      "data/train/0.parquet": "sha256:b46ec089d29fc783db6c6f6882d0c8682f926b65473a164640e33fd15f9a9472",
+      "data/tuning/0.parquet": "sha256:8f3955f23c962d0eba796c1a5e3b4c58fdbf3cca3904cf0f4ae7f0bbb54131fa",
+      "metadata/codes.parquet": "sha256:a85058f1aa76129d7b915d1087b4e924e92200eccba16ad6f3c8653a1a7971f9",
+      "metadata/dataset.json": "sha256:13035d1395272d306bc63f2e05c69331535f2e2e7d45e1da9c5ec3a43fc27898",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
-    "code_metadata": "sha256:54ea160099469a8fa26a704c564bc61969e504a0a819041f21537215fc69c736",
-    "combined": "sha256:36c73d8a11d5e9f22d2609256410fc50107ab3503cec0abb50fbc297d2c7ef84",
+    "code_metadata": "sha256:641c953ba900945c3a90f75dfbcd8da81c4c53889905ca1bad666245dffa2d62",
+    "combined": "sha256:99c08f427dd1e74b7d890e23a22219fbbe1da1e71ec8f58dee27532bf867f0f8",
     "data": {
-      "digest": "sha256:5fc3989c5f2c2d6b5c4c564cd90c3989810a13a2198235bd87252cad772949ef",
+      "digest": "sha256:78d5e76b67ad983cc88ae38f65ccdb3cb847b1bc172f7dd7058129829de4faac",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:a50d3ee44e8bb5f62d4afa40576f9ddc400e56c5bfa9dfa520bdd299a617e598",
+    "dataset_metadata": "sha256:d982e36c0f1c0146d27a580901737bff8bca2efa2b4f9710b6fb6d92b0cd0685",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-12T21:14:12.363026",
+  "extracted_at": "2026-11-12T21:35:59.046913",
   "layout": {
     "code_metadata_columns": {
       "code": "String",

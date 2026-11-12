@@ -183,6 +183,22 @@ single `text_value` slot on `input_end` (100% of rows carry both), and `rateuom`
 so promoting it would stamp `UNK` into half of all `INFUSION_START` codes. See
 [#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15).
 
+### ICU chart events
+
+`icu/chartevents` is coded `ICU_CHART//{itemid}//{valueuom}` (`UNK` when the unit is null), for
+example `ICU_CHART//220045//bpm`. These are values charted at the ICU bedside: vital signs, scores,
+assessments, device settings and point-of-care measurements, keyed on `icu/d_items`. Hospital
+laboratory results come from `hosp/labevents` and keep their own codes, `LAB//RESULT//…` and
+`LAB//SPECIMEN_COLLECTED//…`, so `^LAB//` selects hospital labs only and `^ICU_CHART//` selects
+ICU charting only. The prefix sits beside the other ICU tables' own prefixes (`ICU_ADMISSION`,
+`INFUSION_START`, `PROCEDURE//START`, `SUBJECT_FLUID_OUTPUT`).
+
+**This changes the chartevents vocabulary.** Up to 0.3.0 the same events were coded
+`LAB//{itemid}//{valueuom}`. Only the prefix changed (the itemid and unit segments are as before),
+so an old code maps to the new one by replacing a leading `LAB//` followed by a digit with
+`ICU_CHART//`. Cohorts, predicates and vocabularies built against the old codes need that rename
+([#64](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/64)).
+
 ## Code metadata
 
 `metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary
@@ -190,11 +206,11 @@ applies, `parent_codes` in OMOP form (`LOINC/2160-0`, `ICD10CM/I10`, `NDC/…`),
 that maps codes across datasets or resolves them through OHDSI Athena has something to work
 with. All of it is declared in `event_configs.yaml`, through three routes:
 
-| Codes                                                                                                                                                                                | Route                                                                     | Source                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DIAGNOSIS`, `PROCEDURE//ICD`, `HCPCS`, ICU itemid codes (`LAB//<itemid>`, `PROCEDURE//START`/`END`, `INFUSION_*`, `SUBJECT_FLUID_OUTPUT`), `LAB//RESULT`, `LAB//SPECIMEN_COLLECTED` | `_metadata` joins against dictionary tables at run time                   | MIMIC-IV's own `d_icd_diagnoses`, `d_icd_procedures`, `d_hcpcs` and `d_items`; the [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps (MIT, tag v2.4.0, checksum-pinned under `sources:`) for lab descriptions and the LOINC, SNOMED and RxNorm parents |
-| every other component-coded event (admissions, demographics, transfers, ICU stays, DRGs, medications, OMR)                                                                           | `_self` templates over the code's own components                          | the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) of the column each component comes from (MIT-LCP/mimic-website, MIT), paraphrased, with the column named in parentheses                                                                                  |
-| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION//KG`                                                                                            | `_self` templates, the code rendered from a constant `_table.cols` column | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                   |
+| Codes                                                                                                                                                                                      | Route                                                                     | Source                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DIAGNOSIS`, `PROCEDURE//ICD`, `HCPCS`, ICU itemid codes (`ICU_CHART//<itemid>`, `PROCEDURE//START`/`END`, `INFUSION_*`, `SUBJECT_FLUID_OUTPUT`), `LAB//RESULT`, `LAB//SPECIMEN_COLLECTED` | `_metadata` joins against dictionary tables at run time                   | MIMIC-IV's own `d_icd_diagnoses`, `d_icd_procedures`, `d_hcpcs` and `d_items`; the [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps (MIT, tag v2.4.0, checksum-pinned under `sources:`) for lab descriptions and the LOINC, SNOMED and RxNorm parents |
+| every other component-coded event (admissions, demographics, transfers, ICU stays, DRGs, medications, OMR)                                                                                 | `_self` templates over the code's own components                          | the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) of the column each component comes from (MIT-LCP/mimic-website, MIT), paraphrased, with the column named in parentheses                                                                                  |
+| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION//KG`                                                                                                  | `_self` templates, the code rendered from a constant `_table.cols` column | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                   |
 
 Literal codes take the detour through a constant column because MEDS-Extract attaches
 metadata only through a code's components and rejects a `_metadata` block on a code with
