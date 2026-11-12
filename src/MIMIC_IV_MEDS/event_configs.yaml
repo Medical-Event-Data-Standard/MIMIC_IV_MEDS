@@ -26,6 +26,20 @@ etl:
   # removed the knob and always infers CSV schemas from the full file, which is exactly
   # what the huge value was emulating.
   n_subjects_per_shard: 1000
+  # Extension columns that dataset.json lists by role (MEDS DatasetMetadataSchema). Every
+  # other extension column is listed under `other_extension_columns` automatically. There is
+  # no `license` or `description_uri`: this one spec builds both the credentialed release
+  # and the open demo (`dataset_key=demo`), whose licenses and PhysioNet pages differ.
+  raw_source_id_columns:
+    [hadm_id, icustay_id, emar_id, poe_id, order_id, link_order_id]
+  code_modifier_columns: [unit]
+  # After the canonical pipeline, suMEDS (a dependency of this package) enriches
+  # metadata/codes.parquet with the rules registered as MIMIC-IV (sumeds_rules.yaml) and
+  # records it in metadata/dataset.json. A failed enrichment (e.g. without internet access)
+  # keeps codes.parquet as the ETL wrote it and does not fail the run; `suMEDS-enrich
+  # OUTPUT_DIR` finishes it later. `skip_stages=[sumeds_enrich]` leaves it out of a run.
+  post_stages:
+    - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:
   _table:
@@ -107,11 +121,11 @@ hosp/admissions:
           f"Hospital discharge; disposition after leaving the hospital: {$discharge_location ?? 'UNK'}
           (hosp/admissions.discharge_location)"
   # We omit the death event here: `deathtime` is joined into hosp/patients via that
-  # table's aggregated `_table.join`, and the death event is emitted there.
+  # table's aggregated `_table.joins`, and the death event is emitted there.
 
 hosp/diagnoses_icd:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -140,7 +154,7 @@ hosp/diagnoses_icd:
 
 hosp/drgcodes:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
@@ -183,7 +197,7 @@ hosp/emar:
       # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
       # it) and an unmatched join leaves it null -- both collapse to UNK.
       ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
-    join:
+    joins:
       hosp/prescriptions:
         left_on: [pharmacy_id, drug_type]
         right_on: [pharmacy_id, drug_type]
@@ -205,7 +219,7 @@ hosp/emar:
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
       # NDC attached is exactly the one dispensed for this order.
       # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
-      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # the `_table.joins` above, so the parent is a row-wise expression over the event's own
       # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
       # `extract_code_metadata` re-scan that whole table and join it against every observed
       # code -- a full-data materialization for a column we already have.
@@ -326,7 +340,7 @@ hosp/patients:
       # Constants rendering the literal MEDS codes; see `ed_registration_code` in hosp/admissions.
       meds_birth_code: "'MEDS_BIRTH'"
       meds_death_code: "'MEDS_DEATH'"
-    join:
+    joins:
       # Earliest per-subject in-hospital death time, via an aggregated join
       # (mmcdermott/MEDS_extract#65 / #98, on the 0.7 line). `min` over the fixed-width
       # "%Y-%m-%d %H:%M:%S" strings is chronological. This replaces the last
@@ -341,10 +355,8 @@ hosp/patients:
       _self:
         description: >-
           f"Sex of the patient: {$gender} (hosp/patients.gender, documented as genotypical sex)"
-        # The OMOP Gender vocabulary codes FEMALE and MALE as `F` and `M`, MIMIC-IV's own values.
-        # Inferred by identity; the MIMIC-IV demo in the OMOP CDM (PhysioNet, ODbL) maps them
-        # the same way (gender_source_value F/M to gender_concept_id 8532/8507).
-        parent_codes: '"Gender/F" if $gender == "F" else "Gender/M" if $gender == "M"'
+        # No `parent_codes`: the OMOP Gender tag (`Gender//F`, `Gender//M`) is an external-ontology
+        # link, added by suMEDS from `sumeds_rules.yaml` (see the README).
   dob:
     code: $meds_birth_code # MEDS_BIRTH, the MEDS official code for birth.
     time: "$year_of_birth::year"
@@ -385,7 +397,7 @@ hosp/pharmacy:
       # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
       # it) and an unmatched join leaves it null -- both collapse to UNK.
       ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
-    join:
+    joins:
       hosp/prescriptions:
         left_on: [pharmacy_id, drug_type]
         right_on: [pharmacy_id, drug_type]
@@ -406,7 +418,7 @@ hosp/pharmacy:
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
       # NDC attached is exactly the one dispensed for this order.
       # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
-      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # the `_table.joins` above, so the parent is a row-wise expression over the event's own
       # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
       # `extract_code_metadata` re-scan that whole table and join it against every observed
       # code -- a full-data materialization for a column we already have.
@@ -434,7 +446,7 @@ hosp/pharmacy:
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
       # NDC attached is exactly the one dispensed for this order.
       # `_self`, not `hosp/prescriptions`: the NDC is already on this frame, brought over by
-      # the `_table.join` above, so the parent is a row-wise expression over the event's own
+      # the `_table.joins` above, so the parent is a row-wise expression over the event's own
       # prepared rows. Pointing a `_metadata` block at `prescriptions` would make
       # `extract_code_metadata` re-scan that whole table and join it against every observed
       # code -- a full-data materialization for a column we already have.
@@ -454,7 +466,7 @@ hosp/pharmacy:
 
 hosp/procedures_icd:
   _table:
-    join:
+    joins:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]

@@ -20,6 +20,11 @@ export DATASET_DOWNLOAD_PASSWORD=$PHYSIONET_PASSWORD
 meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
 ```
 
+This one command runs the ETL and then, as its last step, adds external-ontology links to
+`metadata/codes.parquet` with [suMEDS](https://github.com/rvandewater/SumMEDS) (installed with this
+package; see [Enriching code metadata with suMEDS](#enriching-code-metadata-with-sumeds)). For the
+plain ETL, add `skip_stages=[sumeds_enrich]`.
+
 When you run this, the program will:
 
 1. Download the needed raw MIMIC files for the currently supported version (v3.1) into
@@ -31,6 +36,8 @@ When you run this, the program will:
     joins, and metadata extraction are declared in
     `src/MIMIC_IV_MEDS/event_configs.yaml` — and write it to `$MEDS_OUTPUT_DIR`
     (`data/` and `metadata/`, alongside the run's intermediate stage outputs).
+3. Enrich `metadata/codes.parquet` in place with the suMEDS rules this package ships, and record
+    the enrichment in `metadata/dataset.json`.
 
 To run over the publicly available, fully open MIMIC-IV demo dataset (v2.2, no credentials
 required):
@@ -61,7 +68,8 @@ There is no Python in this package. The entire ETL is one file —
 - a `sources:` block declaring the release versions and where to fetch the raw data
     (PhysioNet for MIMIC-IV itself, checksum-pinned GitHub URLs for the
     [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps);
-- an `etl:` block with the run's few knobs;
+- an `etl:` block with the run's few knobs, the roles of the extension columns for
+    `metadata/dataset.json`, and the suMEDS enrichment that runs after the pipeline;
 - one block per raw table describing the events extracted from it, including joins,
     derived columns, and the code-metadata programs that attach descriptions and parent
     vocabulary codes.
@@ -285,11 +293,11 @@ standard pipeline (`extract_code_metadata` reads it from the output of
 `split_and_shard_subjects`, which writes none). The constant changes nothing in the data;
 only the codes' `code_template` names the column.
 
-Two parents are inferred rather than read from a map: `GENDER//F` and `GENDER//M` carry
-`Gender/F` and `Gender/M`, the OMOP Gender vocabulary's codes for the same values, as in the
-[MIMIC-IV demo in the OMOP CDM](https://physionet.org/content/mimic-iv-demo-omop/0.9/) (ODbL).
+Every parent the ETL writes is read from MIMIC-IV's own tables or the mimic-code maps;
+links that need an external ontology (the OMOP Gender tags, the ICD pack hierarchy) come from
+suMEDS instead (next section).
 
-On the demo (2.2), 10,250 of 10,254 codes are described and 7,901 have a parent code. What
+On the demo (2.2), 10,250 of 10,254 codes are described and 7,899 have a parent code. What
 is left uncovered, and why:
 
 - **Labs missing from mimic-code's lab map.** Lab descriptions come from
@@ -303,6 +311,78 @@ is left uncovered, and why:
     CPT codes (`HCPCS//…` is keyed on MIMIC's short description, which for CPT is only the
     section name). The `DRG` parents use `MS-DRG/` and `APR-DRG/` (see [DRG](#drg)), which
     vocabulary tooling does not resolve; OMOP's own id for MS-DRGs is `DRG`.
+
+## Enriching code metadata with suMEDS
+
+External-ontology links are not written by the ETL. The package ships
+[`src/MIMIC_IV_MEDS/sumeds_rules.yaml`](src/MIMIC_IV_MEDS/sumeds_rules.yaml), a
+[suMEDS](https://github.com/rvandewater/SumMEDS) rules file registered in suMEDS's `sumeds.rules`
+entry-point group under the same name as the MEDS-Extract spec, `MIMIC-IV`. The spec declares
+suMEDS's `sumeds_enrich` stage after the canonical pipeline (`etl.post_stages`), so
+`meds-extract-run spec=MIMIC-IV` enriches the finished `metadata/codes.parquet` in place, and it
+stays valid MEDS code metadata. `--rules MIMIC-IV` works for any suMEDS command. The ontology data
+comes from suMEDS's versioned ontology packs (sumeds-ontologies, pinned release), fetched from GitHub
+on first use and cached; no Athena download is needed.
+
+Whether a build was enriched is recorded in `metadata/dataset.json`, under
+`sumeds_enrichment.enriched`, with the rules, the suMEDS version and the coverage. Enrichment is on
+by default, and a failed enrichment (for example, on a server without internet access) does not fail
+the ETL: `metadata/codes.parquet` is left as the ETL wrote it, `dataset.json` records
+`"enriched": false` with the error, and the exit code is still 0. The warning, with the command that
+finishes the enrichment, is in `$MEDS_OUTPUT_DIR/.logs/pipeline.log`. Running `meds-extract-run`
+again does not retry it (the stage is marked done); enrich the build afterwards, with the same rules
+and options, with:
+
+```bash
+suMEDS-enrich $MEDS_OUTPUT_DIR
+# Without internet access, from a copy of the sumeds-ontologies packs directory:
+suMEDS-enrich $MEDS_OUTPUT_DIR --ontology-source /path/to/sumeds-ontologies/ontologies --offline
+```
+
+The stage's options are set at run time through `overrides=`, with `++` because the overrides reach
+every stage of the pipeline:
+
+```bash
+# Without enrichment:
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR skip_stages=[sumeds_enrich]
+# Make a failed enrichment fail the run (exit code 1):
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR "overrides=['++stage_cfg.strict=true']"
+# Also look codes up in your own OHDSI Athena download (this validates the Gender tags too):
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR "overrides=['++stage_cfg.athena_csv=/path/to/athena']"
+```
+
+On a cluster whose compute nodes have no internet access, fill a cache on shared storage once from a
+login node, then run offline on the compute nodes with the same cache:
+
+```bash
+export XDG_CACHE_HOME=/shared/project/cache
+# On a login node:
+suMEDS-enrich --prefetch --rules MIMIC-IV
+# On a compute node:
+meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR "overrides=['++stage_cfg.offline=true']"
+```
+
+For MIMIC-IV, the rules add:
+
+- `GENDER//F` and `GENDER//M` get the OMOP Gender codes `Gender//F` and `Gender//M` (a tag:
+    Gender has no public pack; with `--athena-csv` suMEDS validates them against Athena).
+- `DIAGNOSIS//ICD//{9,10}//…` and `PROCEDURE//ICD//{9,10}//…` are matched to the dotted ICD-9-CM,
+    ICD-10-CM, ICD-9 procedure or ICD-10-PCS code, which fills `vocabulary_id` and `concept_code`.
+    The ETL's own reference (`ICD10CM/I50.23`) stays first in `parent_codes`, and every ancestor
+    in the pack follows it (`ICD10CM//I50.2`, `ICD10CM//I50`).
+- Same-dataset parents: an ICD code of the table becomes the parent of another when its
+    vocabulary code is the nearest ancestor present (`DIAGNOSIS//ICD//10//I5023` gets
+    `DIAGNOSIS//ICD//10//I502` when both occur).
+- `parent_names` maps each vocabulary code in `parent_codes` that a pack knows to its official
+    name, including the ETL's own references. Lab and fluid-output codes whose parent is a
+    LOINC code (`LOINC/2160-0`) also get `vocabulary_id` `LOINC` and the `concept_code`.
+
+On the demo (2.2), the published packs add parents to 1,779 codes (1,777 of its 1,826 ICD codes, 4
+of them with a same-dataset parent, and both Gender codes) and names to 3,222 codes. The ETL alone
+does not emit any of this: a plain `meds-extract-run` build has no Gender parents, no ICD ancestors,
+no same-dataset parents and no names. suMEDS enrichment never removes or rewrites existing parents
+or descriptions, so the ETL's own parents (`ICD10CM/…`, `LOINC/…`, `NDC/…`, RxNorm, SNOMED, DRG) and
+its descriptions from MIMIC-IV's dictionary tables stay as they are.
 
 ## Parallel and multi-node runs
 
@@ -326,6 +406,8 @@ parallelize:
 YAML
 MEDS_transform-pipeline $MEDS_OUTPUT_DIR/.meds_extract_run/pipeline.yaml
 ```
+
+The pipeline config lists the `sumeds_enrich` stage too, so this also enriches the code metadata.
 
 That file is self-contained (every path and version inlined), so it is also the place to
 change the stage sequence, point a run at different directories, or add
@@ -413,6 +495,38 @@ Intermediate stage outputs are retained under the output directory, which is why
 15 GB against 4.5 GB of actual MEDS data. See
 [this github issue](https://github.com/Medical-Event-Data-Standard/MEDS_transforms/issues/235) for tracking on ensuring these
 directories are automatically cleaned up in the future.
+
+## Summary statistics
+
+[`tests/regression/demo_summary_stats.json`](tests/regression/demo_summary_stats.json) is a
+[meds_summary_stats](https://github.com/Medical-Event-Data-Standard/meds_summary_stats) fingerprint of
+the MEDS dataset this ETL builds from the open MIMIC-IV demo: subject, event and measurement counts,
+digests of the code vocabulary, per-subject, value and time distributions, code-metadata coverage, the
+splits and the schema. It names no code and reports no cell of fewer than 20 subjects and no minimum or
+maximum, which is what makes it safe to publish. The Tests workflow rebuilds the demo on every pull
+request and fails when the result no longer matches the baseline, as decided by
+[`tests/regression/policy.yaml`](tests/regression/policy.yaml).
+
+`scripts/summary_stats.sh` regenerates a baseline from a build of this checkout. It prints how the
+statistics changed against the committed baseline before overwriting it, and `--compare` checks a build
+without writing anything:
+
+```bash
+# The demo: downloaded and built with this checkout
+scripts/summary_stats.sh demo
+# The full release, built from a copy on disk, or summarized from an existing build
+scripts/summary_stats.sh full --input-dir $RAW_INPUT_DIR
+scripts/summary_stats.sh full --meds-dir $MEDS_OUTPUT_DIR
+```
+
+[`tests/regression/full_summary_stats.json`](tests/regression/full_summary_stats.json) is the same
+fingerprint of the full MIMIC-IV 3.1 release. Because it is committed next to the ETL, its diff shows
+what an ETL change did to the whole credentialed release, and two ETL versions can be compared without
+access to the data. CI cannot rebuild the credentialed release, so regenerate it with
+`scripts/summary_stats.sh full` in every pull request that changes the output.
+
+Both baselines are built with `skip_stages=[sumeds_enrich]`: they fingerprint what the ETL writes, which
+does not depend on network access or on the suMEDS pack release. Summarize a build made the same way.
 
 ## 📚 Citing this work
 
