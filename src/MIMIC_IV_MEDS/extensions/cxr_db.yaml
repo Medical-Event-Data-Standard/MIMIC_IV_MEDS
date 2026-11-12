@@ -309,9 +309,11 @@ cxr_db/discharge_jev:
           f"SNOMED/{$object_uri[7:]}" if /^snomed:[0-9]+$/ in $object_uri
           else f"LOINC/{$object_uri[6:]}" if /^loinc:[A-Z]*[0-9]+-[0-9]$/ in $object_uri
 
-# Merged into the base `sources:` by the build script (see extensions/mne.yaml). `demo` is dropped:
-# there is no public CXR-DB subset. The include list fetches the three tables above (~140 MB of the
-# ~495 MB release) and keeps CXR-DB's own LICENSE/README from colliding with MIMIC-IV's.
+# Merged into the base `sources:` by the build script (see extensions/mne.yaml). The include list
+# fetches the three tables above (~140 MB of the ~495 MB release) and keeps CXR-DB's own
+# LICENSE/README from colliding with MIMIC-IV's. There is no public CXR-DB subset, so the `demo`
+# bucket below adds SIMULATED CXR-DB tables (scripts/synthetic_demo.py) to the public MIMIC-IV demo,
+# shipped already converted (`cxr_db/*.parquet`), so a demo run needs no `prepare_cxr_db` step.
 sources:
   dataset:
     - type: physionet

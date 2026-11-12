@@ -70,6 +70,7 @@ import os
 import random
 import re
 import sys
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -1238,9 +1239,9 @@ NONE_KNOWN_PATTERN = re.compile(r"(?i)no known|nkda|\bnka\b|no allerg")
 def mne_tables(seed: int, demo: Demo) -> dict[str, Table]:
     """MNE's tables, extracted from the simulated discharge summaries' structured content.
 
-    MNE structures the sections of MIMIC-IV-Note discharge summaries; here it structures the simulated
-    ones, so every MNE row is what the matching simulated note says. One summary for an admission that
-    is not in MIMIC-IV is added, as MNE has such rows (they must be dropped).
+    MNE structures the sections of MIMIC-IV-Note discharge summaries; here it structures the simulated ones,
+    so every MNE row is what the matching simulated note says. One summary for an admission that is not in
+    MIMIC-IV is added, as MNE has such rows (they must be dropped).
     """
     adm_by_hadm = {a["hadm_id"]: a for a in demo.admissions}
     summaries = [
@@ -1266,9 +1267,13 @@ def mne_tables(seed: int, demo: Demo) -> dict[str, Table]:
         for table in ("medications_on_admission", "discharge_medications"):
             for m in s[table]:
                 rows[table].append(
-                    {**key, **m, "strength": m["strength"] and _json(m["strength"]),
-                     "frequency": m["frequency"] and _json(m["frequency"])}
-                )  # fmt: skip
+                    {
+                        **key,
+                        **m,
+                        "strength": m["strength"] and _json(m["strength"]),
+                        "frequency": m["frequency"] and _json(m["frequency"]),
+                    }
+                )
         for seq, (primary, title) in enumerate(s["diagnoses"], start=1):
             rows["discharge_diagnosis"].append({**key, "seq_num": seq, "title": title, "is_primary": primary})
         for seq, (previous, title) in enumerate(s["procedures"], start=1):
@@ -1277,13 +1282,22 @@ def mne_tables(seed: int, demo: Demo) -> dict[str, Table]:
             rows["physical_exam_vitals"].append({**key, **vitals, "warnings": _pg_array(vitals["warnings"])})
             for system, status, findings in systems:
                 rows["physical_exam_systems"].append(
-                    {**key, "timepoint": vitals["timepoint"], "system": system, "status": status,
-                     "abnormal_findings": _pg_array(findings)}
-                )  # fmt: skip
+                    {
+                        **key,
+                        "timepoint": vitals["timepoint"],
+                        "system": system,
+                        "status": status,
+                        "abnormal_findings": _pg_array(findings),
+                    }
+                )
         rows["discharge_condition"].append(
-            {**key, **s["condition"], "patient_died": adm["hospital_expire_flag"] == 1,
-             "patient_left_ama": adm["discharge_location"] == "AGAINST ADVICE"}
-        )  # fmt: skip
+            {
+                **key,
+                **s["condition"],
+                "patient_died": adm["hospital_expire_flag"] == 1,
+                "patient_left_ama": adm["discharge_location"] == "AGAINST ADVICE",
+            }
+        )
     return {t: (["subject_id", "hadm_id", *MNE_COLUMNS[t].split(",")], rows[t]) for t in MNE_COLUMNS}
 
 
@@ -1367,6 +1381,226 @@ def mne_files(seed: int, demo: Demo) -> dict[str, bytes]:
     return {f"{t}.csv.gz": gzip_bytes(csv_text(tables[t])) for t in tables}
 
 
+#: MIMIC-CXR-DB 1.0: the columns of the three tables `extensions/cxr_db.yaml` reads. `radiographs`'
+#: columns are on the public project page (https://physionet.org/content/mimic-cxr-ext-mimic-cxr-db/1.0/);
+#: their order, the `_jev` tables' `id`/`label`/`class` columns and the semicolon delimiter are not,
+#: and follow this repository's fragment and `MIMIC_IV_MEDS.prepare_cxr_db` instead.
+CXR_DB_LABELS = tuple(sorted(label.replace(" ", "_") for label in CHEXPERT_LABELS))
+CXR_DB_COLUMNS = {
+    "radiographs": [
+        "subject_id",
+        "study_id",
+        *CXR_DB_LABELS,
+        "dicom_id",
+        "study_datetime",
+        "StudyDate",
+        "StudyTime",
+        "PerformedProcedureStepDescription",
+        "ViewPosition",
+        "Rows",
+        "Columns",
+        "ProcedureCodeSequence_CodeMeaning",
+        "ViewCodeSequence_CodeMeaning",
+        "PatientOrientationCodeSequence_CodeMeaning",
+        "hadm_id",
+    ],
+    "radiology_jev": ["study_id", "relation_type", "object_uri", "id", "label", "class"],
+    "discharge_jev": ["hadm_id", "relation_type", "object_uri", "id", "label", "class"],
+}
+#: A MIMIC-CXR subject that is not in MIMIC-IV (CXR-DB has 3,511), a study id with triples but no
+#: images (it has 4), and an admission that is not in MIMIC-IV: their rows must all be dropped.
+CXR_DB_ORPHAN_SUBJECT = 19_999_999
+CXR_DB_ORPHAN_STUDY = 59_999_999
+CXR_DB_ORPHAN_HADM = 29_999_999
+#: SNOMED CT preferred terms of the concepts linked to (verified on tx.fhir.org), and MeSH headings
+#: (verified on id.nlm.nih.gov) for history concepts that a second vocabulary also matches.
+SNOMED_TERMS = {
+    "snomed:46621007": "Atelectasis",
+    "snomed:8186001": "Cardiomegaly",
+    "snomed:95436008": "Lung consolidation",
+    "snomed:19242006": "Pulmonary edema",
+    "snomed:125605004": "Fracture of bone",
+    "snomed:60046008": "Pleural effusion",
+    "snomed:233604007": "Pneumonia",
+    "snomed:36118008": "Pneumothorax",
+}
+MESH_ALSO = {
+    "snomed:38341003": ("mesh:D006973", "Hypertension"),
+    "snomed:44054006": ("mesh:D003920", "Diabetes Mellitus"),
+}
+
+
+def _ms(t: datetime) -> str:
+    return t.strftime("%Y-%m-%d %H:%M:%S.") + f"{t.microsecond // 1000:03d}"
+
+
+def cxr_db_tables(seed: int, demo: Demo) -> dict[str, Table]:
+    """CXR-DB's tables, derived from the simulated MIMIC-CXR(-JPG) studies and MIMIC-IV-Note notes.
+
+    `radiographs` is the CXR-JPG metadata and CheXpert labels of each simulated image, with the image's
+    own time and the admission the exam fell in (none for ED and outpatient exams). The triples are the
+    concepts the simulated reports and discharge summaries mention: a radiology finding the report
+    calls present or possible (negated mentions are not extracted), in FINDINGS and, if present, in
+    IMPRESSION; and each discharge summary's coded history items and discharge labs. One study of a
+    subject not in MIMIC-IV, one triple of a study with no images, one of an admission not in MIMIC-IV,
+    and one triple repeated within a section are added, as the real release has such rows.
+    """
+    exams = [x for x in radiology_exams(seed, demo) if x.is_cxr]
+    radiographs, radiology = [], []
+    for x in sorted(exams, key=lambda x: (x.subject_id, x.study_id)):
+        labels = {k.replace(" ", "_"): None if not x.sections else _label(v) for k, v in x.labels.items()}
+        first = x.images[0]["time"]
+        for im in x.images:
+            radiographs.append(
+                {
+                    "subject_id": x.subject_id,
+                    "study_id": x.study_id,
+                    **labels,
+                    "dicom_id": im["dicom_id"],
+                    "study_datetime": _ms(im["time"]),
+                    "StudyDate": first.strftime("%Y%m%d"),
+                    "StudyTime": first.strftime("%H%M%S.") + f"{first.microsecond // 1000:03d}",
+                    "PerformedProcedureStepDescription": im["PerformedProcedureStepDescription"],
+                    "ViewPosition": im["ViewPosition"],
+                    "Rows": im["Rows"],
+                    "Columns": im["Columns"],
+                    "ProcedureCodeSequence_CodeMeaning": x.exam[0],
+                    "ViewCodeSequence_CodeMeaning": im["ViewCodeSequence_CodeMeaning"],
+                    "PatientOrientationCodeSequence_CodeMeaning": im[
+                        "PatientOrientationCodeSequence_CodeMeaning"
+                    ],
+                    "hadm_id": None if x.hadm_id is None else f"{x.hadm_id}.0",
+                }
+            )
+        if not x.sections:
+            continue
+        for label, concept in CHEXPERT:
+            if concept is None or x.labels[label] not in (1.0, -1.0):
+                continue
+            triple = {
+                "study_id": x.study_id,
+                "object_uri": concept,
+                "id": concept,
+                "label": SNOMED_TERMS[concept],
+                "class": "Clinical_Findings_and_Diseases",
+            }
+            radiology.append({**triple, "relation_type": "FINDINGS"})
+            if x.labels[label] == 1.0:
+                radiology.append({**triple, "relation_type": "IMPRESSION"})
+    # A repeated mention within one section, and a study with triples but no images.
+    radiology.insert(1, dict(radiology[0]))
+    radiology.append({**radiology[0], "study_id": CXR_DB_ORPHAN_STUDY})
+    # A study of a subject who is not in MIMIC-IV.
+    orphan = dict(radiographs[0])
+    orphan |= {
+        "subject_id": CXR_DB_ORPHAN_SUBJECT,
+        "study_id": CXR_DB_ORPHAN_STUDY - 1,
+        "hadm_id": None,
+        "dicom_id": "0" * 8 + "-" + "-".join(["f" * 8] * 4),
+    }
+    radiographs.append(orphan)
+
+    discharge = []
+    for n in _discharge_notes(seed, demo):
+        if n["note_type"] != "DS":
+            continue
+        s = n["content"]
+        for h in s["history"]:
+            if h["concept_id"] is None:
+                continue
+            row = {"hadm_id": n["hadm_id"], "relation_type": "Past Medical History"}
+            discharge.append(
+                {
+                    **row,
+                    "object_uri": h["concept_id"],
+                    "id": h["concept_id"],
+                    "label": h["concept_name"],
+                    "class": "Clinical_Findings_and_Diseases",
+                }
+            )
+            if h["concept_id"] in MESH_ALSO:
+                mesh, term = MESH_ALSO[h["concept_id"]]
+                discharge.append(
+                    {**row, "object_uri": mesh, "id": mesh, "label": term, "class": "Domain_Specific"}
+                )
+        for loinc, name, _, _ in s["labs"]:
+            discharge.append(
+                {
+                    "hadm_id": n["hadm_id"],
+                    "relation_type": "Laboratory and Results.Discharge Labs",
+                    "object_uri": loinc,
+                    "id": loinc,
+                    "label": name,
+                    "class": "Measurements_and_Concepts",
+                }
+            )
+    discharge.append({**discharge[0], "hadm_id": CXR_DB_ORPHAN_HADM})
+    return {
+        "radiographs": (CXR_DB_COLUMNS["radiographs"], radiographs),
+        "radiology_jev": (CXR_DB_COLUMNS["radiology_jev"], radiology),
+        "discharge_jev": (CXR_DB_COLUMNS["discharge_jev"], discharge),
+    }
+
+
+def cxr_db_coverage_gaps(tables: dict[str, Table]) -> list[str]:
+    """Every routing case of `extensions/cxr_db.yaml` the tables fail to exercise (empty when complete)."""
+    rad = tables["radiographs"][1]
+    gaps = []
+    values = {r[label] for r in rad for label in CXR_DB_LABELS}
+    if values != {"1.0", "0.0", "-1.0", None}:
+        gaps.append(f"CheXpert values: {values}")
+    checks = {
+        "an image linked to an admission": any(r["hadm_id"] for r in rad),
+        "an image with no admission": any(r["hadm_id"] is None for r in rad),
+        "a missing view position": any(r["ViewPosition"] is None for r in rad),
+        "a missing patient orientation": any(
+            r["PatientOrientationCodeSequence_CodeMeaning"] is None for r in rad
+        ),
+        "a multi-image study": len({r["study_id"] for r in rad}) < len(rad),
+        "an unlabelled study": any(all(r[label] is None for label in CXR_DB_LABELS) for r in rad),
+        "a subject not in MIMIC-IV": any(r["subject_id"] == CXR_DB_ORPHAN_SUBJECT for r in rad),
+    }
+    for table in ("radiology_jev", "discharge_jev"):
+        key = "study_id" if table == "radiology_jev" else "hadm_id"
+        rows = [(r[key], r["relation_type"], r["object_uri"]) for r in tables[table][1]]
+        checks[f"{table}: a triple repeated in a section"] = len(rows) != len(set(rows))
+        sections: dict[tuple, set] = {}
+        for k, rel, uri in rows:
+            sections.setdefault((k, uri), set()).add(rel)
+        checks[f"{table}: a concept in two sections"] = table == "discharge_jev" or any(
+            len(s) > 1 for s in sections.values()
+        )
+        checks[f"{table}: an orphan key"] = any(
+            k in (CXR_DB_ORPHAN_STUDY, CXR_DB_ORPHAN_HADM) for k, _, _ in rows
+        )
+    checks["orphan study ids are unused"] = not {CXR_DB_ORPHAN_STUDY, CXR_DB_ORPHAN_STUDY - 1} & {
+        r["study_id"] for r in rad if r["subject_id"] != CXR_DB_ORPHAN_SUBJECT
+    }
+    uris = {r["object_uri"].split(":")[0] for t in ("radiology_jev", "discharge_jev") for r in tables[t][1]}
+    checks["SNOMED, LOINC and other ontology ids"] = {"snomed", "loinc", "mesh"} <= uris
+    return gaps + [name for name, ok in checks.items() if not ok]
+
+
+def cxr_db_files(seed: int, demo: Demo) -> dict[str, bytes]:
+    """MIMIC-CXR-DB 1.0: the three tables, semicolon-delimited `.csv` as released, and the parquet `python -m
+    MIMIC_IV_MEDS.prepare_cxr_db` makes of them under `cxr_db/`, so a demo run needs no separate conversion
+    step."""
+    from MIMIC_IV_MEDS.prepare_cxr_db import OUT_SUBDIR, convert_table
+
+    tables = cxr_db_tables(seed, demo)
+    if gaps := cxr_db_coverage_gaps(tables):
+        raise RuntimeError("the simulated CXR-DB tables miss routing cases:\n  " + "\n  ".join(gaps))
+    files = {f"{t}.csv": csv_text(tables[t], delimiter=";").encode() for t in tables}
+    with tempfile.TemporaryDirectory() as tmp:
+        for t in tables:
+            src = Path(tmp) / f"{t}.csv"
+            src.write_bytes(files[f"{t}.csv"])
+            dest = Path(tmp) / OUT_SUBDIR / f"{t}.parquet"
+            convert_table(src, dest)
+            files[f"{OUT_SUBDIR}/{t}.parquet"] = dest.read_bytes()
+    return files
+
+
 # --------------------------------------------------------------------------------------------------
 # Registry, provenance and pinning
 
@@ -1424,6 +1658,13 @@ MODULES = {
             mne_files,
             fragment="mne",
         ),
+        Module(
+            "mimic-cxr-ext-mimic-cxr-db",
+            "MIMIC-CXR-Ext MIMIC-CXR-DB",
+            "1.0",
+            cxr_db_files,
+            fragment="cxr_db",
+        ),
     )
 }
 
@@ -1463,7 +1704,10 @@ def build(m: Module, demo: Demo, seed: int) -> dict[str, bytes]:
 
 
 def _comparable(path: str, data: bytes):
-    """File content compared by `check`: decompressed, since gzip bytes vary across zlib builds."""
+    """File content compared by `check`: decompressed, since gzip bytes vary across zlib builds, and parquet
+    as its rows, since its bytes record the writer's version."""
+    if path.endswith(".parquet"):
+        return pl.read_parquet(io.BytesIO(data)).to_dicts()
     return gzip.decompress(data) if path.endswith(".gz") else data
 
 

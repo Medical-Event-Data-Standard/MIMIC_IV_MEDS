@@ -344,6 +344,24 @@ The rest of the release re-derives MIMIC-IV (its admissions, diagnoses and labs)
 extracted. The design decisions, coverage, caveats (including overlap with MNE) and validation are
 in [`docs/extensions/cxr-db.md`](docs/extensions/cxr-db.md).
 
+MIMIC-CXR-DB has no public demo, so `dataset_key=demo` adds **simulated** CXR-DB tables to the public
+MIMIC-IV demo. The simulated tables ship already converted to parquet, so this is one command with
+no `prepare_cxr_db` step and no credentials:
+
+```bash
+meds-extract-run spec=MIMIC-IV-CXRDB output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+> [!WARNING]
+> The CXR-DB part of that build is **synthetic**: it is for pipeline testing and tutorials only, not
+> for research. Its `dataset_version` says so (`2.2+cxr_db-1.0-synthetic-0.1:<package version>`).
+
+The simulated tables are derived from the simulated MIMIC-CXR(-JPG) studies and MIMIC-IV-Note
+reports and discharge summaries (see
+[Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)). The images, their
+CheXpert labels and the report concepts therefore agree with the report texts, and the discharge
+concepts agree with the summaries.
+
 ## Code metadata
 
 `metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary

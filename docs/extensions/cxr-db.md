@@ -126,8 +126,46 @@ writes to `cxr_db/` and leaves the `.csv` files alone, so a later download still
 MEDS-Extract refuses a table that resolves to both a `.csv` and a `.parquet`, which is why the
 output goes to a subdirectory.
 
-There is no public demo of MIMIC-CXR-DB, so `dataset_key=demo` is not available for this spec. CI
-checks it with fabricated rows keyed to MIMIC-IV demo subjects (`tests/e2e_cxr_db_synthetic_test.py`).
+### Demo: simulated CXR-DB
+
+!!! warning "Synthetic data: for pipeline testing and tutorials only"
+
+    There is no public demo of MIMIC-CXR-DB. The `demo` bucket of this spec adds **simulated**
+    CXR-DB tables to the public MIMIC-IV demo. They are not patient data, carry no clinical signal,
+    and must not be used for research. A demo build stamps its `dataset_version` as
+    `2.2+cxr_db-1.0-synthetic-0.1:<package version>`.
+
+```bash
+meds-extract-run spec=MIMIC-IV-CXRDB output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+That is one command, with no credentials and no `prepare_cxr_db` step. The simulated tables are
+committed under `data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/` in both forms: as the release's
+semicolon-delimited `.csv`, and as the `cxr_db/*.parquet` that `prepare_cxr_db` makes of them. The
+demo bucket fetches both from GitHub at a pinned commit and checks each file's SHA-256. Shipping the
+converted parquet keeps the demo one step. Shipping the `.csv` lets the tests run the converter on
+them and check that it reproduces the parquet, so the converter path is still exercised.
+
+`scripts/synthetic_demo.py` derives the tables from the simulated MIMIC-CXR(-JPG) studies and
+MIMIC-IV-Note notes (see `data/synthetic_demo/README.md`):
+
+- **`radiographs`**: each image's metadata and CheXpert labels. Images are linked to the admission
+    their exam fell in; ED and outpatient images have none.
+- **`radiology_jev`**: each finding the report calls present or possible, in `FINDINGS`, and also in
+    `IMPRESSION` when present.
+- **`discharge_jev`**: each discharge summary's coded history items (SNOMED CT, with MeSH for two)
+    and discharge labs (LOINC).
+
+Together they exercise every rule below. That includes:
+
+- CheXpert values 1, 0, -1 and blank, and an unlabelled study;
+- images with and without `hadm_id`, multi-image studies, and missing view and orientation;
+- a triple repeated within a section, and a concept in two sections;
+- SNOMED, LOINC and MeSH ids;
+- a subject, a study and an admission that exist nowhere else, which must be dropped.
+
+`tests/e2e_cxr_db_demo_test.py` runs the command above and compares every CXR-DB event with what
+these rules give for the simulated rows.
 
 ## Tables → events
 
@@ -324,8 +362,8 @@ one is the nurse's record of the procedure, the other the image itself.
 
 These numbers come from running the extension's three tables, with their `hosp/patients` and
 `hosp/admissions` joins, on the real MIMIC-CXR-DB 1.0 and MIMIC-IV 3.1, with MEDS-Extract 0.8.1.
-They are unchanged from the earlier run on 0.7.0. Only aggregates were inspected. The composed spec as a whole runs in CI over the MIMIC-IV demo with synthetic CXR-DB
-rows.
+They are unchanged from the earlier run on 0.7.0. Only aggregates were inspected. The composed spec as a whole runs in CI over the MIMIC-IV demo with the simulated CXR-DB
+tables (`dataset_key=demo`).
 
 | Family               | Events        | Distinct codes | Subjects   | Studies     | Admissions                               |
 | -------------------- | ------------- | -------------- | ---------- | ----------- | ---------------------------------------- |
