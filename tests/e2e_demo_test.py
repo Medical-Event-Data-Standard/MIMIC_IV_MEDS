@@ -14,6 +14,7 @@ CI does it exactly once, on one Python version, and both checks read the result.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -39,13 +40,16 @@ def test_e2e_demo(demo_cohort: Path):
     assert dataset_json["dataset_version"].startswith(f"{DEMO_RELEASE}:")
 
     # Code metadata, as read from disk, is valid MEDS code metadata, and every code is
-    # described except lab items absent from mimic-code's lab map, which have no other
-    # source (see "Code metadata" in the README). No description may hold a newline:
-    # that is MEDS-Extract joining the output of two `_metadata` blocks for one code.
+    # described except `hosp/labevents` items absent from mimic-code's lab map (the 53xxx
+    # itemids), which have no other source (see "Code metadata" in the README). ICU chart
+    # codes (`ICU_CHART//…`) are described from `icu/d_items` and get no exemption. No
+    # description may hold a newline: that is MEDS-Extract joining the output of two
+    # `_metadata` blocks for one code.
     codes = pq.read_table(metadata / "codes.parquet")
     CodeMetadataSchema.validate(codes)
     described = dict(zip(codes["code"].to_pylist(), codes["description"].to_pylist(), strict=True))
-    undescribed = sorted(c for c, d in described.items() if d is None and not c.startswith("LAB//"))
+    unmapped_lab = re.compile(r"^LAB//(RESULT|SPECIMEN_COLLECTED)//53\d{3}//")
+    undescribed = sorted(c for c, d in described.items() if d is None and not unmapped_lab.match(c))
     assert not undescribed, f"codes without a description: {undescribed}"
     multi = sorted(c for c, d in described.items() if d is not None and "\n" in d)
     assert not multi, f"codes with several joined descriptions: {multi}"

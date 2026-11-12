@@ -529,8 +529,13 @@ icu/icustays:
           f"End of an ICU stay; last ICU care unit: {$last_careunit} (icu/icustays.last_careunit)"
 
 icu/chartevents:
+  # `ICU_CHART`, not `LAB`: these are values charted at the ICU bedside (vital signs, scores,
+  # assessments, device settings, point-of-care values; `icu/d_items` itemids, 22xxxx), not
+  # hospital lab results, which are `LAB//RESULT` and `LAB//SPECIMEN_COLLECTED` from
+  # `hosp/labevents`. Up to 0.3.0 this was `LAB//{itemid}//{unit}`, so a `^LAB//` filter
+  # mixed the two (#64). The itemid and unit segments are unchanged.
   event:
-    code: f"LAB//{$itemid}//{$valueuom ?? 'UNK'}"
+    code: f"ICU_CHART//{$itemid}//{$valueuom ?? 'UNK'}"
     time: '$charttime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $valuenum
     text_value: $value
@@ -539,7 +544,7 @@ icu/chartevents:
     _metadata:
       # `icu/d_items` is the dictionary for chartevents itemids and ships inside MIMIC-IV
       # itself, so it covers 100% of them and needs no external map. It supplies the human
-      # name; without it every one of these codes reads as a bare `LAB//220045//bpm`.
+      # name; without it every one of these codes reads as a bare `ICU_CHART//220045//bpm`.
       #
       # Joining on `itemid` alone is a deliberate PARTIAL match on the code's components
       # (`itemid` and `valueuom`): the metadata broadcasts to every code sharing the itemid,
