@@ -286,13 +286,35 @@
     }
   },
   "dataset": {
-    "created_at": "2026-11-10T22:21:55.488498+00:00",
+    "code_modifier_columns": [
+      "unit"
+    ],
+    "created_at": "2026-11-11T17:11:49.549473+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.2.1",
+    "dataset_version": "2.2:0.2.2.dev6+g74d4f12d8.d20261111",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.0",
     "meds_version": "0.4.1",
-    "present": true
+    "other_extension_columns": [
+      "source_block",
+      "drg_severity",
+      "drg_mortality",
+      "emar_seq",
+      "route",
+      "frequency",
+      "doses_per_24_hrs",
+      "ordercategorydescription",
+      "statusdescription"
+    ],
+    "present": true,
+    "raw_source_id_columns": [
+      "hadm_id",
+      "icustay_id",
+      "emar_id",
+      "poe_id",
+      "order_id",
+      "link_order_id"
+    ]
   },
   "dataset_digest": {
     "by_file": {
@@ -300,7 +322,7 @@
       "data/train/0.parquet": "sha256:efcdcd662d9e9742d49f8a2c54c5385f0a25086be806a3e0fc4d4a7d6e773d04",
       "data/tuning/0.parquet": "sha256:22269e7c94666847f0ceb3ff992767f7ff3552e82accfb5b3a4de255ee296464",
       "metadata/codes.parquet": "sha256:f792200ad3989593e4af46a559ee5df7bfe1c3a3fb256296fcee52e5c9c845d5",
-      "metadata/dataset.json": "sha256:e39056f6d2bf42bbeaf77345587f34fa5ab4af6d12be182ab40c3c75a852ed06",
+      "metadata/dataset.json": "sha256:7c8f5da9396f8d0980a698a51ddd1d1093b944061a4778e9cdf9d65f6e95c112",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
     "code_metadata": "sha256:8be08743e09fdeb1c5970733b1f801388c91e06963529d7ba7f872e8225ef359",
@@ -309,12 +331,12 @@
       "digest": "sha256:9ce11cdb301e32c6279f7274f67df63026abb1f59a788bb754fa8c9846e9ecd3",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:5d402deaab8f18d7855b80bf70925aa6cdae74f9f15a1b32688f64a035366353",
+    "dataset_metadata": "sha256:aa5c05769cbd97a76a456d86815d551c6b8ae0a646fc4a1f8ae8feab884b01cc",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-10T22:22:21.498174",
+  "extracted_at": "2026-11-11T17:11:53.004606",
   "layout": {
     "code_metadata_columns": {
       "code": "String",

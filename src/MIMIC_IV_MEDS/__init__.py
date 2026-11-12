@@ -9,6 +9,10 @@ as::
 
     meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR
 
+It also ships ``MIMIC_IV_MEDS/sumeds_rules.yaml``, registered with suMEDS's ``sumeds.rules``
+entry-point group under the same name, which the config's ``sumeds_enrich`` post-stage uses to
+enrich the code metadata at the end of that run.
+
 This package exists so the YAML is addressable as package data —
 ``importlib.resources.files("MIMIC_IV_MEDS")`` — from an installed wheel. Nothing here is
 importable API; deliberately, there is nothing to import.

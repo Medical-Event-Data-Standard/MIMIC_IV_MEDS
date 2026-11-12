@@ -5,15 +5,19 @@
 # (sumeds-ontologies, pinned release; ICD-10-CM, ICD-10-PCS, ICD-9-CM, ICD-9 procedures,
 # LOINC), fetched on demand. Here they add
 #   - `Gender//F` and `Gender//M` (OMOP Gender vocabulary) to `GENDER//F` and `GENDER//M`;
-#   - for ICD diagnosis and procedure codes, the dotted vocabulary code with `vocabulary_id`,
-#     `concept_code` and every pack ancestor (`ICD10CM//I50.23`, `ICD10CM//I50.2`, ...);
+#   - for ICD diagnosis and procedure codes, the dotted vocabulary code as `vocabulary_id` and
+#     `concept_code`, and every pack ancestor after the ETL's own reference (`ICD10CM/I50.23`,
+#     then `ICD10CM//I50.2`, `ICD10CM//I50`);
 #   - same-dataset parents: an ICD code of this table whose vocabulary code is an ancestor
 #     (`DIAGNOSIS//ICD//10//I5023` gets `DIAGNOSIS//ICD//10//I502` when both occur).
 # The ETL's own parents (ICD, LOINC, SNOMED, RxNorm, NDC, DRG from MIMIC-IV and mimic-code
 # maps) are kept: suMEDS enrichment never removes or rewrites existing parents or
-# descriptions. Run (see "Enriching code metadata with suMEDS" in the README):
+# descriptions. `pyproject.toml` registers this file in suMEDS's `sumeds.rules` group under the
+# spec's name, and the spec's `sumeds_enrich` post-stage runs it with the ETL (see "Enriching
+# code metadata with suMEDS" in the README):
 #
-#   suMEDS-enrich $MEDS_DIR/metadata/codes.parquet -o codes_enriched.parquet --rules <this file>
+#   meds-extract-run spec=MIMIC-IV output_dir=$MEDS_DIR
+#   suMEDS-enrich $MEDS_DIR --rules MIMIC-IV   # an existing build
 schema: sumeds-rules/0.1
 
 ontology:

@@ -30,16 +30,20 @@ die() {
 # How this repository builds each kind of dataset: `build KIND INPUT_DIR OUTPUT_DIR`, run from the
 # repository root. Prints the root of the MEDS dataset it wrote (the directory holding data/ and
 # metadata/). The build uses this checkout and its locked dependencies.
+#
+# Both kinds skip the spec's sumeds_enrich post-stage: the baselines fingerprint what the ETL writes,
+# which does not depend on network access or on the suMEDS ontology pack release. The demo is the
+# cohort CI builds (tests/conftest.py), which skips it too.
 build() {
   local kind=$1 input=$2 output=$3
   case $kind in
     full)
-      uv run --frozen meds-extract-run spec=MIMIC-IV do_download=false input_dir="$input" output_dir="$output" >&2 \
-        && echo "$output"
+      uv run --frozen meds-extract-run spec=MIMIC-IV do_download=false input_dir="$input" output_dir="$output" \
+        "skip_stages=[sumeds_enrich]" >&2 && echo "$output"
       ;;
     demo)
-      uv run --frozen meds-extract-run spec=MIMIC-IV dataset_key=demo output_dir="$output" ${input:+do_download=false} ${input:+"input_dir=$input"} >&2 \
-        && echo "$output"
+      uv run --frozen meds-extract-run spec=MIMIC-IV dataset_key=demo output_dir="$output" ${input:+do_download=false} ${input:+"input_dir=$input"} \
+        "skip_stages=[sumeds_enrich]" >&2 && echo "$output"
       ;;
     *) die "unknown kind '$kind' (expected one of: $KINDS)" ;;
   esac
