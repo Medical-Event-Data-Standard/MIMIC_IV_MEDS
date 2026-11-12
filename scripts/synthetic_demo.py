@@ -81,6 +81,10 @@ import polars as pl
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "data" / "synthetic_demo"
 SOURCES = DATA / "sources.yaml"
+FRAGMENTS = REPO / "src" / "MIMIC_IV_MEDS" / "extensions"
+#: Markers of the block `pin` writes into an extension fragment's `sources:`.
+BEGIN = "  # BEGIN synthetic demo"
+END = "  # END synthetic demo"
 
 GENERATOR = "scripts/synthetic_demo.py"
 GENERATOR_VERSION = "0.1"
@@ -1200,6 +1204,169 @@ def echo_files(seed: int, demo: Demo) -> dict[str, bytes]:
     }
 
 
+#: MIMIC-Note-Extract (MNE) 1.0: the columns of the ten tables `extensions/mne.yaml` reads, in the
+#: order of MNE's public data dictionary. Each is one comma-separated, gzipped CSV with a header;
+#: booleans are `true`/`false`, arrays Postgres literals, JSON fields compact JSON.
+MNE_COLUMNS = {
+    "allergies": "seq_num,title,title_std",
+    "chief_complaint": "seq_num,category,text",
+    "past_medical_history": "seq_num,subject,family_relation,concept_name,category,temporal_status",
+    "medications_on_admission": (
+        "seq_num,name,presentation_form,dose_value,dose_unit,dose_redacted,route,duration_value,"
+        "duration_unit,prn,prn_condition,hold,hold_condition,strength,frequency"
+    ),
+    "discharge_medications": (
+        "seq_num,name,presentation_form,dose_value,dose_unit,dose_redacted,route,duration_value,"
+        "duration_unit,prn,prn_condition,hold,hold_condition,strength,frequency"
+    ),
+    "discharge_diagnosis": "seq_num,title,is_primary",
+    "major_procedures": "seq_num,title,is_previous",
+    "physical_exam_vitals": (
+        "timepoint,temperature_f,temperature_redacted,temperature_c,heart_rate,heart_rate_redacted,"
+        "bp_systolic,bp_systolic_redacted,bp_diastolic,bp_diastolic_redacted,respiratory_rate,"
+        "o2_saturation,weight_value,weight_unit,o2_support_method,o2_support_lpm,warnings"
+    ),
+    "physical_exam_systems": "timepoint,system,status,abnormal_findings",
+    "discharge_condition": ",".join((*CONDITION_ASPECTS, "patient_died", "patient_left_ama")),
+}
+#: An admission that is not in MIMIC-IV, like the 57 MNE admissions missing from MIMIC-IV 3.1.
+MNE_ORPHAN_HADM = 29_999_999
+#: The fragment's `none_known` pattern (`extensions/mne.yaml`), applied where `title_std` is null.
+NONE_KNOWN_PATTERN = re.compile(r"(?i)no known|nkda|\bnka\b|no allerg")
+
+
+def mne_tables(seed: int, demo: Demo) -> dict[str, Table]:
+    """MNE's tables, extracted from the simulated discharge summaries' structured content.
+
+    MNE structures the sections of MIMIC-IV-Note discharge summaries; here it structures the simulated
+    ones, so every MNE row is what the matching simulated note says. One summary for an admission that
+    is not in MIMIC-IV is added, as MNE has such rows (they must be dropped).
+    """
+    adm_by_hadm = {a["hadm_id"]: a for a in demo.admissions}
+    summaries = [
+        (n["subject_id"], adm_by_hadm[n["hadm_id"]], n["content"])
+        for n in _discharge_notes(seed, demo)
+        if n["note_type"] == "DS"
+    ]
+    first = demo.admissions[0]
+    orphan = {**first, "hadm_id": MNE_ORPHAN_HADM, "hospital_expire_flag": 0, "discharge_location": None}
+    summaries.append((first["subject_id"], orphan, discharge_summary(seed, orphan, False)))
+
+    rows: dict[str, list[dict]] = {t: [] for t in MNE_COLUMNS}
+    for subject_id, adm, s in summaries:
+        key = {"subject_id": subject_id, "hadm_id": adm["hadm_id"]}
+        for seq, (title, std) in enumerate(s["allergies"], start=1):
+            rows["allergies"].append({**key, "seq_num": seq, "title": title, "title_std": std})
+        for seq, (category, text) in enumerate(s["chief_complaint"], start=1):
+            rows["chief_complaint"].append({**key, "seq_num": seq, "category": category, "text": text})
+        for seq, h in enumerate(s["history"], start=1):
+            rows["past_medical_history"].append(
+                {**key, "seq_num": seq, **{k: v for k, v in h.items() if k != "concept_id"}}
+            )
+        for table in ("medications_on_admission", "discharge_medications"):
+            for m in s[table]:
+                rows[table].append(
+                    {**key, **m, "strength": m["strength"] and _json(m["strength"]),
+                     "frequency": m["frequency"] and _json(m["frequency"])}
+                )  # fmt: skip
+        for seq, (primary, title) in enumerate(s["diagnoses"], start=1):
+            rows["discharge_diagnosis"].append({**key, "seq_num": seq, "title": title, "is_primary": primary})
+        for seq, (previous, title) in enumerate(s["procedures"], start=1):
+            rows["major_procedures"].append({**key, "seq_num": seq, "title": title, "is_previous": previous})
+        for vitals, systems in s["exam"]:
+            rows["physical_exam_vitals"].append({**key, **vitals, "warnings": _pg_array(vitals["warnings"])})
+            for system, status, findings in systems:
+                rows["physical_exam_systems"].append(
+                    {**key, "timepoint": vitals["timepoint"], "system": system, "status": status,
+                     "abnormal_findings": _pg_array(findings)}
+                )  # fmt: skip
+        rows["discharge_condition"].append(
+            {**key, **s["condition"], "patient_died": adm["hospital_expire_flag"] == 1,
+             "patient_left_ama": adm["discharge_location"] == "AGAINST ADVICE"}
+        )  # fmt: skip
+    return {t: (["subject_id", "hadm_id", *MNE_COLUMNS[t].split(",")], rows[t]) for t in MNE_COLUMNS}
+
+
+def mne_coverage_gaps(tables: dict[str, Table]) -> list[str]:
+    """Every routing case of `extensions/mne.yaml` the tables fail to exercise (empty when complete)."""
+    rows = {t: rs for t, (_, rs) in tables.items()}
+    e = ENUMS
+    seen: dict[str, set] = {}
+
+    def see(key: str, values) -> None:
+        seen.setdefault(key, set()).update(values)
+
+    def allergy_route(r: dict) -> str:
+        if r.get("title_std") is not None:
+            return "STD_READS_NONE_KNOWN" if NONE_KNOWN_PATTERN.search(r["title"]) else "STD"
+        return "NONE_KNOWN" if NONE_KNOWN_PATTERN.search(r["title"]) else "UNK"
+
+    see("allergy", map(allergy_route, rows["allergies"]))
+    see("chief_complaint.category", (r["category"] for r in rows["chief_complaint"]))
+    pmh = rows["past_medical_history"]
+    see("history.subject", (r["subject"] for r in pmh))
+    see("history.category", (r["category"] for r in pmh))
+    see("history.temporal_status", (r["temporal_status"] for r in pmh))
+    keys = [(r["hadm_id"], tuple(sorted((k, str(v)) for k, v in r.items() if k != "seq_num"))) for r in pmh]
+    see("history_repeated_row", (len(keys) != len(set(keys)),))
+    meds = rows["medications_on_admission"] + rows["discharge_medications"]
+    see("presentation", (r["presentation_form"] for r in meds))
+    see("dose_unit", (r["dose_unit"] for r in meds))
+    see("route", (r["route"] for r in meds))
+    see("period", (r["duration_unit"] for r in meds))
+    for flag in ("dose_redacted", "prn", "hold"):
+        see(flag, (r[flag] for r in meds))
+    see("medication_lists", (t for t in ("medications_on_admission", "discharge_medications") if rows[t]))
+    see("is_primary", (r["is_primary"] for r in rows["discharge_diagnosis"]))
+    see("is_previous", (r["is_previous"] for r in rows["major_procedures"]))
+    vitals = rows["physical_exam_vitals"]
+    see("timepoint", (r["timepoint"] for r in vitals))
+    see("o2_support_method", (r.get("o2_support_method") for r in vitals))
+    see("weight_unit", (r.get("weight_unit") for r in vitals if r.get("weight_value") is not None))
+    see("temperature_redacted", (r["temperature_redacted"] for r in vitals))
+    see("system", (r["system"] for r in rows["physical_exam_systems"]))
+    see("status", (r["status"] for r in rows["physical_exam_systems"]))
+    for aspect in CONDITION_ASPECTS:
+        see(aspect, (r[aspect] for r in rows["discharge_condition"]))
+    see("orphan", (all(any(r["hadm_id"] == MNE_ORPHAN_HADM for r in rs) for rs in rows.values() if rs),))
+
+    want = {
+        "allergy": {"NONE_KNOWN", "UNK", "STD", "STD_READS_NONE_KNOWN"},
+        "history.temporal_status": {*e["history.temporal_status"], None},
+        "history_repeated_row": {True},
+        "presentation": {*e["presentation"], None},
+        "dose_unit": {*e["measurement"], *e["presentation"]},
+        "route": {*e["route"], None},
+        "period": {*e["period"], None},
+        "dose_redacted": {True, False},
+        "prn": {True, False},
+        "hold": {True, False},
+        "medication_lists": {"medications_on_admission", "discharge_medications"},
+        "is_primary": {True, False},
+        "is_previous": {True, False},
+        "o2_support_method": {*e["o2_support_method"], None},
+        "weight_unit": {"kg", "lbs", None},
+        "temperature_redacted": {True, False},
+        "orphan": {True},
+        **{k: set(e[k]) for k in ("chief_complaint.category", "history.subject", "history.category")},
+        **{k: set(e[k]) for k in ("timepoint", "system", "status")},
+        **{a: {*e[a], None} for a in CONDITION_ASPECTS},
+    }
+    return [
+        f"{k}: missing {sorted(map(str, v - seen.get(k, set())))}"
+        for k, v in want.items()
+        if v - seen.get(k, set())
+    ]
+
+
+def mne_files(seed: int, demo: Demo) -> dict[str, bytes]:
+    """MIMIC-Note-Extract 1.0: the ten tables the `MIMIC-IV-MNE` spec reads, at the release's root."""
+    tables = mne_tables(seed, demo)
+    if gaps := mne_coverage_gaps(tables):
+        raise RuntimeError("the simulated MNE tables miss routing cases:\n  " + "\n  ".join(gaps))
+    return {f"{t}.csv.gz": gzip_bytes(csv_text(tables[t])) for t in tables}
+
+
 # --------------------------------------------------------------------------------------------------
 # Registry, provenance and pinning
 
@@ -1212,6 +1379,8 @@ class Module:
     title: str
     version: str  #: the release whose layout is simulated
     files: Callable[[int, Demo], dict[str, bytes]]
+    #: The extension fragment (`extensions/<fragment>.yaml`) whose `demo` bucket serves these files.
+    fragment: str | None = None
 
     @property
     def data_dir(self) -> Path:
@@ -1221,6 +1390,15 @@ class Module:
     def dataset_version(self) -> str:
         """How a build from these files identifies its raw data."""
         return f"{self.version}+synthetic-{GENERATOR_VERSION}"
+
+    @property
+    def demo_stamp(self) -> str:
+        """The `dataset_version` of the fragment's `demo` bucket: the MIMIC-IV demo plus these files."""
+        return f"{DEMO_RELEASE}+{self.fragment}-{self.version}-synthetic-{GENERATOR_VERSION}"
+
+    @property
+    def fragment_path(self) -> Path:
+        return FRAGMENTS / f"{self.fragment}.yaml"
 
     @property
     def provenance_name(self) -> str:
@@ -1239,6 +1417,13 @@ MODULES = {
             cxr_jpg_files,
         ),
         Module("mimic-iv-echo", "MIMIC-IV-ECHO: Echocardiogram Matched Subset", "0.1", echo_files),
+        Module(
+            "mimic-iv-ext-note-extract",
+            "MIMIC-IV-Ext MIMIC-Note-Extract (MNE)",
+            "1.0",
+            mne_files,
+            fragment="mne",
+        ),
     )
 }
 
@@ -1330,6 +1515,44 @@ def pinned_ref() -> str | None:
     return m.group(1) if m else None
 
 
+def fragment_block(m: Module, ref: str) -> str:
+    """The fragment's `dataset_version` + `demo` bucket for a module's files at `ref`, between markers.
+
+    The composed spec's `demo` bucket is then the base's (the public MIMIC-IV demo) plus these files,
+    and its version stamps every demo build as synthetic (see scripts/build_extension_specs.py).
+    """
+    lines = [
+        f"{BEGIN}: written by `scripts/synthetic_demo.py pin`; do not edit by hand.",
+        "  # The demo bucket is SYNTHETIC: simulated tables keyed to the public MIMIC-IV demo",
+        "  # (data/synthetic_demo/README.md), fetched from this repository at a fixed commit and checked",
+        "  # against their SHA-256. Its version marks every demo build as synthetic.",
+        "  dataset_version:",
+        f'    demo: "{m.demo_stamp}"',
+        "  demo:",
+        *(f"    {line}" for line in source_entries(m, ref)),
+        END,
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def with_fragment_block(text: str, block: str) -> str:
+    """`text` with its marked block replaced by `block` (appended at the end if it has none)."""
+    start = text.find(BEGIN)
+    if start < 0:
+        return text.rstrip("\n") + "\n" + block
+    end = text.index("\n", text.index(END, start)) + 1
+    return text[:start] + block + text[end:]
+
+
+def pinned_texts(ref: str) -> dict[Path, str]:
+    """Every file `pin --ref ref` writes, with its content."""
+    out = {SOURCES: sources_yaml(ref)}
+    for m in MODULES.values():
+        if m.fragment:
+            out[m.fragment_path] = with_fragment_block(m.fragment_path.read_text(), fragment_block(m, ref))
+    return out
+
+
 # --------------------------------------------------------------------------------------------------
 # CLI
 
@@ -1368,14 +1591,17 @@ def main(argv: list[str] | None = None) -> int:
         if ref is None:
             print(f"no pin in {SOURCES.relative_to(REPO)}", file=sys.stderr)
             return 1
-        text = sources_yaml(ref)
-        if args.check:
-            if not SOURCES.exists() or SOURCES.read_text() != text:
-                print(f"{SOURCES.relative_to(REPO)} is stale: re-run `pin --ref <commit>`", file=sys.stderr)
-                return 1
-            return 0
-        SOURCES.write_text(text)
-        print(f"pinned {SOURCES.relative_to(REPO)} to {ref}")
+        stale = []
+        for path, text in pinned_texts(ref).items():
+            if path.exists() and path.read_text() == text:
+                continue
+            stale.append(path.relative_to(REPO))
+            if not args.check:
+                path.write_text(text)
+                print(f"pinned {path.relative_to(REPO)} to {ref}")
+        if args.check and stale:
+            print("stale pins (re-run `pin --ref <commit>`):", *stale, sep="\n  ", file=sys.stderr)
+            return 1
         return 0
 
     if unknown := sorted(set(args.modules) - set(MODULES)):

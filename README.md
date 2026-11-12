@@ -223,9 +223,25 @@ meds-extract-run spec=MIMIC-IV-MNE output_dir=$MEDS_OUTPUT_DIR
 ```
 
 With `do_download=false`, put MNE's `*.csv.gz` files at the root of `input_dir`, next to `hosp/`
-and `icu/` (that is where the download puts them). There is no demo subset of MNE, so
-`dataset_key=demo` is not available for this spec, and CI checks it with synthetic MNE rows over
-the MIMIC-IV demo (`tests/e2e_mne_synthetic_test.py`). Against the full release the extension adds
+and `icu/` (that is where the download puts them).
+
+MNE has no public demo, so `dataset_key=demo` adds **simulated** MNE tables to the public MIMIC-IV
+demo. It needs no credentials and is still one command:
+
+```bash
+meds-extract-run spec=MIMIC-IV-MNE output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+> [!WARNING]
+> The MNE part of that build is **synthetic**: it is for pipeline testing and tutorials only, not
+> for research. Its `dataset_version` says so (`2.2+mne-1.0-synthetic-0.1:<package version>`).
+
+The simulated tables are what MNE would extract from the simulated MIMIC-IV-Note discharge
+summaries (see [Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)): one
+summary for each of the demo's 275 admissions, plus one for an admission that is not in MIMIC,
+whose rows are dropped. Together they exercise every routing rule below.
+`tests/e2e_mne_demo_test.py` builds that demo and compares every MNE event with what the rules
+give for the simulated rows. Against the full release the extension adds
 **17.6 M events** to 137,362 subjects; the MNE tables take ~90 s and 1.4 GB to extract on their own.
 
 **What it covers.** MNE reaches 300,663 of MIMIC-IV 3.1's 546,028 admissions (55.1%) and 64.6% of

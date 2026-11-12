@@ -454,9 +454,10 @@ discharge_condition:
           (MIMIC-Note-Extract discharge_condition.neurological_status)"
 
 # Merged into the base `sources:` by the build script: each bucket named here is appended to the
-# base bucket of the same name, and base buckets not named here (`demo`: MNE has no demo) are
-# dropped from the composed spec. The include list fetches only the tables above (~210 MB of the
-# ~1.2 GB release) and keeps MNE's own LICENSE/README from colliding with MIMIC-IV's.
+# base bucket of the same name, and base buckets not named here are dropped from the composed spec.
+# The include list fetches only the tables above (~210 MB of the ~1.2 GB release) and keeps MNE's
+# own LICENSE/README from colliding with MIMIC-IV's. MNE has no public demo, so the `demo` bucket
+# below adds SIMULATED MNE tables (scripts/synthetic_demo.py) to the public MIMIC-IV demo.
 sources:
   dataset:
     - type: physionet
