@@ -13,7 +13,10 @@ and a hand-kept copy of the base would drift. Instead each add-on is a fragment,
 - a `sources` block: each bucket the fragment names is the base bucket plus the fragment's
   entries; base buckets the fragment does not name are dropped (the add-on has no data for them,
   so e.g. a `demo` run would fail on its missing tables); `common` is kept; `dataset_version` keeps
-  the entries of the remaining buckets.
+  the entries of the remaining buckets. A fragment may restamp a bucket's version with its own
+  `dataset_version: {<bucket>: ...}` (the synthetic demos do, so a demo build says it is
+  synthetic); the base entries of that bucket then get the base version written in literally, so
+  their download URLs still name the base release.
 
 The output is committed (the entry point needs a file in the package) and
 `tests/extension_specs_test.py` fails when it is stale. After editing the base or a fragment:
@@ -100,6 +103,14 @@ def merge_sources(base: dict, ext: dict) -> dict:
         ({'dataset': '3.1'}, [{'u': 'mimic'}, {'u': 'ext'}], [{'u': 'map'}])
         >>> list(merged)  # `demo` is gone: the fragment has no data for it
         ['dataset_version', 'dataset', 'common']
+
+        A fragment's own `dataset_version` restamps its buckets; the base entries keep the base
+        release in their URLs:
+
+        >>> base["demo"] = [{"u": "demo/${sources.dataset_version.demo}"}]
+        >>> merged = merge_sources(base, {"dataset_version": {"demo": "2.2+x-0.1"}, "demo": [{"u": "x"}]})
+        >>> merged["dataset_version"], merged["demo"]
+        ({'demo': '2.2+x-0.1'}, [{'u': 'demo/2.2'}, {'u': 'x'}])
     """
     reserved = {"dataset_version", "common"}
     merged: dict = {}
@@ -108,15 +119,43 @@ def merge_sources(base: dict, ext: dict) -> dict:
     if missing:
         raise ValueError(f"fragment names buckets the base does not have: {missing}")
     version = base.get("dataset_version")
+    restamp = ext.get("dataset_version") or {}
+    if not isinstance(restamp, dict) or set(restamp) - set(kept):
+        raise ValueError(f"a fragment's dataset_version must map buckets it names to versions; got {restamp}")
+    if restamp and not isinstance(version, dict):
+        raise ValueError("a fragment can only restamp buckets of a per-bucket base dataset_version")
     if version is not None:
         merged["dataset_version"] = (
-            {b: v for b, v in version.items() if b in kept} if isinstance(version, dict) else version
+            {b: restamp.get(b, v) for b, v in version.items() if b in kept}
+            if isinstance(version, dict)
+            else version
         )
     for bucket in kept:
-        merged[bucket] = [*base[bucket], *ext[bucket]]
+        base_entries = base[bucket]
+        if bucket in restamp:
+            base_entries = _pin_version(
+                base_entries, f"${{sources.dataset_version.{bucket}}}", version[bucket]
+            )
+        merged[bucket] = [*base_entries, *ext[bucket]]
     if "common" in base or "common" in ext:
         merged["common"] = [*base.get("common", []), *ext.get("common", [])]
     return merged
+
+
+def _pin_version(node, interpolation: str, value: str):
+    """Replace `interpolation` with `value` in every string of a nested list/dict.
+
+    Examples:
+        >>> _pin_version([{"u": "a/${v}/b", "n": [1, "${v}"]}], "${v}", "2.2")
+        [{'u': 'a/2.2/b', 'n': [1, '2.2']}]
+    """
+    if isinstance(node, str):
+        return node.replace(interpolation, value)
+    if isinstance(node, list):
+        return [_pin_version(x, interpolation, value) for x in node]
+    if isinstance(node, dict):
+        return {k: _pin_version(v, interpolation, value) for k, v in node.items()}
+    return node
 
 
 def compose(base_text: str, ext_text: str, ext_path: Path) -> str:

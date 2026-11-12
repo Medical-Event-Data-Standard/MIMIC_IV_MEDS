@@ -1,0 +1,24 @@
+{
+  "synthetic": true,
+  "warning": "SYNTHETIC DATA for pipeline testing and tutorials only. Not real patient data and not derived from any; do not use for research.",
+  "simulates": "MIMIC-IV-Ext MIMIC-Note-Extract (MNE) 1.0 (https://physionet.org/content/mimic-iv-ext-note-extract/1.0/)",
+  "dataset_version": "1.0+synthetic-0.1",
+  "keyed_to": "MIMIC-IV Clinical Database Demo 2.2 (ODbL 1.0): subject_id, hadm_id, times",
+  "generator": "scripts/synthetic_demo.py",
+  "generator_version": "0.1",
+  "seed": 0,
+  "license": "ODbL-1.0",
+  "tables": {
+    "allergies.csv.gz": 454,
+    "chief_complaint.csv.gz": 535,
+    "discharge_condition.csv.gz": 276,
+    "discharge_diagnosis.csv.gz": 815,
+    "discharge_medications.csv.gz": 798,
+    "major_procedures.csv.gz": 213,
+    "medications_on_admission.csv.gz": 746,
+    "past_medical_history.csv.gz": 993,
+    "physical_exam_systems.csv.gz": 5390,
+    "physical_exam_vitals.csv.gz": 490
+  },
+  "report_files": 0
+}

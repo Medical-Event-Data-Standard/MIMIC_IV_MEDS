@@ -59,6 +59,25 @@ from PhysioNet, which rate-limits each connection to roughly 50 KB/s, while the 
 itself is ~32 minutes and ~20 GB of RAM. Raise `download_concurrency` and keep the raw data
 with `download_dest_dir`; see [Expected runtime and compute needs](#expected-runtime-and-compute-needs).
 
+## Simulated demo data for modules without a public demo
+
+> [!WARNING]
+> The files under [`data/synthetic_demo/`](data/synthetic_demo/README.md) are **synthetic**. They are
+> for testing pipelines and for tutorials only, are not real patient data, and must not be used for
+> research.
+
+MIMIC-IV-Note 2.2, MIMIC-CXR 2.1.0, MIMIC-CXR-JPG 2.1.0 and MIMIC-IV-ECHO 0.1 are credentialed and
+have no public demo. ED, ECG and the waveform database do have a public release. So that
+`dataset_key=demo` can cover those four modules too, `scripts/synthetic_demo.py` simulates them for
+the public demo's 100 subjects. It reuses their real ids and admission, ED and ICU times, and writes
+each module in its release's exact layout. The modules agree with each other: each chest X-ray study
+has the report text and the timing of a radiology note, and each admission has a discharge summary
+at its discharge time. No value comes from a credentialed dataset; the free text is templated
+("Synthetic ..."). [`data/synthetic_demo/sources.yaml`](data/synthetic_demo/sources.yaml) pins
+every file at a commit of this repository, with its SHA-256, as a ready-made `demo` source.
+Provenance, the public schema behind each table, and what the public docs leave open are in
+[`data/synthetic_demo/README.md`](data/synthetic_demo/README.md).
+
 ## How this ETL is defined
 
 There is no Python in this package. The entire ETL is one file —
@@ -204,9 +223,25 @@ meds-extract-run spec=MIMIC-IV-MNE output_dir=$MEDS_OUTPUT_DIR
 ```
 
 With `do_download=false`, put MNE's `*.csv.gz` files at the root of `input_dir`, next to `hosp/`
-and `icu/` (that is where the download puts them). There is no demo subset of MNE, so
-`dataset_key=demo` is not available for this spec, and CI checks it with synthetic MNE rows over
-the MIMIC-IV demo (`tests/e2e_mne_synthetic_test.py`). Against the full release the extension adds
+and `icu/` (that is where the download puts them).
+
+MNE has no public demo, so `dataset_key=demo` adds **simulated** MNE tables to the public MIMIC-IV
+demo. It needs no credentials and is still one command:
+
+```bash
+meds-extract-run spec=MIMIC-IV-MNE output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+> [!WARNING]
+> The MNE part of that build is **synthetic**: it is for pipeline testing and tutorials only, not
+> for research. Its `dataset_version` says so (`2.2+mne-1.0-synthetic-0.1:<package version>`).
+
+The simulated tables are what MNE would extract from the simulated MIMIC-IV-Note discharge
+summaries (see [Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)): one
+summary for each of the demo's 275 admissions, plus one for an admission that is not in MIMIC,
+whose rows are dropped. Together they exercise every routing rule below.
+`tests/e2e_mne_demo_test.py` builds that demo and compares every MNE event with what the rules
+give for the simulated rows. Against the full release the extension adds
 **17.6 M events** to 137,362 subjects; the MNE tables take ~90 s and 1.4 GB to extract on their own.
 
 **What it covers.** MNE reaches 300,663 of MIMIC-IV 3.1's 546,028 admissions (55.1%) and 64.6% of

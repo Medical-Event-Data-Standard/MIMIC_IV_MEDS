@@ -1,0 +1,19 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for ward imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+Possible atelectasis, cannot be excluded.
+Synthetic finding: consolidation is present.
+No fracture.
+Synthetic finding: pneumothorax is present.
+Synthetic finding: support devices is present.
+
+IMPRESSION:
+Synthetic impression: consolidation, pneumothorax, support devices.

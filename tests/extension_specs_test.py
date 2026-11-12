@@ -38,10 +38,20 @@ def test_extension_spec_is_base_plus_fragment(fragment):
     assert {k: spec[k] for k in ext_tables} == {k: ext[k] for k in ext_tables}
     assert spec["etl"] == {**base["etl"], **ext["etl"]}
 
-    # Every bucket the fragment extends starts with the base bucket unchanged; nothing else
-    # but `common` and `dataset_version` survives.
+    # Every bucket the fragment extends starts with the base bucket, unchanged except that a bucket
+    # the fragment restamps has the base version written into its entries; nothing else but
+    # `common` and `dataset_version` survives.
+    base_version = base["sources"]["dataset_version"]
+    restamp = ext["sources"].get("dataset_version", {})
     for bucket, entries in ext["sources"].items():
-        assert spec["sources"][bucket] == base["sources"][bucket] + entries
+        if bucket == "dataset_version":
+            continue
+        base_entries = base["sources"][bucket]
+        if bucket in restamp:
+            pin = f"${{sources.dataset_version.{bucket}}}"
+            base_entries = yaml.safe_load(yaml.safe_dump(base_entries).replace(pin, base_version[bucket]))
+        assert spec["sources"][bucket] == base_entries + entries
+        assert spec["sources"]["dataset_version"][bucket] == restamp.get(bucket, base_version[bucket])
     assert set(spec["sources"]) == set(ext["sources"]) | {"common", "dataset_version"}
     assert spec["sources"]["common"] == base["sources"]["common"]
 

@@ -85,6 +85,16 @@ def demo_cohort():
 
 
 @pytest.fixture(scope="session")
+def demo_download(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The raw public MIMIC-IV demo alone, without building a cohort: the cached download dir if CI set one
+    (the downloader then only verifies it), else a fresh download."""
+    download_dir = os.environ.get(DOWNLOAD_DIR_ENV_VAR)
+    dest = Path(download_dir).resolve() if download_dir else tmp_path_factory.mktemp("demo_download")
+    run_script("meds-extract-download", f"spec={SPEC}", f"output_dir={dest}", "key=demo")
+    return dest
+
+
+@pytest.fixture(scope="session")
 def demo_raw_dir(demo_cohort: Path) -> Path:
     """The raw demo files the build downloaded: the cached download dir if CI set one, else where the
     runner stages them by default."""
