@@ -324,3 +324,34 @@ sources:
         - radiographs.csv
         - radiology_jev.csv
         - discharge_jev.csv
+  # BEGIN synthetic demo: written by `scripts/synthetic_demo.py pin`; do not edit by hand.
+  # The demo bucket is SYNTHETIC: simulated tables keyed to the public MIMIC-IV demo
+  # (data/synthetic_demo/README.md), fetched from this repository at a fixed commit and checked
+  # against their SHA-256. Its version marks every demo build as synthetic.
+  dataset_version:
+    demo: "2.2+cxr_db-1.0-synthetic-0.1"
+  demo:
+    - type: http
+      urls:
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/SYNTHETIC_mimic-cxr-ext-mimic-cxr-db.json
+          rel_path: SYNTHETIC_mimic-cxr-ext-mimic-cxr-db.json
+          sha256: 719abac67da45d6911781fb9acd24eea8d3c5164768a0864ecbc68079a163ec3
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/cxr_db/discharge_jev.parquet
+          rel_path: cxr_db/discharge_jev.parquet
+          sha256: 0ee50cd1d3223680afa826d44808ef2b064061118bc0321da987c81fdd56d8af
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/cxr_db/radiographs.parquet
+          rel_path: cxr_db/radiographs.parquet
+          sha256: 44cdf6650fd5ca9376d7420b20db0fa77efcf6a312650714d50fc35e0a81636a
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/cxr_db/radiology_jev.parquet
+          rel_path: cxr_db/radiology_jev.parquet
+          sha256: 222b2a1ba39561cbb2c171e184b9999a6a562fd8a867092256c95edeaddf00bb
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/discharge_jev.csv
+          rel_path: discharge_jev.csv
+          sha256: be1315e0d1fa24a3ae58f1b7725916c4d746ca512582e9e98bb3bf6040d3bf3f
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/radiographs.csv
+          rel_path: radiographs.csv
+          sha256: cd8d3c942045a6f7407e9a4ac9eb86b3518b4071904dd5bc191f11581e1eb01f
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/radiology_jev.csv
+          rel_path: radiology_jev.csv
+          sha256: 72647d01e6186b40ca3aaaa78cf4829e9675e8a42b489abd3da676839f619c9e
+  # END synthetic demo
