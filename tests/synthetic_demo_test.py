@@ -73,6 +73,24 @@ def test_pinned_urls_serve_the_committed_bytes():
             assert hashlib.sha256(r.read()).hexdigest() == url["sha256"], f"{slug}: {url['url']}"
 
 
+def test_meds_extract_downloads_a_pinned_module(tmp_path: Path):
+    """The pinned entries work as a spec's `demo` bucket: MEDS-Extract's own downloader fetches them, verifies
+    each SHA-256 and lays the files out at their release paths."""
+    from conftest import run_script
+
+    module = yaml.safe_load((DATA / "sources.yaml").read_text())["modules"]["mimic-iv-note"]
+    spec = tmp_path / "spec.yaml"
+    spec.write_text(
+        yaml.safe_dump(
+            {"sources": {"dataset_version": {"demo": module["dataset_version"]}, "demo": module["sources"]}}
+        )
+    )
+    out = tmp_path / "raw"
+    run_script("meds-extract-download", f"spec={spec}", f"output_dir={out}", "key=demo")
+    for rel in synthetic_demo.committed_files(synthetic_demo.MODULES["mimic-iv-note"]):
+        assert (out / rel).read_bytes() == (DATA / "mimic-iv-note" / rel).read_bytes(), rel
+
+
 def test_files_are_small_and_labelled_synthetic():
     files = [p for p in DATA.rglob("*") if p.is_file()]
     assert max(p.stat().st_size for p in files) < 500_000
