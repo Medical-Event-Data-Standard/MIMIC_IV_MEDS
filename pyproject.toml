@@ -59,6 +59,15 @@ dev = [
     "pytest-rerunfailures==16.1",
     "shfmt-py==3.12.0.2",
 ]
+# The documentation site (`mkdocs.yml`, `docs/`), built by Read the Docs from
+# `.readthedocs.yaml` and checked in CI with `mkdocs build --strict`. Preview locally with
+# `uv run --group docs mkdocs serve`. `mkdocs-awesome-nav` builds the navigation from the
+# `docs/` tree, so a new page under `docs/extensions/` appears without editing `mkdocs.yml`.
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.6,<10",
+    "mkdocs-awesome-nav>=3.1,<4",
+]
 
 [tool.setuptools_scm]
 

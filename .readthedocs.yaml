@@ -1,0 +1,25 @@
+# Read the Docs build for the documentation site (mkdocs.yml, docs/).
+# https://docs.readthedocs.com/platform/stable/config-file/v2.html
+#
+# Dependencies come from the `docs` dependency group in pyproject.toml, installed with
+# `uv sync --group docs` against the committed uv.lock, so RTD builds with the same versions as
+# CI and a local `uv run mkdocs build --strict`.
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    # Within the package's requires-python (>=3.11.4,<3.14); the same version CI uses.
+    python: "3.12"
+
+python:
+  install:
+    - method: uv
+      command: sync
+      groups:
+        - docs
+
+mkdocs:
+  configuration: mkdocs.yml
+  # The equivalent of `mkdocs build --strict`: any warning (a broken link or anchor) fails the build.
+  fail_on_warning: true

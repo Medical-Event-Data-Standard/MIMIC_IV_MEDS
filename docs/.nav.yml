@@ -1,0 +1,8 @@
+# Top-level order of the site navigation (mkdocs-awesome-nav; see mkdocs.yml).
+nav:
+  - index.md
+  - getting-started.md
+  - base-etl.md
+  - Extensions: extensions
+  - sources.md
+  - contributing.md
