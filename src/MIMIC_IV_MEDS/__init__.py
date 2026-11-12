@@ -15,5 +15,7 @@ enrich the code metadata at the end of that run.
 
 This package exists so the YAML is addressable as package data —
 ``importlib.resources.files("MIMIC_IV_MEDS")`` — from an installed wheel. Nothing here is
-importable API; deliberately, there is nothing to import.
+importable API. The one module, ``MIMIC_IV_MEDS.prepare_cxr_db``, is a command
+(``python -m MIMIC_IV_MEDS.prepare_cxr_db $RAW``) that converts the semicolon-delimited
+MIMIC-CXR-DB release to parquet for the opt-in ``MIMIC-IV-CXRDB`` spec.
 """

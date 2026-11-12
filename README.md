@@ -273,6 +273,42 @@ The decisions behind the less obvious rows:
 to 300,720) by criteria the paper does not spell out. Its `SHA256SUMS.txt` separates hash and path
 by one space, which `shasum -c` rejects but MEDS-Extract's downloader accepts.
 
+## Optional extension: MIMIC-CXR-DB
+
+[MIMIC-CXR-DB](https://physionet.org/content/mimic-cxr-ext-mimic-cxr-db/1.0/) (v1.0;
+[paper](https://papers.miccai.org/miccai-2026-sat/MultiTab_015.html)) links the MIMIC-CXR-JPG chest
+radiographs to MIMIC-IV admissions. It ships their DICOM metadata, the CheXpert labels, and
+ontology concepts extracted from the radiology reports and discharge summaries. The spec
+`MIMIC-IV-CXRDB` is the full `MIMIC-IV` ETL plus those three tables. The release is
+semicolon-delimited, which MEDS-Extract 0.8.1 cannot read, so a one-second conversion runs between
+the download and the extraction:
+
+```bash
+# Needs a PhysioNet account approved for BOTH MIMIC-IV and MIMIC-CXR-DB.
+meds-extract-download spec=MIMIC-IV-CXRDB output_dir=$RAW
+python -m MIMIC_IV_MEDS.prepare_cxr_db $RAW
+meds-extract-run spec=MIMIC-IV-CXRDB do_download=false input_dir=$RAW output_dir=$MEDS_OUTPUT_DIR
+```
+
+It adds 1.96 M events to 61,868 subjects:
+
+- an image event per radiograph (`CXR//IMAGE//{view}//{orientation}`, with `study_id` and
+    `dicom_id`);
+- a study event (`CXR//STUDY//{procedure}`);
+- the 14 CheXpert labels (`CXR_NLP//CHEXPERT//{finding}//{POSITIVE,NEGATIVE,UNCERTAIN}`);
+- the Jev-screened report and discharge concepts (`CXR_NLP//RADIOLOGY|DISCHARGE//{section}//{ontology id}`).
+
+> [!WARNING]
+> **Open issue: leakage.** The CheXpert labels and radiology-report concepts are timed at the
+> study's last image, which is earlier than the report could be read. How to time them (a fixed
+> reporting delay, MIMIC-IV-Note's radiology `storetime` if a study-level link exists, or keeping
+> this with a warning) is not decided yet. Drop `CXR_NLP//CHEXPERT` and `CXR_NLP//RADIOLOGY` for
+> leakage-sensitive tasks.
+
+The rest of the release re-derives MIMIC-IV (its admissions, diagnoses and labs) and is not
+extracted. The design decisions, coverage, caveats (including overlap with MNE) and validation are
+in [`docs/extensions/cxr-db.md`](docs/extensions/cxr-db.md).
+
 ## Code metadata
 
 `metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary
