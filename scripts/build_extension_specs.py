@@ -133,7 +133,9 @@ def merge_sources(base: dict, ext: dict) -> dict:
     for bucket in kept:
         base_entries = base[bucket]
         if bucket in restamp:
-            base_entries = _pin_version(base_entries, f"${{sources.dataset_version.{bucket}}}", version[bucket])
+            base_entries = _pin_version(
+                base_entries, f"${{sources.dataset_version.{bucket}}}", version[bucket]
+            )
         merged[bucket] = [*base_entries, *ext[bucket]]
     if "common" in base or "common" in ext:
         merged["common"] = [*base.get("common", []), *ext.get("common", [])]
