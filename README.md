@@ -298,6 +298,64 @@ ED detail exists only for 2011–2019, so its presence is a proxy for calendar p
 visits with the base's `TRANSFER_TO//ED//…`, not with `ED//ARRIVAL`. The modelling decisions,
 caveats and validation are in [`docs/extensions/ed.md`](docs/extensions/ed.md).
 
+## Multimodal build: MIMIC-IV plus any combination of ED, notes, ECG, echo and chest X-rays
+
+`mimic-iv-meds-multimodal` builds one MEDS dataset from local copies of MIMIC-IV and any subset of
+its linked PhysioNet modules. Unlike the `spec=` runs above it downloads nothing: point it at a
+folder holding the releases side by side, in PhysioNet's own layout (`<slug>/<version>/` as
+`wget -r` leaves it, or `<slug>-<version>/` as the ZIP download does).
+
+```bash
+mimic-iv-meds-multimodal --root /data/MIMIC-IV_Multimodal_Demo --output-dir $MEDS_OUTPUT_DIR \
+	--modules ed,note,ecg,echo,cxr # any subset, or `all`; empty for MIMIC-IV alone
+# --link-mode copy|hardlink|symlink  how objects get into the MEDS root (default copy)
+# --path cxr=/elsewhere/mimic-cxr-jpg/2.1.0   when a release is not under --root
+# --no-enrich                        skip the suMEDS code-metadata step (offline)
+```
+
+| Module | Release (demo / full)                | Events                                                                                | Time                        |
+| ------ | ------------------------------------ | ------------------------------------------------------------------------------------- | --------------------------- |
+| core   | `mimic-iv-demo` / `mimiciv`          | the `MIMIC-IV` spec, unchanged                                                        | as in that spec             |
+| `ed`   | `mimic-iv-ed-demo` / `mimic-iv-ed`   | the `MIMIC-IV-ED` tables (`ED//…`)                                                    | as in that spec             |
+| `note` | `mimic-iv-note`                      | `NOTE//DISCHARGE_SUMMARY`, `NOTE//RADIOLOGY_REPORT[//ADDENDUM]`, text in `text_value` | `max(charttime, storetime)` |
+| `ecg`  | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, `ecg_link`                                      | `ecg_time` (acquisition)    |
+| `echo` | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, `echo_link`                                        | `acquisition_datetime`      |
+| `cxr`  | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>`, one per JPG, `cxr_link`                                 | `StudyDate` + `StudyTime`   |
+
+Objects (waveforms, DICOMs, JPGs) are stored inside the MEDS root under their SHA-256, in their
+original formats, and each object event names its file in a link column relative to that root:
+
+```text
+$MEDS_OUTPUT_DIR/
+  data/…, metadata/dataset.json, codes.parquet, subject_splits.parquet
+  metadata/objects.parquet   # link -> modality, format, sha256, size, source release + path, source IDs
+  metadata/sources.json      # each release used (slug, version, demo/full, license) and what it contributed
+  ecg/<sha[:2]>/<sha>/<record>.hea, .dat   # wfdb.rdrecord(root / ecg_link)
+  echo/<sha[:2]>/<sha>.dcm
+  cxr/<sha[:2]>/<sha>.jpg
+```
+
+`metadata/dataset.json` says which combination this is: `dataset_name` is e.g.
+`MIMIC-IV+ED+Note+ECG+ECHO+CXR`, `dataset_version` lists every release as `<slug>/<version>`,
+`license` is the PhysioNet Credentialed Health Data License as soon as one credentialed release is
+in, and the link columns are declared as MEDS `additional_value_modality_columns`. MEDS-Extract
+writes all of that from the composed spec's `etl:` block. `objects.parquet` and `sources.json`
+have no MEDS or MEDS-Extract counterpart yet; they are written by
+`src/MIMIC_IV_MEDS/multimodal/finalize.py`, kept self-contained so they can move upstream as a
+post-stage.
+
+Every module is restricted to the subjects of the core's `hosp/patients`, so a module can never
+add subjects or reshuffle the core's splits. An object listed in a record list but not (fully) on
+disk gets no event: no link ever dangles, `sources.json` counts what was skipped, and re-running
+after a download completes picks it up. On the MIMIC-IV demo subjects (100) the build adds 2,042
+notes, 659 ECGs, 411 echo DICOMs and 566 chest X-rays.
+
+Caveats: the ECG time is the ECG machine's clock, which the release says was mostly not
+synchronized with the hospital's. The CheXpert labels and the echo measurements are not extracted
+yet: the labels are mined from the report, which MIMIC-CXR-JPG does not time. Notes are timed at
+when they were saved, not when the care happened: the median gap is about 20 h for discharge
+summaries and 2.4 h for radiology reports on the demo subjects.
+
 ## Code metadata
 
 `metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary

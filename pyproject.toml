@@ -60,6 +60,12 @@ dev = [
     "shfmt-py==3.12.0.2",
 ]
 
+[project.scripts]
+# MIMIC-IV plus any combination of MIMIC-IV-ED, -Note, -ECG, -ECHO and MIMIC-CXR-JPG, from local
+# copies of the releases, with the ECG/echo/CXR objects stored inside the MEDS root. See
+# src/MIMIC_IV_MEDS/multimodal/cli.py.
+mimic-iv-meds-multimodal = "MIMIC_IV_MEDS.multimodal.cli:main"
+
 [tool.setuptools_scm]
 
 [project.entry-points."MEDS_extract.pipelines"]
