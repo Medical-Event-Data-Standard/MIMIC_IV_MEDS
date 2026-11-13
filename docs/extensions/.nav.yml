@@ -1,0 +1,6 @@
+# The overview first, then every other page in this folder, alphabetically. A new extension page
+# dropped here (e.g. `ed.md`, `cxr-db.md`) is picked up by the glob, titled by its first
+# `# heading`. Neither this file nor zensical.toml needs editing.
+nav:
+  - index.md
+  - "*"

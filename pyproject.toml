@@ -60,6 +60,15 @@ dev = [
     "pytest-rerunfailures==16.1",
     "shfmt-py==3.12.0.2",
 ]
+# The documentation site (`zensical.toml`, `docs/`), built with Zensical, the successor to
+# Material for MkDocs: by Read the Docs from `.readthedocs.yaml`, and in CI with
+# `zensical build --strict`. Preview locally with `uv run --group docs zensical serve`.
+# Zensical's built-in awesome-nav support builds the navigation from the `.nav.yml` files in
+# `docs/`, so a new page under `docs/extensions/` appears without a config edit. Zensical is 0.x,
+# so the ceiling is raised deliberately.
+docs = [
+    "zensical>=0.1.1,<0.2",
+]
 
 [project.scripts]
 # MIMIC-IV plus any combination of MIMIC-IV-ED, -Note, -ECG, -ECHO and MIMIC-CXR-JPG, from local
