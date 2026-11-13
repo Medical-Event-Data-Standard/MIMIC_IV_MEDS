@@ -72,14 +72,16 @@ def place_objects(objects: pl.DataFrame, roots: dict[str, Path], meds_root: Path
     counts: dict[str, dict[str, int]] = {}
     for row in objects.unique("link", keep="first", maintain_order=True).iter_rows(named=True):
         root = roots[row["modality"]]
-        c = counts.setdefault(row["modality"], {"objects": 0, "files_written": 0, "bytes": 0})
+        c = counts.setdefault(row["modality"], {"objects": 0, "files_written": 0, "bytes_written": 0})
         c["objects"] += 1
-        c["bytes"] += row["size_bytes"]
         dest = meds_root / row["link"]
         for rel in row["files"]:
-            # A multi-file record's link names the record, not a file: its files go next to it.
+            # A multi-file record's link names the record, not a file: its files go next to it. Objects can
+            # share files (a waveform segment's files are also its record's): each is placed once.
             target = dest.parent / Path(rel).name if len(row["files"]) > 1 else dest
-            c["files_written"] += _place(root / rel, target, mode)
+            if _place(root / rel, target, mode):
+                c["files_written"] += 1
+                c["bytes_written"] += (root / rel).stat().st_size
     return counts
 
 
@@ -133,14 +135,10 @@ def write_sources(
 def check_links(meds_root: Path, link_columns: list[str]) -> dict[str, int]:
     """Count the links in `data/` per column; raise if any is unknown to objects.parquet or missing on
     disk."""
-    known, folders = set(), set()
+    known = set()
     objects_fp = meds_root / "metadata" / "objects.parquet"
     if objects_fp.exists():
-        objects = pl.read_parquet(objects_fp, columns=["link", "files"])
-        known = set(objects["link"])
-        # A multi-file object is a folder of WFDB records (a waveform record's segments sit next to it):
-        # a link to any record in that folder belongs to the object.
-        folders = {str(Path(x).parent) for x, f in objects.iter_rows() if len(f) > 1}
+        known = set(pl.read_parquet(objects_fp, columns=["link"])["link"])
     data = pl.scan_parquet(meds_root / "data" / "**" / "*.parquet")
     present = set(data.collect_schema().names())
     counts = {}
@@ -148,7 +146,7 @@ def check_links(meds_root: Path, link_columns: list[str]) -> dict[str, int]:
         if col not in present:
             raise ValueError(f"{col} is declared but not in data/")
         links = data.select(pl.col(col).drop_nulls().unique()).collect()[col].to_list()
-        unknown = [x for x in links if x not in known and str(Path(x).parent) not in folders]
+        unknown = [x for x in links if x not in known]
         # An ECG link names a WFDB record (no extension); its header is `<link>.hea`.
         missing = [x for x in links if not ((meds_root / x).exists() or (meds_root / f"{x}.hea").exists())]
         if unknown or missing:

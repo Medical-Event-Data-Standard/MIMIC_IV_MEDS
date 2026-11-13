@@ -339,6 +339,17 @@ def test_waveform(built):
     assert sorted(p.name for p in folder.iterdir()) == sorted(expected)
     for link in links:
         assert (out / f"{link}.hea").is_file()
+    # Every link is a row of objects.parquet; a segment's row lists only that segment's files.
+    objects = pl.read_parquet(out / "metadata" / "objects.parquet").filter(pl.col("modality") == "waveform")
+    assert set(links) == set(objects["link"])
+    by_id = {r["object_id"]: r for r in objects.iter_rows(named=True)}
+    assert by_id["88000001"]["format"] == "WFDB multi-segment" and len(by_id["88000001"]["files"]) == 7
+    assert [Path(f).name for f in by_id["88000001_0001"]["files"]] == [
+        "88000001_0001.hea",
+        "88000001_0001e.dat",
+    ]
+    assert by_id["88000001_0001"]["format"] == "WFDB segment"
+    assert len({r["sha256"] for r in by_id.values()}) == 3
     sources = json.loads((out / "metadata" / "sources.json").read_text())
     staged = next(x for x in sources["sources"] if x["module"] == "waveform")["staging"]
     assert {
@@ -400,7 +411,7 @@ def test_objects_and_sources(built, synthetic_root):
         ("cxr", 3),
         ("ecg", 2),
         ("echo", 2),
-        ("waveform", 1),
+        ("waveform", 3),  # the record and its two segments
     ]
     for row in objects.iter_rows(named=True):
         src_root = {
@@ -423,7 +434,7 @@ def test_objects_and_sources(built, synthetic_root):
         "staging"
     ]["measurements"].items()
     assert by["cxr"]["staging"]["distinct_objects"] == 2
-    assert by["cxr"]["objects"] == {"objects": 2, "files_written": 2, "bytes": 12}
+    assert by["cxr"]["objects"] == {"objects": 2, "files_written": 2, "bytes_written": 12}
     assert by["note"]["staging"]["radiology"]["missing_storetime"] == 1
     assert (by["core"]["release"], by["note"]["release"], by["ecg"]["license"]) == (
         "demo",

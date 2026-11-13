@@ -123,8 +123,12 @@ def test_place_objects_modes_and_reruns(tmp_path):
         counts = finalize.place_objects(objects, {"ecg": src, "cxr": src}, out, mode)
         # The duplicate link is placed once; the record keeps its file names next to its link.
         assert counts == {
-            "ecg": {"objects": 1, "files_written": 2, "bytes": 10},
-            "cxr": {"objects": 1, "files_written": 1, "bytes": 3},
+            "ecg": {
+                "objects": 1,
+                "files_written": 2,
+                "bytes_written": (src / "a" / "r.hea").stat().st_size + 2,
+            },
+            "cxr": {"objects": 1, "files_written": 1, "bytes_written": 3},
         }
         assert (out / "ecg/ab/abcd/r.hea").read_text().startswith("r ")
         assert (out / "cxr/cd/cdef.jpg").read_bytes() == b"jpg"

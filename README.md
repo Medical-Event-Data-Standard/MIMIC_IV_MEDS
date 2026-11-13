@@ -363,7 +363,11 @@ segments and its numerics (`<record>n.csv.gz`, ~1 Hz HR, SpO2, NBP, …). `WAVEF
 timed at the end of its segment and its link is a WFDB record of that segment alone;
 `WAVEFORM//RECORD`, the only event linking to the whole record (and so the only way to its
 numerics), is timed at the end of the record. `waveform_duration_s` gives each window,
-`[time - duration, time]`. Do not list or glob a link's folder.
+`[time - duration, time]`. Do not list or glob a link's folder. Every link, segments included, is
+a row of `metadata/objects.parquet`. The price of end-timing: a segment is usable only once it
+ends, and on the demo segments last up to ~60 h (records: median ~30 h, up to ~76 h). An encoder
+that wants earlier access must cut the signal at the prediction time itself; the ETL could also
+cut segments into fixed windows, which it does not do yet.
 
 Caveats: the ECG time is the ECG machine's clock, which the release says was mostly not
 synchronized with the hospital's. The CheXpert labels are not extracted: they are mined from the

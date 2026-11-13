@@ -775,6 +775,20 @@ def stage_waveform(wdb: FoundRelease, raw_input: Path, subjects: pl.Series, work
                     "hadm_id": hadm, "waveform_record_id": record_id, "waveform_segment": seg,
                     "waveform_duration_s": n / m.fs,
                 })  # fmt: skip
+                # Every link is a row of objects.parquet: the segment is its header plus its signal files,
+                # inside the record's folder (and so also part of the record's own row).
+                seg_rels = [
+                    (rdir / f).relative_to(wdb.root).as_posix()
+                    for f in [f"{seg}.hea", *_segment_files(rdir / f"{seg}.hea")]
+                ]
+                objects.append({
+                    "link": f"{folder}/{seg}", "modality": "waveform", "format": "WFDB segment",
+                    "sha256": object_digest({r: digests[r] for r in seg_rels}),
+                    "size_bytes": sum((wdb.root / r).stat().st_size for r in seg_rels), "files": seg_rels,
+                    "source_project": wdb.release.project, "source_version": wdb.version,
+                    "source_path": (Path(sd) / Path(rec_rel).parent / seg).as_posix(), "subject_id": subject,
+                    "study_id": record_id, "object_id": seg,
+                })  # fmt: skip
             rows.append({
                 "subject_id": subject, "code": "WAVEFORM//RECORD",
                 "time": m.start + timedelta(seconds=m.n_samples / m.fs), "link": f"{folder}/{m.name}",
@@ -801,7 +815,7 @@ def stage_waveform(wdb: FoundRelease, raw_input: Path, subjects: pl.Series, work
     events.write_parquet(out)
     stats |= {
         "segment_events": int((events["code"] == "WAVEFORM//SEGMENT").sum()),
-        "record_events": len(objects),
+        "record_events": int((events["code"] == "WAVEFORM//RECORD").sum()),
     }
     if stats["records_missing_on_disk"]:
         logger.warning(
