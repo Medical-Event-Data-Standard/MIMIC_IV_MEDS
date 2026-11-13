@@ -14,8 +14,9 @@ entry-point group under the same name, which the config's ``sumeds_enrich`` post
 enrich the code metadata at the end of that run.
 
 This package exists so the YAML is addressable as package data —
-``importlib.resources.files("MIMIC_IV_MEDS")`` — from an installed wheel. The one piece of code is
-``MIMIC_IV_MEDS.multimodal`` (the ``mimic-iv-meds-multimodal`` command), which combines MIMIC-IV
-with its linked modules and stores their images and waveforms inside the MEDS root; it is a
-command, not a library API.
+``importlib.resources.files("MIMIC_IV_MEDS")`` — from an installed wheel. Nothing here is
+importable API; the code is two commands: ``MIMIC_IV_MEDS.multimodal`` (``mimic-iv-meds-multimodal``),
+which builds MIMIC-IV plus any combination of extensions and stores their images and waveforms
+inside the MEDS root, and ``MIMIC_IV_MEDS.prepare_cxr_db`` (``python -m MIMIC_IV_MEDS.prepare_cxr_db
+$RAW``), which converts the semicolon-delimited MIMIC-CXR-DB release to parquet.
 """

@@ -1,0 +1,357 @@
+# Extension: MIMIC-CXR-Ext MIMIC-CXR-DB v1.0
+#   https://physionet.org/content/mimic-cxr-ext-mimic-cxr-db/1.0/ (doi:10.13026/gy0s-e371)
+#
+# This is NOT a spec on its own. `scripts/build_extension_specs.py` composes it with
+# `event_configs.yaml` into the generated, registered spec `event_configs_cxr_db.yaml`
+# (`spec=MIMIC-IV-CXRDB`); edit this file and the base, never the generated one. Full reasoning and
+# validation numbers: docs/extensions/cxr-db.md.
+#
+# MIMIC-CXR-DB joins the MIMIC-CXR-JPG v2.1.0 chest radiographs (DICOM metadata and CheXpert labels)
+# to MIMIC-IV 3.1 admissions, and ships concepts extracted from the radiology reports and discharge
+# summaries as (key, note section, ontology concept) triples. Only what MIMIC-IV lacks is extracted:
+#
+# - **Images and studies** (`cxr_db/radiographs`), linked to an admission or not (61% are not;
+#   `subject_id` and time are always known). An image is timed at its own `study_datetime`;
+#   everything about the study as a whole (the study, its CheXpert labels, its report's concepts)
+#   at `study_end_datetime`, its last image, which is the earliest the report could exist. The
+#   report's own sign-off time is not distributed, so the report-derived events (CheXpert labels,
+#   report concepts) are still EARLIER than the report was readable: a known, open leakage issue
+#   (see the warning at the top of docs/extensions/cxr-db.md before using them for prediction). Images of the 3,511 MIMIC-CXR subjects absent
+#   from MIMIC-IV 3.1 are not emitted (`subject_id` is gated on `hosp/patients`): they have no
+#   other events, and adding them would reshuffle the subject splits of the base cohort.
+# - **CheXpert labels** as `CXR_NLP//CHEXPERT//{finding}//{POSITIVE,NEGATIVE,UNCERTAIN}`; a blank
+#   label (not mentioned) emits nothing.
+# - **Report and discharge-summary concepts** from the Jev-screened edition (`*_jev`), which is the
+#   full triple table restricted to the (section, concept) pairs that passed TypeSafe Jev's
+#   automated plausibility check: 31% of radiology and 8.7% of discharge triples. The code is that
+#   validated pair, `{section}//{ontology id}`. Discharge concepts are timed at
+#   `hosp/admissions.dischtime`, the rule MNE, `DIAGNOSIS` and `DRG` follow.
+# - **`CXR_NLP//` prefix** on everything derived from report or note text, so it can be dropped
+#   wholesale; `CXR//` is the DICOM metadata.
+#
+# Not extracted: `admissions` (equal to hosp/admissions and hosp/patients on every column; its
+# diagnoses are the diagnoses_icd titles), `labs` (the earliest in-admission labevents value, with
+# no time), `d_labs`, `d_concepts` (the Jev tables carry each concept's label and class), and the
+# unscreened `radiology`/`discharge` triples. The `include` list below skips them too.
+#
+# The release is semicolon-delimited, which MEDS-Extract 0.8.1 cannot read (it has no CSV separator
+# option), so these tables are the parquet files `python -m MIMIC_IV_MEDS.prepare_cxr_db $RAW`
+# writes under `$RAW/cxr_db/` after the download (see that module). That step also adds the one
+# column MEDS-Extract cannot compute, `radiographs.study_end_datetime`: a per-study reduction of a
+# table over itself would need a self-join, which 0.8.1 rejects at parse time (every joined column
+# would collide with the left side, and joined columns cannot be renamed).
+
+etl:
+  dataset_name: MIMIC-IV-CXRDB
+
+# One row per DICOM image (377,095); a study has 1-11 images. Study-level events are emitted from
+# every image row at the same time with the same columns, so the merge stage's `unique_by: "*"`
+# collapses them to one per study.
+cxr_db/radiographs:
+  _defaults:
+    # Null for subjects absent from MIMIC-IV, which drops them from the cohort entirely.
+    subject_id: "$subject_id if ($anchor_year ?? -1) >= 0"
+  _table:
+    joins:
+      hosp/patients:
+        key: subject_id
+        cols: [anchor_year]
+    cols:
+      # CheXpert's 1.0 / 0.0 / -1.0; a blank (not mentioned) is null and so drops its event.
+      atelectasis: "'POSITIVE' if $Atelectasis == 1 else 'NEGATIVE' if $Atelectasis == 0 else 'UNCERTAIN' if $Atelectasis == -1"
+      cardiomegaly: "'POSITIVE' if $Cardiomegaly == 1 else 'NEGATIVE' if $Cardiomegaly == 0 else 'UNCERTAIN' if $Cardiomegaly == -1"
+      consolidation: "'POSITIVE' if $Consolidation == 1 else 'NEGATIVE' if $Consolidation == 0 else 'UNCERTAIN' if $Consolidation == -1"
+      edema: "'POSITIVE' if $Edema == 1 else 'NEGATIVE' if $Edema == 0 else 'UNCERTAIN' if $Edema == -1"
+      enlarged_cardiomediastinum: >-
+        'POSITIVE' if $Enlarged_Cardiomediastinum == 1 else 'NEGATIVE' if $Enlarged_Cardiomediastinum == 0
+        else 'UNCERTAIN' if $Enlarged_Cardiomediastinum == -1
+      fracture: "'POSITIVE' if $Fracture == 1 else 'NEGATIVE' if $Fracture == 0 else 'UNCERTAIN' if $Fracture == -1"
+      lung_lesion: "'POSITIVE' if $Lung_Lesion == 1 else 'NEGATIVE' if $Lung_Lesion == 0 else 'UNCERTAIN' if $Lung_Lesion == -1"
+      lung_opacity: "'POSITIVE' if $Lung_Opacity == 1 else 'NEGATIVE' if $Lung_Opacity == 0 else 'UNCERTAIN' if $Lung_Opacity == -1"
+      no_finding: "'POSITIVE' if $No_Finding == 1 else 'NEGATIVE' if $No_Finding == 0 else 'UNCERTAIN' if $No_Finding == -1"
+      pleural_effusion: >-
+        'POSITIVE' if $Pleural_Effusion == 1 else 'NEGATIVE' if $Pleural_Effusion == 0
+        else 'UNCERTAIN' if $Pleural_Effusion == -1
+      pleural_other: "'POSITIVE' if $Pleural_Other == 1 else 'NEGATIVE' if $Pleural_Other == 0 else 'UNCERTAIN' if $Pleural_Other == -1"
+      pneumonia: "'POSITIVE' if $Pneumonia == 1 else 'NEGATIVE' if $Pneumonia == 0 else 'UNCERTAIN' if $Pneumonia == -1"
+      pneumothorax: "'POSITIVE' if $Pneumothorax == 1 else 'NEGATIVE' if $Pneumothorax == 0 else 'UNCERTAIN' if $Pneumothorax == -1"
+      support_devices: >-
+        'POSITIVE' if $Support_Devices == 1 else 'NEGATIVE' if $Support_Devices == 0
+        else 'UNCERTAIN' if $Support_Devices == -1
+  # `ViewCodeSequence_CodeMeaning` restates `ViewPosition`; `PerformedProcedureStepDescription` is
+  # a noisier, 9%-null `ProcedureCodeSequence_CodeMeaning`; `StudyDate`/`StudyTime` are
+  # `study_datetime`; `Rows`/`Columns` are pixel dimensions of a file this dataset does not hold,
+  # reachable through `dicom_id`.
+  image:
+    code: >-
+      f"CXR//IMAGE//{$ViewPosition ?? 'UNK'}//{$PatientOrientationCodeSequence_CodeMeaning ?? 'UNK'}"
+    time: '$study_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    # Written as a float in the release ("12345678.0").
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    dicom_id: $dicom_id
+    _metadata:
+      _self:
+        description: >-
+          f"Chest radiograph image, view position {$ViewPosition ?? 'UNK'}, patient orientation
+          {$PatientOrientationCodeSequence_CodeMeaning ?? 'UNK'} (MIMIC-CXR DICOM ViewPosition and
+          PatientOrientationCodeSequence, via MIMIC-CXR-DB radiographs); the image is identified by
+          dicom_id and its study by study_id"
+  study:
+    code: f"CXR//STUDY//{$ProcedureCodeSequence_CodeMeaning}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Chest radiograph study, procedure {$ProcedureCodeSequence_CodeMeaning} (MIMIC-CXR DICOM
+          ProcedureCodeSequence, via MIMIC-CXR-DB radiographs), at the time of its last image; the study
+          is identified by study_id"
+  chexpert_atelectasis:
+    code: f"CXR_NLP//CHEXPERT//ATELECTASIS//{$atelectasis}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Atelectasis {$atelectasis} on the chest radiograph study, as labeled from its radiology report
+          by the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Atelectasis)"
+  chexpert_cardiomegaly:
+    code: f"CXR_NLP//CHEXPERT//CARDIOMEGALY//{$cardiomegaly}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Cardiomegaly {$cardiomegaly} on the chest radiograph study, as labeled from its radiology report
+          by the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Cardiomegaly)"
+  chexpert_consolidation:
+    code: f"CXR_NLP//CHEXPERT//CONSOLIDATION//{$consolidation}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Consolidation {$consolidation} on the chest radiograph study, as labeled from its radiology report
+          by the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Consolidation)"
+  chexpert_edema:
+    code: f"CXR_NLP//CHEXPERT//EDEMA//{$edema}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Edema {$edema} on the chest radiograph study, as labeled from its radiology report by the CheXpert
+          labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Edema)"
+  chexpert_enlarged_cardiomediastinum:
+    code: f"CXR_NLP//CHEXPERT//ENLARGED_CARDIOMEDIASTINUM//{$enlarged_cardiomediastinum}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Enlarged cardiomediastinum {$enlarged_cardiomediastinum} on the chest radiograph study, as
+          labeled from its radiology report by the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB
+          radiographs.Enlarged_Cardiomediastinum)"
+  chexpert_fracture:
+    code: f"CXR_NLP//CHEXPERT//FRACTURE//{$fracture}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Fracture {$fracture} on the chest radiograph study, as labeled from its radiology report by the
+          CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Fracture)"
+  chexpert_lung_lesion:
+    code: f"CXR_NLP//CHEXPERT//LUNG_LESION//{$lung_lesion}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Lung lesion {$lung_lesion} on the chest radiograph study, as labeled from its radiology report by
+          the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Lung_Lesion)"
+  chexpert_lung_opacity:
+    code: f"CXR_NLP//CHEXPERT//LUNG_OPACITY//{$lung_opacity}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Lung opacity {$lung_opacity} on the chest radiograph study, as labeled from its radiology report
+          by the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Lung_Opacity)"
+  chexpert_no_finding:
+    code: f"CXR_NLP//CHEXPERT//NO_FINDING//{$no_finding}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"No finding {$no_finding} on the chest radiograph study (no CheXpert finding positive or
+          uncertain, support devices aside), as labeled from its radiology report by the CheXpert labeler
+          (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.No_Finding)"
+  chexpert_pleural_effusion:
+    code: f"CXR_NLP//CHEXPERT//PLEURAL_EFFUSION//{$pleural_effusion}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Pleural effusion {$pleural_effusion} on the chest radiograph study, as labeled from its radiology
+          report by the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Pleural_Effusion)"
+  chexpert_pleural_other:
+    code: f"CXR_NLP//CHEXPERT//PLEURAL_OTHER//{$pleural_other}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Other pleural abnormality {$pleural_other} on the chest radiograph study, as labeled from its
+          radiology report by the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Pleural_Other)"
+  chexpert_pneumonia:
+    code: f"CXR_NLP//CHEXPERT//PNEUMONIA//{$pneumonia}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Pneumonia {$pneumonia} on the chest radiograph study, as labeled from its radiology report by the
+          CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Pneumonia)"
+  chexpert_pneumothorax:
+    code: f"CXR_NLP//CHEXPERT//PNEUMOTHORAX//{$pneumothorax}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Pneumothorax {$pneumothorax} on the chest radiograph study, as labeled from its radiology report
+          by the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Pneumothorax)"
+  chexpert_support_devices:
+    code: f"CXR_NLP//CHEXPERT//SUPPORT_DEVICES//{$support_devices}"
+    time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Support devices {$support_devices} on the chest radiograph study, as labeled from its radiology
+          report by the CheXpert labeler (MIMIC-CXR-JPG, via MIMIC-CXR-DB radiographs.Support_Devices)"
+
+# Keyed by `study_id` only; subject and time come from the study's images. Every study with triples
+# is admission-linked; 4 study ids are not in `radiographs` and their rows are dropped.
+# `relation_type` is the report section the concept was found in, not a predicate; negated
+# mentions were already removed upstream (NegEx). A concept repeated within one section of one
+# report collapses to one event.
+cxr_db/radiology_jev:
+  _table:
+    joins:
+      # `study_datetime: max` is the study's last image, the same time as `study_end_datetime`
+      # on the radiographs side; this table has no times of its own, so it can reduce the image
+      # times directly and does not depend on the converter's added column.
+      cxr_db/radiographs:
+        key: study_id
+        cols: { subject_id: min, study_datetime: max, hadm_id: max }
+  concept:
+    code: f"CXR_NLP//RADIOLOGY//{$relation_type}//{$object_uri}"
+    time: '$study_datetime::"%Y-%m-%d %H:%M:%S%.f"'
+    hadm_id: $hadm_id::int64
+    study_id: $study_id
+    _metadata:
+      _self:
+        description: >-
+          f"{$label} ({$class}; ontology concept {$object_uri}), mentioned in the {$relation_type} section of
+          the chest radiograph's radiology report; found by scispaCy NER with negated mentions removed, linked
+          by fuzzy matching, kept by TypeSafe Jev's plausibility screen, not clinician-reviewed
+          (MIMIC-CXR-DB radiology_jev)"
+        concept_class: $class
+        # SNOMED CT and LOINC ids are standard concept ids; the other vocabularies (OCHV, MeSH, IOBC,
+        # DICOM, OBO, PathLex) have no MEDS/OMOP parent convention here.
+        parent_codes: >-
+          f"SNOMED/{$object_uri[7:]}" if /^snomed:[0-9]+$/ in $object_uri
+          else f"LOINC/{$object_uri[6:]}" if /^loinc:[A-Z]*[0-9]+-[0-9]$/ in $object_uri
+
+# Keyed by `hadm_id`; every admission is in MIMIC-IV 3.1. Timed at discharge like MNE: the summary
+# is written then. These are concepts from the same MIMIC-IV-Note discharge summaries MNE
+# structures; enabling both would give two NLP views of one note.
+cxr_db/discharge_jev:
+  _table:
+    joins:
+      hosp/admissions:
+        key: hadm_id
+        cols: [subject_id, dischtime]
+  concept:
+    code: f"CXR_NLP//DISCHARGE//{$relation_type}//{$object_uri}"
+    time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
+    hadm_id: $hadm_id
+    _metadata:
+      _self:
+        description: >-
+          f"{$label} ({$class}; ontology concept {$object_uri}), mentioned in the {$relation_type} section of
+          the discharge summary; found by scispaCy NER with negated mentions removed, linked by fuzzy
+          matching, kept by TypeSafe Jev's plausibility screen, not clinician-reviewed
+          (MIMIC-CXR-DB discharge_jev)"
+        concept_class: $class
+        parent_codes: >-
+          f"SNOMED/{$object_uri[7:]}" if /^snomed:[0-9]+$/ in $object_uri
+          else f"LOINC/{$object_uri[6:]}" if /^loinc:[A-Z]*[0-9]+-[0-9]$/ in $object_uri
+
+# Merged into the base `sources:` by the build script (see extensions/mne.yaml). The include list
+# fetches the three tables above (~140 MB of the ~495 MB release) and keeps CXR-DB's own
+# LICENSE/README from colliding with MIMIC-IV's. There is no public CXR-DB subset, so the `demo`
+# bucket below adds SIMULATED CXR-DB tables (scripts/synthetic_demo.py) to the public MIMIC-IV demo,
+# shipped already converted (`cxr_db/*.parquet`), so a demo run needs no `prepare_cxr_db` step.
+sources:
+  dataset:
+    - type: physionet
+      base_url: https://physionet.org/files/mimic-cxr-ext-mimic-cxr-db/1.0
+      username: ${oc.env:DATASET_DOWNLOAD_USERNAME}
+      password: ${oc.env:DATASET_DOWNLOAD_PASSWORD}
+      include:
+        - radiographs.csv
+        - radiology_jev.csv
+        - discharge_jev.csv
+  # BEGIN synthetic demo: written by `scripts/synthetic_demo.py pin`; do not edit by hand.
+  # The demo bucket is SYNTHETIC: simulated tables keyed to the public MIMIC-IV demo
+  # (data/synthetic_demo/README.md), fetched from this repository at a fixed commit and checked
+  # against their SHA-256. Its version marks every demo build as synthetic.
+  dataset_version:
+    demo: "2.2+cxr_db-1.0-synthetic-0.1"
+  demo:
+    - type: http
+      urls:
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/SYNTHETIC_mimic-cxr-ext-mimic-cxr-db.json
+          rel_path: SYNTHETIC_mimic-cxr-ext-mimic-cxr-db.json
+          sha256: 719abac67da45d6911781fb9acd24eea8d3c5164768a0864ecbc68079a163ec3
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/cxr_db/discharge_jev.parquet
+          rel_path: cxr_db/discharge_jev.parquet
+          sha256: 0ee50cd1d3223680afa826d44808ef2b064061118bc0321da987c81fdd56d8af
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/cxr_db/radiographs.parquet
+          rel_path: cxr_db/radiographs.parquet
+          sha256: 44cdf6650fd5ca9376d7420b20db0fa77efcf6a312650714d50fc35e0a81636a
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/cxr_db/radiology_jev.parquet
+          rel_path: cxr_db/radiology_jev.parquet
+          sha256: 222b2a1ba39561cbb2c171e184b9999a6a562fd8a867092256c95edeaddf00bb
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/discharge_jev.csv
+          rel_path: discharge_jev.csv
+          sha256: be1315e0d1fa24a3ae58f1b7725916c4d746ca512582e9e98bb3bf6040d3bf3f
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/radiographs.csv
+          rel_path: radiographs.csv
+          sha256: cd8d3c942045a6f7407e9a4ac9eb86b3518b4071904dd5bc191f11581e1eb01f
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-cxr-ext-mimic-cxr-db/radiology_jev.csv
+          rel_path: radiology_jev.csv
+          sha256: 72647d01e6186b40ca3aaaa78cf4829e9675e8a42b489abd3da676839f619c9e
+  # END synthetic demo

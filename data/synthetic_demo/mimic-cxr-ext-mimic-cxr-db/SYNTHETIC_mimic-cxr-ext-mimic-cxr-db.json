@@ -1,0 +1,20 @@
+{
+  "synthetic": true,
+  "warning": "SYNTHETIC DATA for pipeline testing and tutorials only. Not real patient data and not derived from any; do not use for research.",
+  "simulates": "MIMIC-CXR-Ext MIMIC-CXR-DB 1.0 (https://physionet.org/content/mimic-cxr-ext-mimic-cxr-db/1.0/)",
+  "dataset_version": "1.0+synthetic-0.1",
+  "keyed_to": "MIMIC-IV Clinical Database Demo 2.2 (ODbL 1.0): subject_id, hadm_id, times",
+  "generator": "scripts/synthetic_demo.py",
+  "generator_version": "0.1",
+  "seed": 0,
+  "license": "ODbL-1.0",
+  "tables": {
+    "cxr_db/discharge_jev.parquet": null,
+    "cxr_db/radiographs.parquet": null,
+    "cxr_db/radiology_jev.parquet": null,
+    "discharge_jev.csv": 1124,
+    "radiographs.csv": 539,
+    "radiology_jev.csv": 1031
+  },
+  "report_files": 0
+}

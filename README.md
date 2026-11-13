@@ -82,6 +82,25 @@ place for the ETL's design and for the extensions:
 
 The site's source is in [`docs/`](docs/); preview it with `uv run --group docs zensical serve`.
 
+## Simulated demo data for modules without a public demo
+
+> [!WARNING]
+> The files under [`data/synthetic_demo/`](data/synthetic_demo/README.md) are **synthetic**. They are
+> for testing pipelines and for tutorials only, are not real patient data, and must not be used for
+> research.
+
+MIMIC-IV-Note 2.2, MIMIC-CXR 2.1.0, MIMIC-CXR-JPG 2.1.0 and MIMIC-IV-ECHO 0.1 are credentialed and
+have no public demo. ED, ECG and the waveform database do have a public release. So that
+`dataset_key=demo` can cover those four modules too, `scripts/synthetic_demo.py` simulates them for
+the public demo's 100 subjects. It reuses their real ids and admission, ED and ICU times, and writes
+each module in its release's exact layout. The modules agree with each other: each chest X-ray study
+has the report text and the timing of a radiology note, and each admission has a discharge summary
+at its discharge time. No value comes from a credentialed dataset; the free text is templated
+("Synthetic ..."). [`data/synthetic_demo/sources.yaml`](data/synthetic_demo/sources.yaml) pins
+every file at a commit of this repository, with its SHA-256, as a ready-made `demo` source.
+Provenance, the public schema behind each table, and what the public docs leave open are in
+[`data/synthetic_demo/README.md`](data/synthetic_demo/README.md).
+
 ## How this ETL is defined
 
 There is no Python in this package. The entire ETL is one file —
@@ -163,8 +182,25 @@ meds-extract-run spec=MIMIC-IV-MNE output_dir=$MEDS_OUTPUT_DIR
 ```
 
 With `do_download=false`, put MNE's `*.csv.gz` files at the root of `input_dir`, next to `hosp/`
-and `icu/` (that is where the download puts them). There is no demo subset of MNE, so
-`dataset_key=demo` is not available for this spec.
+and `icu/` (that is where the download puts them).
+
+MNE has no public demo, so `dataset_key=demo` adds **simulated** MNE tables to the public MIMIC-IV
+demo. It needs no credentials and is still one command:
+
+```bash
+meds-extract-run spec=MIMIC-IV-MNE output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+> [!WARNING]
+> The MNE part of that build is **synthetic**: it is for pipeline testing and tutorials only, not
+> for research. Its `dataset_version` says so (`2.2+mne-1.0-synthetic-0.1:<package version>`).
+
+The simulated tables are what MNE would extract from the simulated MIMIC-IV-Note discharge
+summaries (see [Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)): one
+summary for each of the demo's 275 admissions, plus one for an admission that is not in MIMIC,
+whose rows are dropped. Together they exercise every routing rule below.
+`tests/e2e_mne_demo_test.py` builds that demo and compares every MNE event with what the rules
+give for the simulated rows.
 
 In short: every MNE event is timed at `hosp/admissions.dischtime` (MNE has no timestamps, and it
 was all written at discharge), every code starts with `NOTE//`, and MNE's free text rides in
@@ -290,6 +326,60 @@ the rows: blank fields of the report form) get no event; most measurements belon
 DICOMs are not released, so only some carry an `echo_study_id`. Notes are timed at
 when they were saved, not when the care happened: the median gap is about 20 h for discharge
 summaries and 2.4 h for radiology reports on the demo subjects.
+
+## Optional extension: MIMIC-CXR-DB
+
+[MIMIC-CXR-DB](https://physionet.org/content/mimic-cxr-ext-mimic-cxr-db/1.0/) (v1.0;
+[paper](https://papers.miccai.org/miccai-2026-sat/MultiTab_015.html)) links the MIMIC-CXR-JPG chest
+radiographs to MIMIC-IV admissions. It ships their DICOM metadata, the CheXpert labels, and
+ontology concepts extracted from the radiology reports and discharge summaries. The spec
+`MIMIC-IV-CXRDB` is the full `MIMIC-IV` ETL plus those three tables. The release is
+semicolon-delimited, which MEDS-Extract 0.8.1 cannot read, so a one-second conversion runs between
+the download and the extraction:
+
+```bash
+# Needs a PhysioNet account approved for BOTH MIMIC-IV and MIMIC-CXR-DB.
+meds-extract-download spec=MIMIC-IV-CXRDB output_dir=$RAW
+python -m MIMIC_IV_MEDS.prepare_cxr_db $RAW
+meds-extract-run spec=MIMIC-IV-CXRDB do_download=false input_dir=$RAW output_dir=$MEDS_OUTPUT_DIR
+```
+
+It adds 1.96 M events to 61,868 subjects:
+
+- an image event per radiograph (`CXR//IMAGE//{view}//{orientation}`, with `study_id` and
+    `dicom_id`);
+- a study event (`CXR//STUDY//{procedure}`);
+- the 14 CheXpert labels (`CXR_NLP//CHEXPERT//{finding}//{POSITIVE,NEGATIVE,UNCERTAIN}`);
+- the Jev-screened report and discharge concepts (`CXR_NLP//RADIOLOGY|DISCHARGE//{section}//{ontology id}`).
+
+> [!WARNING]
+> **Open issue: leakage.** The CheXpert labels and radiology-report concepts are timed at the
+> study's last image, which is earlier than the report could be read. How to time them (a fixed
+> reporting delay, MIMIC-IV-Note's radiology `storetime` if a study-level link exists, or keeping
+> this with a warning) is not decided yet. Drop `CXR_NLP//CHEXPERT` and `CXR_NLP//RADIOLOGY` for
+> leakage-sensitive tasks.
+
+The rest of the release re-derives MIMIC-IV (its admissions, diagnoses and labs) and is not
+extracted. The design decisions, coverage, caveats (including overlap with MNE) and validation are
+in [`docs/extensions/cxr-db.md`](docs/extensions/cxr-db.md).
+
+MIMIC-CXR-DB has no public demo, so `dataset_key=demo` adds **simulated** CXR-DB tables to the public
+MIMIC-IV demo. The simulated tables ship already converted to parquet, so this is one command with
+no `prepare_cxr_db` step and no credentials:
+
+```bash
+meds-extract-run spec=MIMIC-IV-CXRDB output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+> [!WARNING]
+> The CXR-DB part of that build is **synthetic**: it is for pipeline testing and tutorials only, not
+> for research. Its `dataset_version` says so (`2.2+cxr_db-1.0-synthetic-0.1:<package version>`).
+
+The simulated tables are derived from the simulated MIMIC-CXR(-JPG) studies and MIMIC-IV-Note
+reports and discharge summaries (see
+[Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)). The images, their
+CheXpert labels and the report concepts therefore agree with the report texts, and the discharge
+concepts agree with the summaries.
 
 ## Code metadata
 

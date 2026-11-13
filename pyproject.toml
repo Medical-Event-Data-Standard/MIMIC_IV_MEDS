@@ -19,9 +19,11 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-# The ETL is `event_configs.yaml`, run by MEDS-Extract's own `meds-extract-run`; the only Python
-# is the `mimic-iv-meds-multimodal` command (MIMIC_IV_MEDS.multimodal), which needs nothing beyond
-# what MEDS-Extract brings (polars, pyyaml). The `[download]` extra adds
+# The ETL is `event_configs.yaml` (plus the opt-in extension specs), run by MEDS-Extract's own
+# `meds-extract-run`. The only Python is the `mimic-iv-meds-multimodal` command
+# (MIMIC_IV_MEDS.multimodal), which combines MIMIC-IV with any set of extensions, and
+# `MIMIC_IV_MEDS.prepare_cxr_db`, which converts the semicolon-delimited MIMIC-CXR-DB release to
+# parquet; both need nothing beyond what MEDS-Extract brings (polars, pyyaml). The `[download]` extra adds
 # `meds-extract-download` (httpx + tenacity), which the runner spawns to stage the raw
 # data. MEDS-transforms, polars and hydra all arrive through it at the versions it fences;
 # duplicating those pins here would only create drift.
@@ -86,6 +88,10 @@ MIMIC-IV-MNE = "MIMIC_IV_MEDS:event_configs_mne.yaml"
 # MIMIC-IV plus the separately-credentialed MIMIC-IV-ED tables (the demo works too: it adds the
 # public MIMIC-IV-ED demo). Generated from the base and `extensions/ed.yaml`; see docs/extensions/ed.md.
 MIMIC-IV-ED = "MIMIC_IV_MEDS:event_configs_ed.yaml"
+# MIMIC-IV plus MIMIC-CXR-DB's radiographs, CheXpert labels and note concepts, from
+# `extensions/cxr_db.yaml`. Its download needs `python -m MIMIC_IV_MEDS.prepare_cxr_db` before the run;
+# see docs/extensions/cxr-db.md.
+MIMIC-IV-CXRDB = "MIMIC_IV_MEDS:event_configs_cxr_db.yaml"
 
 # Registers the suMEDS rules under the same name, so the config's `sumeds_enrich: {rules: MIMIC-IV}`
 # and `--rules MIMIC-IV` find them.

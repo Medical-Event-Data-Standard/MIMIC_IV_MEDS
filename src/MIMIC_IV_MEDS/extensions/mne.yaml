@@ -454,9 +454,10 @@ discharge_condition:
           (MIMIC-Note-Extract discharge_condition.neurological_status)"
 
 # Merged into the base `sources:` by the build script: each bucket named here is appended to the
-# base bucket of the same name, and base buckets not named here (`demo`: MNE has no demo) are
-# dropped from the composed spec. The include list fetches only the tables above (~210 MB of the
-# ~1.2 GB release) and keeps MNE's own LICENSE/README from colliding with MIMIC-IV's.
+# base bucket of the same name, and base buckets not named here are dropped from the composed spec.
+# The include list fetches only the tables above (~210 MB of the ~1.2 GB release) and keeps MNE's
+# own LICENSE/README from colliding with MIMIC-IV's. MNE has no public demo, so the `demo` bucket
+# below adds SIMULATED MNE tables (scripts/synthetic_demo.py) to the public MIMIC-IV demo.
 sources:
   dataset:
     - type: physionet
@@ -474,3 +475,46 @@ sources:
         - past_medical_history.csv.gz
         - physical_exam_systems.csv.gz
         - physical_exam_vitals.csv.gz
+  # BEGIN synthetic demo: written by `scripts/synthetic_demo.py pin`; do not edit by hand.
+  # The demo bucket is SYNTHETIC: simulated tables keyed to the public MIMIC-IV demo
+  # (data/synthetic_demo/README.md), fetched from this repository at a fixed commit and checked
+  # against their SHA-256. Its version marks every demo build as synthetic.
+  dataset_version:
+    demo: "2.2+mne-1.0-synthetic-0.1"
+  demo:
+    - type: http
+      urls:
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/SYNTHETIC_mimic-iv-ext-note-extract.json
+          rel_path: SYNTHETIC_mimic-iv-ext-note-extract.json
+          sha256: eb4fd3b33f4e8dfd66bc510e4b8eaeb6e05cc674888d30649e6d86464797dc6d
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/allergies.csv.gz
+          rel_path: allergies.csv.gz
+          sha256: 6a980bd2e19fe7793faa189e006009438af8aab2f684ddad2dd38a12f6321fd5
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/chief_complaint.csv.gz
+          rel_path: chief_complaint.csv.gz
+          sha256: a3a9f8a2ce204681ca2b299ae8585c64513535469d595fd89478d4db18126e66
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/discharge_condition.csv.gz
+          rel_path: discharge_condition.csv.gz
+          sha256: c017248af3ce1ffad6dc5196a578b2a1c410b44ffa7da59552f47def428c022d
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/discharge_diagnosis.csv.gz
+          rel_path: discharge_diagnosis.csv.gz
+          sha256: 4d6c1f967b5e67fab2bfae7d85da8dad92733f519fb04f8cf512a5d9ee4eefbb
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/discharge_medications.csv.gz
+          rel_path: discharge_medications.csv.gz
+          sha256: 046623108454c107a4e915c77cbbe66a6ff35657f9e32afd43e10600e120fe1f
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/major_procedures.csv.gz
+          rel_path: major_procedures.csv.gz
+          sha256: 3727ffb53c8cc039b3067a487b0d37cb0a68f271af08ff508e5362b1a0549a92
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/medications_on_admission.csv.gz
+          rel_path: medications_on_admission.csv.gz
+          sha256: 067d7873fffd46c52fca606f75bb557f08862f3663441bfbb4b4664e2d09b836
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/past_medical_history.csv.gz
+          rel_path: past_medical_history.csv.gz
+          sha256: 1d3d3d1c387818ba948c278b46bc1687c883dd873dcc0d2cc6272d5ff7f94f4d
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/physical_exam_systems.csv.gz
+          rel_path: physical_exam_systems.csv.gz
+          sha256: e4a012038338aed29cc48f83e7a86143c9a5820d430b7354e78ba5d16bb6e74e
+        - url: https://raw.githubusercontent.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/7b708035edc4eb20f4cb8c143e14a02b76551c15/data/synthetic_demo/mimic-iv-ext-note-extract/physical_exam_vitals.csv.gz
+          rel_path: physical_exam_vitals.csv.gz
+          sha256: c17be2c0ed8843cfd6e6b10234a3d8f31152181d082a4dae5b1de4c7d634cd09
+  # END synthetic demo

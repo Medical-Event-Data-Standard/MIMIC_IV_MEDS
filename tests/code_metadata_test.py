@@ -2,8 +2,7 @@
 
 This reads the spec files only and needs no data, so it runs in milliseconds. Whether the
 descriptions actually land in `metadata/codes.parquet` is checked on built cohorts by
-`e2e_demo_test.py` (the base spec), `e2e_mne_synthetic_test.py` (the MNE extension) and
-`e2e_ed_demo_test.py` (the ED extension).
+`e2e_demo_test.py` (the base spec) and the `e2e_*_synthetic_test.py` files (the extensions).
 """
 
 from importlib.resources import files
@@ -13,7 +12,14 @@ import yaml
 
 #: Every registered spec. The extension specs are generated from the base plus a fragment, so
 #: checking them checks the fragments' events.
-SPECS = ["event_configs.yaml", "event_configs_mne.yaml", "event_configs_ed.yaml"]
+SPECS = [
+    "event_configs.yaml",
+    *sorted(
+        f"event_configs_{p.name.removesuffix('.yaml')}.yaml"
+        for p in files("MIMIC_IV_MEDS").joinpath("extensions").iterdir()
+        if p.name.endswith(".yaml")
+    ),
+]
 
 #: Top-level keys of the MESSY file that are not raw tables.
 RESERVED_KEYS = {"etl", "sources", "_defaults"}
@@ -25,7 +31,8 @@ def _events(spec: str):
         if table in RESERVED_KEYS:
             continue
         for name, event in events.items():
-            if name != "_table":
+            # `_table` and `_defaults` are table settings; MEDS-Extract reserves every `_` name.
+            if not name.startswith("_"):
                 yield f"{table}/{name}", event
 
 
