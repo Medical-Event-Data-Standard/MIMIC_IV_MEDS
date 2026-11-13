@@ -301,13 +301,17 @@ hosp/omr:
   # See "OMR" in the README.
   _table:
     cols:
-      is_number: '/^[-+]?[0-9]+(\.[0-9]+)?$/ in ($result_value ?? "")'
-      bp_systolic: 'extract group 1 of /^([0-9]+(?:\.[0-9]+)?)\/[0-9]+(?:\.[0-9]+)?$/ from $result_value'
-      bp_diastolic: 'extract group 1 of /^[0-9]+(?:\.[0-9]+)?\/([0-9]+(?:\.[0-9]+)?)$/ from $result_value'
+      # `result_value` is a varchar, but a reader that infers dtypes types it as a float when
+      # every value it sees is a number (synthetic data, or a chunk without a blood pressure),
+      # and the regexes below need a string. The cast is a no-op on the real varchar column.
+      result_text: "$result_value::str"
+      is_number: '/^[-+]?[0-9]+(\.[0-9]+)?$/ in ($result_text ?? "")'
+      bp_systolic: 'extract group 1 of /^([0-9]+(?:\.[0-9]+)?)\/[0-9]+(?:\.[0-9]+)?$/ from $result_text'
+      bp_diastolic: 'extract group 1 of /^[0-9]+(?:\.[0-9]+)?\/([0-9]+(?:\.[0-9]+)?)$/ from $result_text'
   omr:
     code: '$result_name if ($bp_systolic ?? "") == ""'
-    numeric_value: "$result_value::?float if $is_number"
-    text_value: "$result_value if not $is_number"
+    numeric_value: "$result_text::?float if $is_number"
+    text_value: "$result_text if not $is_number"
     time: '$chartdate::"%Y-%m-%d"'
     _metadata:
       _self:
