@@ -135,3 +135,28 @@ def test_place_objects_modes_and_reruns(tmp_path):
         assert (out / "cxr/cd/cdef.jpg").is_symlink() == (mode == "symlink")
         again = finalize.place_objects(objects, {"ecg": src, "cxr": src}, out, mode)
         assert again["ecg"]["files_written"] == again["cxr"]["files_written"] == 0
+
+
+def test_stage_ed_filters_to_the_cohort_and_keeps_empty_cells_null(tmp_path):
+    """The full ED release next to the demo core: only the cohort's rows, written so types infer as raw."""
+    import gzip
+
+    ed = tmp_path / "mimic-iv-ed" / "2.2" / "ed"
+    ed.mkdir(parents=True)
+    with gzip.open(ed / "edstays.csv.gz", "wt") as f:
+        f.write("subject_id,stay_id,intime\n1,11,2150-01-01 00:00:00\n2,22,2150-01-02 00:00:00\n")
+    with gzip.open(ed / "triage.csv.gz", "wt") as f:
+        f.write('subject_id,stay_id,temperature,chiefcomplaint\n1,11,,Fever\n2,22,98.6,"Pain, chest"\n')
+    found = modules.FoundRelease(MODULES["ed"], MODULES["ed"].releases[1], "2.2", ed.parent)
+    raw = tmp_path / "raw"
+    staged = staging.stage_ed(found, raw, pl.Series([2]))
+    assert staged.stats["filtered"] and staged.stats["stays_outside_core_subjects"] == 1
+    assert not (raw / "ed").is_symlink()
+    triage = pl.read_csv(raw / "ed" / "triage.csv.gz")
+    assert triage.rows() == [(2, 22, 98.6, "Pain, chest")]
+    assert triage.schema["temperature"] == pl.Float64  # numeric, as in the raw file
+
+    # Nothing outside the cohort: the folder is linked in unchanged.
+    raw2 = tmp_path / "raw2"
+    assert not staging.stage_ed(found, raw2, pl.Series([1, 2])).stats["filtered"]
+    assert (raw2 / "ed").is_symlink()

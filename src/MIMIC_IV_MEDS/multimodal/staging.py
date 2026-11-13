@@ -261,15 +261,36 @@ def stage_common(raw_input: Path, common: list[dict], search_dirs: list[Path], c
 
 
 def stage_ed(ed: FoundRelease, raw_input: Path, subjects: pl.Series) -> Staged:
-    _link_dir(ed.root / "ed", raw_input / "ed")
+    """`ed/`: the MIMIC-IV-ED tables as the `MIMIC-IV-ED` spec reads them, restricted to the core cohort.
+
+    When every ED stay belongs to a core subject (the ED demo next to the MIMIC-IV demo, or the full releases
+    together) the folder is linked in unchanged. Otherwise (the full ED release next to the MIMIC-IV demo)
+    each table is streamed and rewritten as csv.gz with only the cohort's rows, so ED cannot add subjects;
+    MEDS-Extract then infers its column types exactly as from the raw files.
+    """
+    src = ed.root / "ed"
     stays = pl.read_csv(
-        ed.root / "ed" / "edstays.csv.gz", columns=["subject_id"], schema_overrides={"subject_id": pl.Int64}
+        src / "edstays.csv.gz", columns=["subject_id"], schema_overrides={"subject_id": pl.Int64}
     )
     outside = int((~stays["subject_id"].is_in(subjects.implode())).sum())
-    if outside:
-        # The ED fragment reads the raw tables, so it cannot drop these; say so rather than hide it.
-        logger.warning(f"ED: {outside} of {stays.height} stays belong to subjects not in hosp/patients")
-    return Staged("ed", {"stays": stays.height, "stays_outside_core_subjects": outside})
+    stats = {"stays": stays.height, "stays_outside_core_subjects": outside, "filtered": bool(outside)}
+    if not outside:
+        _link_dir(src, raw_input / "ed")
+        return Staged("ed", stats)
+    logger.info(
+        f"ED: {outside} of {stays.height} stays are outside the core cohort; filtering every ED table"
+    )
+    dst = raw_input / "ed"
+    dst.mkdir(parents=True, exist_ok=True)
+    for fp in sorted(src.glob("*.csv.gz")):
+        with open(fp, "rb") as f:
+            kept = stream_subject_rows(f, subjects.to_list())
+        # `csv` reads an empty field as "", which polars would write back quoted (a string); null keeps
+        # it empty, as in the raw file, so MEDS-Extract infers the same column types.
+        with gzip.open(dst / fp.name, "wb") as g:
+            kept.with_columns(pl.all().replace("", None)).write_csv(g)
+        stats[f"{fp.name.removesuffix('.csv.gz')}_rows_kept"] = kept.height
+    return Staged("ed", stats)
 
 
 #: `(table, note_type) -> (code, description)`; other note types get `NOTE//<TABLE>//<type>`.
