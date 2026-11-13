@@ -12,6 +12,10 @@ and notes. Each case it covers is planted on purpose and checked exactly:
 - note times are `max(charttime, storetime)`; note text lands in `text_value`;
 - every link resolves inside the MEDS root, and `objects.parquet` maps it back to its source file;
 - `dataset.json` names the combination, its releases, its license and its link columns.
+
+The build also takes MIMIC-Note-Extract and MIMIC-CXR-DB from this repository's simulated
+`data/synthetic_demo/` (a second `--root`): they are used because no real release of them is there,
+flagged as synthetic, and CXR-DB leaves the image events to MIMIC-CXR-JPG.
 """
 
 import gzip
@@ -25,6 +29,8 @@ import pytest
 from conftest import run_script
 
 TS = "%Y-%m-%d %H:%M:%S"
+SIMULATED = Path(__file__).resolve().parents[1] / "data" / "synthetic_demo"
+EXTENSIONS = "mimic-iv-note,mimic-iv-mne,mimic-iv-ecg,mimic-iv-echo,mimic-iv-cxr,mimic-iv-cxr-db,mimic-iv-wdb"
 
 
 def _csv(fp: Path, df: pl.DataFrame, gz: bool = False) -> None:
@@ -217,10 +223,12 @@ def built(synthetic_root, demo_raw_dir, tmp_path_factory) -> tuple[Path, list[in
         "mimic-iv-meds-multimodal",
         "--root",
         str(root),
+        "--root",
+        str(SIMULATED),
         "--output-dir",
         str(out),
-        "--modules",
-        "note,ecg,echo,cxr,waveform",
+        "--extensions",
+        EXTENSIONS,
         "--common-dir",
         str(demo_raw_dir),
         "--no-enrich",
@@ -242,13 +250,15 @@ def _events(out: Path, prefix: str) -> pl.DataFrame:
 def test_dataset_json(built):
     out, _ = built
     meta = json.loads((out / "metadata" / "dataset.json").read_text())
-    assert meta["dataset_name"] == "MIMIC-IV+Note+ECG+ECHO+CXR+WDB"
+    assert meta["dataset_name"] == "MIMIC-IV+Note+MNE[synthetic]+ECG+ECHO+CXR+CXR-DB[synthetic]+WDB"
     assert meta["dataset_version"].split(",") == [
         "mimic-iv-demo/2.2",
         "mimic-iv-note/2.2",
+        "mimic-iv-ext-note-extract/1.0+synthetic-0.1",
         "mimic-iv-ecg-demo/0.1",
         "mimic-iv-echo/1.0.1",
         "mimic-cxr-jpg/2.1.0",
+        "mimic-cxr-ext-mimic-cxr-db/1.0+synthetic-0.1",
         "mimic4wdb/0.1.0",
     ]
     assert meta["license"] == "PhysioNet Credentialed Health Data License 1.5.0"
@@ -259,14 +269,9 @@ def test_dataset_json(built):
     assert not {"ecg_link", "echo_link", "cxr_link"} & set(meta.get("other_extension_columns", []))
     # The same releases, structured: version, demo or full, license and the parts built, per release.
     src = {d["module"]: d for d in meta["source_datasets"]}
-    assert [d["module"] for d in meta["source_datasets"]] == [
-        "core",
-        "note",
-        "ecg",
-        "echo",
-        "cxr",
-        "waveform",
-    ]
+    assert [d["extension"] for d in meta["source_datasets"]] == ["mimic-iv", *EXTENSIONS.split(",")]
+    assert [d["module"] for d in meta["source_datasets"] if d["synthetic"]] == ["mne", "cxr_db"]
+    assert src["mne"]["release"] == "synthetic" and src["mne"]["url"] is None
     assert (src["core"]["name"], src["core"]["version"], src["core"]["release"]) == (
         "mimic-iv-demo",
         "2.2",
@@ -286,7 +291,7 @@ def test_dataset_json(built):
 
 def test_parts_selection(synthetic_root, demo_raw_dir, tmp_path):
     """Radiology reports only, echo measurements without any DICOM, and ECGs."""
-    root, s = synthetic_root
+    root, _ = synthetic_root
     out = tmp_path / "meds"
     run_script(
         "mimic-iv-meds-multimodal", "--root", str(root), "--output-dir", str(out),
@@ -421,11 +426,11 @@ def test_waveform(built):
 
 def test_cxr(built):
     out, s = built
-    ev = _events(out, "CXR//")
+    ev = _events(out, "CXR//IMAGE//")
     assert ev.select("subject_id", "code", "cxr_dicom_id", pl.col("time").dt.strftime(TS)).rows() == [
-        (s[0], "CXR//IMAGE//PA", "aaaa-1", "2150-03-01 00:42:12"),
-        (s[0], "CXR//IMAGE//UNKNOWN", "aaaa-2", "2150-03-01 10:42:12"),
-        (s[1], "CXR//IMAGE//AP", "bbbb-1", "2150-03-02 23:59:59"),
+        (s[0], "CXR//IMAGE//PA//UNK", "aaaa-1", "2150-03-01 00:42:12"),
+        (s[0], "CXR//IMAGE//UNK//UNK", "aaaa-2", "2150-03-01 10:42:12"),
+        (s[1], "CXR//IMAGE//AP//UNK", "bbbb-1", "2150-03-02 23:59:59"),
     ]
     links = dict(ev.select("cxr_dicom_id", "cxr_link").rows())
     assert links["aaaa-1"] == links["bbbb-1"] != links["aaaa-2"]
@@ -438,7 +443,7 @@ def test_cxr(built):
 
 def test_notes(built):
     out, s = built
-    ev = _events(out, "NOTE//")
+    ev = _events(out, "NOTE//").filter(pl.col("note_id").is_not_null())
     assert ev.select(
         "subject_id", "code", "note_id", pl.col("time").dt.strftime(TS), "text_value"
     ).rows() == [
@@ -482,7 +487,8 @@ def test_objects_and_sources(built, synthetic_root):
         assert sum((src_root / f).stat().st_size for f in row["files"]) == row["size_bytes"]
 
     sources = json.loads((out / "metadata" / "sources.json").read_text())
-    assert sources["modules"] == ["core", "note", "ecg", "echo", "cxr", "waveform"]
+    assert sources["extensions"] == EXTENSIONS.split(",")
+    assert sources["synthetic_extensions"] == ["mimic-iv-mne", "mimic-iv-cxr-db"]
     assert "only the record or file the link names" in sources["loader_rule"]
     by = {x["module"]: x for x in sources["sources"]}
     assert {"listed": 3, "missing_on_disk": 1, "emitted": 2}.items() <= by["ecg"]["staging"].items()
@@ -517,3 +523,21 @@ def test_rerun_needs_overwrite(built, synthetic_root, demo_raw_dir):
             str(demo_raw_dir),
             "--no-enrich",
         )
+
+
+def test_mne_and_cxr_db_from_the_simulated_releases(built):
+    """MNE and CXR-DB events from `data/synthetic_demo`, restricted to the cohort, CXR-DB without images."""
+    out, _ = built
+    data = pl.scan_parquet(out / "data" / "**" / "*.parquet")
+    subjects = set(pl.read_parquet(out / "metadata" / "subject_splits.parquet")["subject_id"])
+    mne = data.filter(pl.col("code").str.starts_with("NOTE//") & pl.col("note_id").is_null()).collect()
+    assert mne.height > 0 and set(mne["subject_id"]) <= subjects
+    assert {"NOTE//ALLERGY", "NOTE//PHYSICAL_EXAM"} <= {"//".join(c.split("//")[:2]) for c in mne["code"]}
+    cxr_db = data.filter(
+        pl.col("code").str.starts_with("CXR//STUDY//") | pl.col("code").str.starts_with("CXR_NLP//")
+    ).collect()
+    assert cxr_db.height > 0 and set(cxr_db["subject_id"]) <= subjects
+    assert cxr_db.filter(pl.col("code").str.starts_with("CXR//STUDY//"))["cxr_study_id"].null_count() == 0
+    # Only MIMIC-CXR-JPG's image events (each with its link): CXR-DB's were left out.
+    images = data.filter(pl.col("code").str.starts_with("CXR//IMAGE//")).collect()
+    assert images["cxr_link"].null_count() == 0

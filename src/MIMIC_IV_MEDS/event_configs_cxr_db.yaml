@@ -787,31 +787,31 @@ cxr_db/radiographs:
     time: '$study_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     # Written as a float in the release ("12345678.0").
     hadm_id: $hadm_id::int64
-    study_id: $study_id
-    dicom_id: $dicom_id
+    cxr_study_id: $study_id
+    cxr_dicom_id: $dicom_id
     _metadata:
       _self:
         description: >-
           f"Chest radiograph image, view position {$ViewPosition ?? 'UNK'}, patient orientation
           {$PatientOrientationCodeSequence_CodeMeaning ?? 'UNK'} (MIMIC-CXR DICOM ViewPosition and
           PatientOrientationCodeSequence, via MIMIC-CXR-DB radiographs); the image is identified by
-          dicom_id and its study by study_id"
+          cxr_dicom_id and its study by cxr_study_id"
   study:
     code: f"CXR//STUDY//{$ProcedureCodeSequence_CodeMeaning}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
           f"Chest radiograph study, procedure {$ProcedureCodeSequence_CodeMeaning} (MIMIC-CXR DICOM
           ProcedureCodeSequence, via MIMIC-CXR-DB radiographs), at the time of its last image; the study
-          is identified by study_id"
+          is identified by cxr_study_id"
   chexpert_atelectasis:
     code: f"CXR_NLP//CHEXPERT//ATELECTASIS//{$atelectasis}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -821,7 +821,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//CARDIOMEGALY//{$cardiomegaly}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -831,7 +831,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//CONSOLIDATION//{$consolidation}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -841,7 +841,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//EDEMA//{$edema}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -851,7 +851,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//ENLARGED_CARDIOMEDIASTINUM//{$enlarged_cardiomediastinum}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -862,7 +862,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//FRACTURE//{$fracture}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -872,7 +872,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//LUNG_LESION//{$lung_lesion}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -882,7 +882,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//LUNG_OPACITY//{$lung_opacity}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -892,7 +892,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//NO_FINDING//{$no_finding}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -903,7 +903,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//PLEURAL_EFFUSION//{$pleural_effusion}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -913,7 +913,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//PLEURAL_OTHER//{$pleural_other}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -923,7 +923,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//PNEUMONIA//{$pneumonia}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -933,7 +933,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//PNEUMOTHORAX//{$pneumothorax}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -943,7 +943,7 @@ cxr_db/radiographs:
     code: f"CXR_NLP//CHEXPERT//SUPPORT_DEVICES//{$support_devices}"
     time: '$study_end_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-
@@ -968,7 +968,7 @@ cxr_db/radiology_jev:
     code: f"CXR_NLP//RADIOLOGY//{$relation_type}//{$object_uri}"
     time: '$study_datetime::"%Y-%m-%d %H:%M:%S%.f"'
     hadm_id: $hadm_id::int64
-    study_id: $study_id
+    cxr_study_id: $study_id
     _metadata:
       _self:
         description: >-

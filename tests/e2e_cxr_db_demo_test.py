@@ -158,14 +158,16 @@ def test_e2e_cxr_db_demo(demo_cohort: Path, demo_download: Path):
         data = _data(out)
         is_cxr = pl.col("code").str.starts_with("CXR//") | pl.col("code").str.starts_with("CXR_NLP//")
         cxr = data.filter(is_cxr)
-        got = list(cxr.select("subject_id", "code", "time", "hadm_id", "study_id", "dicom_id").iter_rows())
+        got = list(
+            cxr.select("subject_id", "code", "time", "hadm_id", "cxr_study_id", "cxr_dicom_id").iter_rows()
+        )
         assert len(got) == len(set(got)), "duplicate CXR-DB events"
         expected = expected_events(demo_download)
         missing = sorted(expected - set(got), key=str)[:10]
         extra = sorted(set(got) - expected, key=str)[:10]
         assert set(got) == expected, f"missing: {missing}\nextra: {extra}"
         assert ORPHAN_SUBJECT not in set(data["subject_id"])
-        assert ORPHAN_STUDY not in set(cxr["study_id"].drop_nulls())
+        assert ORPHAN_STUDY not in set(cxr["cxr_study_id"].drop_nulls())
         assert ORPHAN_HADM not in set(cxr["hadm_id"].drop_nulls())
 
         # Every routing case shows up in the output.

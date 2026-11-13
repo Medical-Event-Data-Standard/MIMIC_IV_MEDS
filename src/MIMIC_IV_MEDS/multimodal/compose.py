@@ -4,8 +4,12 @@ Unlike `scripts/build_extension_specs.py`, which writes one registered spec per 
 the YAML comments, this composes at build time, for whichever modules were asked for, so every
 combination works without a registered spec per subset. The composed spec:
 
-- has every event table of the base, plus every table of each module's fragment (ED reuses the
-  registered `extensions/ed.yaml`; the others are `multimodal/fragments/<module>.yaml`);
+- has every event table of the base, plus every table of each extension's fragment: ED, MNE and
+  CXR-DB reuse the fragments of their registered specs (`extensions/<name>.yaml`, so
+  `spec=MIMIC-IV-ED` and a multimodal build with only ED extract the same events); the
+  object-linked extensions use `multimodal/fragments/<name>.yaml`;
+- leaves out the events an extension yields to another one in the build (CXR-DB's image events
+  when MIMIC-CXR-JPG's linked image events are there);
 - has no `sources:` block: the build stages the raw input itself and runs MEDS-Extract with
   `do_download=false`;
 - describes the combination in its `etl:` block, which MEDS-Extract writes to
@@ -14,7 +18,7 @@ combination works without a registered spec per subset. The composed spec:
   - `raw_dataset_version`: every release used, as `<slug>/<version>`, comma-separated (MEDS-Extract
     appends `:<package version>`);
   - `license`: the PhysioNet Credentialed Health Data License as soon as any release used is
-    credentialed, else ODbL;
+    credentialed, else ODbL (a simulated release is ODbL);
   - `additional_value_modality_columns`: the link column of each object module;
   - `raw_source_id_columns`: the base's plus each module's raw-release keys.
 """
@@ -38,11 +42,19 @@ def base_spec() -> dict:
 
 def fragment(module: str) -> dict:
     """A module's event tables (its `etl:` and `sources:` blocks, if any, are dropped)."""
-    if module == "ed":
-        text = PKG.joinpath("extensions", "ed.yaml").read_text()
-    else:
-        text = PKG.joinpath("multimodal", "fragments", f"{module}.yaml").read_text()
+    text = PKG.joinpath(*MODULES[module].fragment.split("/")).read_text()
     return {k: v for k, v in yaml.safe_load(text).items() if k not in RESERVED}
+
+
+def _drop_yielded(frag: dict, f: FoundRelease, built: set[str]) -> dict:
+    """`frag` without the events `f`'s module yields to another module in the build."""
+    for other, events in f.module.yields_to.items():
+        if other not in built:
+            continue
+        for table, event in events:
+            if table in frag:
+                frag[table] = {k: v for k, v in frag[table].items() if k != event}
+    return frag
 
 
 def compose(core: FoundRelease, found: list[FoundRelease], skip_tables: set[str] = frozenset()) -> dict:
@@ -57,8 +69,10 @@ def compose(core: FoundRelease, found: list[FoundRelease], skip_tables: set[str]
     skip_tables = set(skip_tables) | {
         t for f in found for p in f.module.parts if not f.wants(p.name) for t in p.tables
     }
+    built = {f.module.name for f in found}
     for f in found:
         frag = {k: v for k, v in fragment(f.module.name).items() if k not in skip_tables}
+        frag = _drop_yielded(frag, f, built)
         if clash := sorted(set(frag) & set(tables)):
             raise ValueError(f"module {f.module.name} redefines tables {clash}")
         tables.update(frag)
@@ -67,7 +81,7 @@ def compose(core: FoundRelease, found: list[FoundRelease], skip_tables: set[str]
     etl = dict(base["etl"])
     etl["dataset_name"] = "+".join([core.module.label, *(f.label for f in found)])
     etl["raw_dataset_version"] = ",".join(r.tag for r in releases)
-    etl["license"] = PHYSIONET_CREDENTIALED if any(r.release.credentialed for r in releases) else ODBL
+    etl["license"] = PHYSIONET_CREDENTIALED if any(r.credentialed for r in releases) else ODBL
     links = link_columns(found, skip_tables)
     if links:
         etl["additional_value_modality_columns"] = links

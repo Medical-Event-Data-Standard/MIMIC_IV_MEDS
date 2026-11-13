@@ -132,7 +132,7 @@ the fragment and re-run the script; `tests/extension_specs_test.py` fails if you
 extensions so far are [MIMIC-Note-Extract](#optional-extension-mimic-note-extract) and
 [MIMIC-IV-ED](#optional-extension-mimic-iv-ed). See
 [Extensions](https://mimic-iv-meds.readthedocs.io/en/latest/extensions/) for the mechanism and
-how to add one. 
+how to add one.
 
 ## What goes in the code, and what doesn't
 
@@ -234,31 +234,64 @@ ED detail exists only for 2011–2019, so its presence is a proxy for calendar p
 visits with the base's `TRANSFER_TO//ED//…`, not with `ED//ARRIVAL`. The modelling decisions,
 caveats and validation are in [`docs/extensions/ed.md`](docs/extensions/ed.md).
 
-## Multimodal build: MIMIC-IV plus any combination of ED, notes, ECG, echo, chest X-rays and waveforms
+## Multimodal build: MIMIC-IV plus any combination of extensions
 
-`mimic-iv-meds-multimodal` builds one MEDS dataset from local copies of MIMIC-IV and any subset of
-its linked PhysioNet modules. Unlike the `spec=` runs above it downloads nothing: point it at a
-folder holding the releases side by side, in PhysioNet's own layout (`<slug>/<version>/` as
-`wget -r` leaves it, or `<slug>-<version>/` as the ZIP download does).
+`mimic-iv-meds-multimodal` builds one MEDS dataset from MIMIC-IV and any combination of the
+optional extensions: ED, notes, MIMIC-Note-Extract, ECG, echo, chest X-rays (images and/or
+MIMIC-CXR-DB) and bedside-monitor waveforms. Every extension is listed by
+`mimic-iv-meds-multimodal --list-extensions` and selected the same way, with `--extensions`.
+Unlike the `spec=` runs above it reads local copies: point `--root` at a folder holding the
+releases side by side, in PhysioNet's own layout (`<slug>/<version>/` as `wget -r` leaves it,
+`<slug>-<version>/` as the ZIP download, the `physionet` package and the multimodal demo
+downloader leave it).
 
 ```bash
-# --modules: any subset of ed,note,ecg,echo,cxr,waveform, or `all`; empty for MIMIC-IV alone.
-# A module can be narrowed to parts: note:radiology, echo:measurements (no DICOMs needed),
-# echo:dicom+measurements. `--list-modules` lists modules, parts and the releases each is found as.
+# --extensions: any of the names below, or `all`; empty for MIMIC-IV alone. PhysioNet slugs
+# (mimic-cxr-jpg, mimic-iv-ext-note-extract, mimic4wdb, …) work too. An extension can be narrowed to
+# parts: mimic-iv-note:radiology, mimic-iv-echo:measurements (no DICOMs needed).
 # Optional: --link-mode copy|hardlink|symlink (how objects get into the MEDS root; default copy),
-# --path cxr=/elsewhere/mimic-cxr-jpg/2.1.0 (a release not under --root), --no-enrich (offline).
-mimic-iv-meds-multimodal --root /data/MIMIC-IV_Multimodal_Demo --output-dir $MEDS_OUTPUT_DIR --modules all
+# --path mimic-iv-cxr=/elsewhere/mimic-cxr-jpg/2.1.0 (a release not under --root), --no-enrich (offline).
+mimic-iv-meds-multimodal --root /data/mimic-demo-multimodal --output-dir $MEDS_OUTPUT_DIR --extensions mimic-iv-ed,mimic-iv-mne,mimic-iv-cxr,mimic-iv-cxr-db
 ```
 
-| Module     | Release (demo / full)                | Events                                                                                                                        | Time                                           |
-| ---------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| core       | `mimic-iv-demo` / `mimiciv`          | the `MIMIC-IV` spec, unchanged                                                                                                | as in that spec                                |
-| `ed`       | `mimic-iv-ed-demo` / `mimic-iv-ed`   | the `MIMIC-IV-ED` tables (`ED//…`)                                                                                            | as in that spec                                |
-| `note`     | `mimic-iv-note`                      | `NOTE//DISCHARGE_SUMMARY`, `NOTE//RADIOLOGY_REPORT[//ADDENDUM]`, text in `text_value`                                         | `max(charttime, storetime)`                    |
-| `ecg`      | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, `ecg_link`                                                                              | `ecg_time` (acquisition)                       |
-| `echo`     | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, `echo_link`; `ECHO//MEASUREMENT//<measurement>` from `structured-measurement` (if present) | `acquisition_datetime`; `measurement_datetime` |
-| `cxr`      | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>`, one per JPG, `cxr_link`                                                                         | `StudyDate` + `StudyTime`                      |
-| `waveform` | `mimic4wdb`                          | `WAVEFORM//SEGMENT` per continuous segment and `WAVEFORM//RECORD` per multi-segment record, `waveform_link`                   | the **end** of the linked data                 |
+| `--extensions`    | Release (demo / full)                | Events                                                                                                                        | Time                                           |
+| ----------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| (always)          | `mimic-iv-demo` / `mimiciv`          | the `MIMIC-IV` spec, unchanged                                                                                                | as in that spec                                |
+| `mimic-iv-ed`     | `mimic-iv-ed-demo` / `mimic-iv-ed`   | the `MIMIC-IV-ED` tables (`ED//…`)                                                                                            | as in that spec                                |
+| `mimic-iv-note`   | `mimic-iv-note`                      | `NOTE//DISCHARGE_SUMMARY`, `NOTE//RADIOLOGY_REPORT[//ADDENDUM]`, text in `text_value`                                         | `max(charttime, storetime)`                    |
+| `mimic-iv-mne`    | `mimic-iv-ext-note-extract`          | the `MIMIC-IV-MNE` tables (`NOTE//ALLERGY`, `NOTE//PHYSICAL_EXAM//…`, …)                                                      | as in that spec (discharge)                    |
+| `mimic-iv-ecg`    | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, `ecg_link`                                                                              | `ecg_time` (acquisition)                       |
+| `mimic-iv-echo`   | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, `echo_link`; `ECHO//MEASUREMENT//<measurement>` from `structured-measurement` (if present) | `acquisition_datetime`; `measurement_datetime` |
+| `mimic-iv-cxr`    | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>//<PatientOrientation>`, one per JPG, `cxr_link`                                                   | `StudyDate` + `StudyTime`                      |
+| `mimic-iv-cxr-db` | `mimic-cxr-ext-mimic-cxr-db`         | the `MIMIC-IV-CXRDB` tables (`CXR//STUDY//…`, `CXR_NLP//…`; its `CXR//IMAGE//…` only without `mimic-iv-cxr`)                  | as in that spec                                |
+| `mimic-iv-wdb`    | `mimic4wdb`                          | `WAVEFORM//SEGMENT` per continuous segment and `WAVEFORM//RECORD` per multi-segment record, `waveform_link`                   | the **end** of the linked data                 |
+
+ED, MNE and CXR-DB use the same spec fragments as their registered specs (`spec=MIMIC-IV-ED`,
+`MIMIC-IV-MNE`, `MIMIC-IV-CXRDB`), so a multimodal build with one of them extracts the same events
+as that spec, and any combination works without a spec per combination. MIMIC-CXR-JPG and
+MIMIC-CXR-DB code an image the same way (`CXR//IMAGE//{view}//{orientation}`, `UNK` if missing) and
+share `cxr_study_id` and `cxr_dicom_id`; with both in a build, the image events are MIMIC-CXR-JPG's
+(with the link) and CXR-DB adds the studies, CheXpert labels and concepts. CXR-DB's semicolon-
+delimited CSVs are converted to parquet during the build (`prepare_cxr_db` need not be run first).
+
+**The multimodal demo.** [`mimic-demo-mm`](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo)
+downloads the 100 MIMIC-IV demo subjects across every module (open demos whole, credentialed
+releases filtered to those subjects; a PhysioNet sign-in is needed for those) into exactly the
+layout this build reads. Install it with the optional extra and let the build run it first:
+
+```bash
+pip install "MIMIC-IV-MEDS[demo-download]"
+mimic-iv-meds-multimodal --download-demo --root ./mimic-demo-multimodal --output-dir $MEDS_OUTPUT_DIR --extensions mimic-iv-ed,mimic-iv-note,mimic-iv-ecg,mimic-iv-echo,mimic-iv-cxr,mimic-iv-wdb
+```
+
+`--download-demo` fetches only the sources the selected extensions need (`--yes` skips its
+confirmation); without it the build uses whatever is already under `--root`, however it got
+there. MIMIC-Note-Extract and MIMIC-CXR-DB have no demo subset. For those, add this repository's
+simulated releases as a second root (`--root data/synthetic_demo`; see
+[Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)): a simulated
+release (`SYNTHETIC_<slug>.json`) is used only when no real one is found, and the build marks it
+everywhere: `[synthetic]` in `dataset_name`, its `+synthetic` version in `dataset_version`,
+`"synthetic": true` in `source_datasets`, and `synthetic_extensions` in `sources.json`.
 
 Objects (waveforms, DICOMs, JPGs) are stored inside the MEDS root under their SHA-256, in their
 original formats, and each object event names its file in a link column relative to that root:
@@ -280,8 +313,8 @@ shown when only some were built), `dataset_version` (every release as `<slug>/<v
 `mimic-iv-demo/2.2,mimic-iv-ed/2.2,…`), `license` (the PhysioNet Credentialed Health Data License
 as soon as one credentialed release is in), the link columns as MEDS
 `additional_value_modality_columns`, and the raw-source id columns of the parts built. The build
-adds `source_datasets`: the same releases as a list, each with name, version, demo or full,
-license, PhysioNet URL, parts built and link columns. `source_datasets`, `objects.parquet` and
+adds `source_datasets`: the same releases as a list, each with its extension name, PhysioNet name,
+version, demo, full or synthetic, license, PhysioNet URL, parts built and link columns. `source_datasets`, `objects.parquet` and
 `sources.json` (which also records the pinned mimic-code concept maps) have no MEDS-Extract
 counterpart yet; they are written by `src/MIMIC_IV_MEDS/multimodal/finalize.py`, kept
 self-contained so they can move upstream as a post-stage.
@@ -320,8 +353,9 @@ that wants earlier access must cut the signal at the prediction time itself; the
 cut segments into fixed windows, which it does not do yet.
 
 Caveats: the ECG time is the ECG machine's clock, which the release says was mostly not
-synchronized with the hospital's. The CheXpert labels are not extracted: they are mined from the
-report, which MIMIC-CXR-JPG does not time. Echo measurements with an empty `result` (two thirds of
+synchronized with the hospital's. `mimic-iv-cxr` alone extracts no CheXpert labels: they are mined
+from the report, which MIMIC-CXR-JPG does not time (`mimic-iv-cxr-db` adds them at the study's last
+image, with the caveat in its section below). Echo measurements with an empty `result` (two thirds of
 the rows: blank fields of the report form) get no event; most measurements belong to echos whose
 DICOMs are not released, so only some carry an `echo_study_id`. Notes are timed at
 when they were saved, not when the care happened: the median gap is about 20 h for discharge

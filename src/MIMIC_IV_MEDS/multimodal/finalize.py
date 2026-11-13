@@ -97,16 +97,24 @@ def write_objects_table(objects: pl.DataFrame, meds_root: Path) -> Path:
 def source_dataset(f: FoundRelease, skip_tables: set[str] = frozenset()) -> dict:
     """One release the build used: what `dataset.json`'s `source_datasets` lists."""
     links, _ = compose.module_columns(f, skip_tables)
-    return {
+    doc = {
+        "extension": "mimic-iv" if f.module.name == "core" else f.module.names[0],
         "module": f.module.name,
         "name": f.release.project,
         "version": f.version,
-        "release": "demo" if f.release.demo else "full",
-        "license": f.release.license,
+        "release": "synthetic" if f.synthetic else "demo" if f.release.demo else "full",
+        "synthetic": f.synthetic,
+        "license": f.license,
         "url": f"{f.release.url}{f.version}/",
         "parts": list(compose.active_parts(f, skip_tables)),
         "link_columns": links,
     }
+    if f.synthetic:
+        info = f.extras.get("synthetic", {})
+        doc["url"] = None
+        doc["simulates"] = info.get("simulates")
+        doc["warning"] = info.get("warning")
+    return doc
 
 
 def auxiliary_sources() -> list[dict]:
@@ -148,7 +156,8 @@ def write_sources(
     doc = {
         "generated_by": f"MIMIC_IV_MEDS.multimodal {version('MIMIC-IV-MEDS')}",
         "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "modules": [core.module.name, *(f.module.name for f in found)],
+        "extensions": [f.module.names[0] for f in found],
+        "synthetic_extensions": [f.module.names[0] for f in found if f.synthetic],
         "object_link_mode": link_mode,
         "loader_rule": LOADER_RULE,
         "notes": (

@@ -1,9 +1,10 @@
-# Multimodal module `cxr`: MIMIC-CXR-JPG chest radiographs.
+# Extension `mimic-iv-cxr`: MIMIC-CXR-JPG chest radiographs.
 #   https://physionet.org/content/mimic-cxr-jpg/2.1.0/
 #
 # Composed into the multimodal spec by `MIMIC_IV_MEDS.multimodal`; not a spec on its own. It reads
 # `cxr/images.parquet`, which `staging.stage_cxr` builds from `mimic-cxr-2.0.0-metadata.csv`: one
-# row per image of a core subject that is on disk, timed at StudyDate + StudyTime.
+# row per image of a core subject that is on disk, timed at StudyDate + StudyTime, coded
+# `CXR//IMAGE//{ViewPosition}//{PatientOrientation}` exactly as MIMIC-CXR-DB codes its images.
 #
 # `cxr_link` is an additional value modality column: `cxr/<sha[:2]>/<sha>.jpg`, relative to the
 # MEDS root. The CheXpert labels are not extracted: they are mined from the report, which exists
@@ -18,6 +19,7 @@ cxr/images:
     _metadata:
       _self:
         description: >-
-          f"Chest radiograph (JPG) from MIMIC-CXR-JPG, view position {$view}
-          (mimic-cxr-2.0.0-metadata.ViewPosition), timed at the study's StudyDate and StudyTime.
-          cxr_link is the image relative to the MEDS root"
+          f"Chest radiograph image, view position {$view}, patient orientation {$orientation}
+          (MIMIC-CXR-JPG mimic-cxr-2.0.0-metadata ViewPosition and
+          PatientOrientationCodeSequence_CodeMeaning; UNK if missing), timed at the study's StudyDate
+          and StudyTime. cxr_link is the JPG relative to the MEDS root"

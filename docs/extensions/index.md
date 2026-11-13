@@ -6,15 +6,45 @@ plus the extension's tables. `spec=MIMIC-IV` and its output are never changed by
 
 ## Overview
 
-| Extension                    | Source                                                                                              | Adds                                                                                                                                                                                                      | Timing rule                                | Code prefix | Access                                                                                  |
-| ---------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------- | --------------------------------------------------------------------------------------- |
-| [`MIMIC-IV-MNE`](mne.md)     | [MIMIC-IV-Ext MIMIC-Note-Extract 1.0](https://physionet.org/content/mimic-iv-ext-note-extract/1.0/) | Structured discharge-summary content: past medical history, home and discharge medications, allergies, physical exam and vitals, chief complaint, discharge diagnoses, procedures, condition at discharge | Every event at `hosp/admissions.dischtime` | `NOTE//`    | Credentialed; own DUA; no demo                                                          |
-| MIMIC-IV-ED *(in progress)*  | [MIMIC-IV-ED 2.2](https://physionet.org/content/mimic-iv-ed/2.2/)                                   | ED stays, triage, ED vital signs, ED diagnoses, medication reconciliation and dispensing ([#74](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/74))                                  | TBD                                        | TBD         | Credentialed; own DUA; open [demo](https://physionet.org/content/mimic-iv-ed-demo/2.2/) |
-| MIMIC-CXR-DB *(in progress)* | [MIMIC-CXR-Ext-MIMIC-CXR-DB 1.0](https://physionet.org/content/mimic-cxr-ext-mimic-cxr-db/1.0/)     | Chest radiographs linked to hospital admissions, with harmonized clinical context                                                                                                                         | TBD                                        | TBD         | Credentialed; own DUA                                                                   |
+| Extension                     | Source                                                                                              | Adds                                                                                                                                                                                                      | Timing rule                                | Code prefix | Access                                                                                  |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------- | --------------------------------------------------------------------------------------- |
+| [`MIMIC-IV-MNE`](mne.md)      | [MIMIC-IV-Ext MIMIC-Note-Extract 1.0](https://physionet.org/content/mimic-iv-ext-note-extract/1.0/) | Structured discharge-summary content: past medical history, home and discharge medications, allergies, physical exam and vitals, chief complaint, discharge diagnoses, procedures, condition at discharge | Every event at `hosp/admissions.dischtime` | `NOTE//`    | Credentialed; own DUA; no demo                                                          |
+| [`MIMIC-IV-ED`](ed.md)        | [MIMIC-IV-ED 2.2](https://physionet.org/content/mimic-iv-ed/2.2/)                                   | ED stays, triage, ED vital signs, ED diagnoses, medication reconciliation and dispensing ([#74](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/74))                                  | TBD                                        | TBD         | Credentialed; own DUA; open [demo](https://physionet.org/content/mimic-iv-ed-demo/2.2/) |
+| [`MIMIC-IV-CXRDB`](cxr-db.md) | [MIMIC-CXR-Ext-MIMIC-CXR-DB 1.0](https://physionet.org/content/mimic-cxr-ext-mimic-cxr-db/1.0/)     | Chest radiographs linked to hospital admissions, with harmonized clinical context                                                                                                                         | TBD                                        | TBD         | Credentialed; own DUA                                                                   |
 
 Each extension has its own page in this section, following the same template: summary, source, how
 to run, tables to events, ETL decisions, caveats, what is not extracted, and validation. Sources and
 citations for all of them are collected in [Sources and citations](../sources.md).
+
+## Combining extensions: `mimic-iv-meds-multimodal`
+
+A registered spec holds one extension. To build MIMIC-IV with any combination of them, use the
+multimodal build, which composes the base with the chosen fragments at build time and lists every
+extension in one place:
+
+```bash
+mimic-iv-meds-multimodal --list-extensions
+mimic-iv-meds-multimodal --root /data/physionet --output-dir $MEDS_OUTPUT_DIR \
+	--extensions mimic-iv-ed,mimic-iv-mne,mimic-iv-cxr,mimic-iv-cxr-db
+```
+
+| `--extensions`    | PhysioNet release                       | Spec fragment                                  |
+| ----------------- | --------------------------------------- | ---------------------------------------------- |
+| `mimic-iv-ed`     | `mimic-iv-ed` (or `mimic-iv-ed-demo`)   | `extensions/ed.yaml` (as `MIMIC-IV-ED`)        |
+| `mimic-iv-note`   | `mimic-iv-note`                         | `multimodal/fragments/note.yaml`               |
+| `mimic-iv-mne`    | `mimic-iv-ext-note-extract`             | `extensions/mne.yaml` (as `MIMIC-IV-MNE`)      |
+| `mimic-iv-ecg`    | `mimic-iv-ecg` (or `mimic-iv-ecg-demo`) | `multimodal/fragments/ecg.yaml`                |
+| `mimic-iv-echo`   | `mimic-iv-echo`                         | `multimodal/fragments/echo.yaml`               |
+| `mimic-iv-cxr`    | `mimic-cxr-jpg`                         | `multimodal/fragments/cxr.yaml`                |
+| `mimic-iv-cxr-db` | `mimic-cxr-ext-mimic-cxr-db`            | `extensions/cxr_db.yaml` (as `MIMIC-IV-CXRDB`) |
+| `mimic-iv-wdb`    | `mimic4wdb`                             | `multimodal/fragments/waveform.yaml`           |
+
+It reads local releases in PhysioNet's layouts (the multimodal demo downloader's output included;
+`--download-demo` runs it), restricts every extension to the core's subjects, stores linked objects
+(ECGs, echo DICOMs, chest X-ray JPGs, waveforms) inside the MEDS root, and records every release
+used, with its version, in `metadata/dataset.json`. Details are in the README section
+"Multimodal build". A new extension is added to `MIMIC_IV_MEDS/multimodal/modules.py` (its
+release, marker file and fragment) and, if its raw files need reshaping, a stager in `staging.py`.
 
 ## Why extensions are separate specs
 

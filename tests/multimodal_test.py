@@ -33,6 +33,7 @@ def test_find_release_layouts(tmp_path):
     ecg = _mk(
         tmp_path, "mimic-iv-ecg-demo-diagnostic-electrocardiogram-matched-subset-demo-0.1", "record_list.csv"
     )
+    (ecg / "files").mkdir()
     note = _mk(tmp_path, "physionet.org/files/mimic-iv-note/2.2", "note/radiology.csv.gz")
     _mk(tmp_path, "mimic-iv-ed-demo-2.2", "ed/edstays.csv.gz")
 
@@ -46,6 +47,82 @@ def test_find_release_layouts(tmp_path):
     assert find_release(MODULES["ed"], tmp_path).tag == "mimic-iv-ed-demo/2.2"
 
 
+def test_find_release_demo_downloader_layout(tmp_path):
+    """What `mimic-demo-mm download` writes: `<slug>-<version>/`, plus a tables-only full ECG release."""
+    root = tmp_path / "mimic-demo-multimodal"
+    _mk(root, "mimic-iv-demo-2.2", "hosp/patients.csv.gz")
+    _mk(root, "mimic-iv-ed-demo-2.2", "ed/edstays.csv.gz")
+    ecg_demo = _mk(root, "mimic-iv-ecg-demo-0.1", "record_list.csv")
+    (ecg_demo / "files").mkdir()
+    _mk(root, "mimic-iv-ecg-1.0", "record_list.csv")  # filtered tables, no files/: not the waveforms
+    _mk(root, "mimic4wdb-0.1.0", "waves/RECORDS")
+    _mk(root, "mimic-cxr-jpg-2.1.0", "mimic-cxr-2.0.0-metadata.csv.gz")
+    _mk(root, "mimic-iv-echo-1.0.1", "echo-record-list.csv")
+    _mk(root, "mimic-iv-note-2.2", "note/discharge.csv.gz")
+
+    assert find_release(CORE, root).tag == "mimic-iv-demo/2.2"
+    tags = {m: find_release(MODULES[m], root).tag for m in ("ed", "ecg", "waveform", "cxr", "echo", "note")}
+    assert tags == {
+        "ed": "mimic-iv-ed-demo/2.2",
+        "ecg": "mimic-iv-ecg-demo/0.1",
+        "waveform": "mimic4wdb/0.1.0",
+        "cxr": "mimic-cxr-jpg/2.1.0",
+        "echo": "mimic-iv-echo/1.0.1",
+        "note": "mimic-iv-note/2.2",
+    }
+
+
+def test_find_release_synthetic_fallback_and_several_roots(tmp_path):
+    """A simulated release (SYNTHETIC_<slug>.json) is used only when no real one is in any root."""
+    import json
+
+    real, synth = tmp_path / "real", tmp_path / "synthetic_demo"
+    _mk(real, "mimic-iv-note-2.2", "note/discharge.csv.gz")
+    for slug, marker in (
+        ("mimic-iv-note", "note/discharge.csv.gz"),
+        ("mimic-iv-ext-note-extract", "allergies.csv.gz"),
+    ):
+        d = _mk(synth, slug, marker)
+        info = {"synthetic": True, "dataset_version": "1.0+synthetic-0.1", "license": ODBL, "simulates": slug}
+        (d / f"SYNTHETIC_{slug}.json").write_text(json.dumps(info))
+
+    note = find_release(MODULES["note"], [synth, real])
+    assert (note.tag, note.synthetic) == ("mimic-iv-note/2.2", False)
+    mne = find_release(MODULES["mne"], [real, synth])
+    assert (mne.tag, mne.synthetic, mne.license, mne.credentialed) == (
+        "mimic-iv-ext-note-extract/1.0+synthetic-0.1",
+        True,
+        ODBL,
+        False,
+    )
+    assert mne.label == "MNE[synthetic]"
+    spec = compose.compose(_found("core", demo=True), [mne])
+    assert spec["etl"]["license"] == ODBL  # nothing credentialed went in
+    assert "[synthetic]" in spec["etl"]["dataset_name"]
+    meta = finalize.source_dataset(mne)
+    assert (meta["extension"], meta["release"], meta["synthetic"], meta["url"]) == (
+        "mimic-iv-mne",
+        "synthetic",
+        True,
+        None,
+    )
+
+
+def test_cxr_db_yields_its_images_to_cxr_jpg():
+    """Both CXR releases in one build: one image event per image (CXR-JPG's, with the link)."""
+    core = _found("core", demo=True)
+    alone = compose.compose(core, [_found("cxr_db")])
+    assert "image" in alone["cxr_db/radiographs"]
+    both = compose.compose(core, [_found("cxr"), _found("cxr_db")])
+    assert "image" not in both["cxr_db/radiographs"]
+    assert {"study", "chexpert_edema"} <= set(both["cxr_db/radiographs"])
+    assert "image" in both["cxr/images"]
+    assert both["etl"]["dataset_name"] == "MIMIC-IV+CXR+CXR-DB"
+    # Same id columns in both, declared once.
+    raw = both["etl"]["raw_source_id_columns"]
+    assert raw.count("cxr_study_id") == raw.count("cxr_dicom_id") == 1
+
+
 def test_find_release_prefers_full_and_newest(tmp_path):
     _mk(tmp_path, "mimic-iv-ed-demo-2.2", "ed/edstays.csv.gz")
     _mk(tmp_path, "mimic-iv-ed/2.0", "ed/edstays.csv.gz")
@@ -57,10 +134,10 @@ def test_find_release_prefers_full_and_newest(tmp_path):
 
 def test_find_release_explicit_path_and_errors(tmp_path):
     d = _mk(tmp_path, "somewhere/echo-files", "echo-record-list.csv")
-    with pytest.raises(ValueError, match="--version echo"):
+    with pytest.raises(ValueError, match="--version mimic-iv-echo"):
         find_release(MODULES["echo"], tmp_path, path=d)
     assert find_release(MODULES["echo"], tmp_path, path=d, version="1.0.1").tag == "mimic-iv-echo/1.0.1"
-    with pytest.raises(FileNotFoundError, match="--path cxr="):
+    with pytest.raises(FileNotFoundError, match="--path mimic-iv-cxr="):
         find_release(MODULES["cxr"], tmp_path)
 
 
@@ -226,10 +303,19 @@ def test_compose_parts(selection, skip, name, links, raw_extra, absent):
 
 
 def test_parse_selection_errors():
-    with pytest.raises(ValueError, match="unknown module"):
-        modules.parse_selection("ecg,mri")
+    with pytest.raises(ValueError, match="unknown extension"):
+        modules.parse_selection("mimic-iv-ecg,mimic-iv-mri")
     with pytest.raises(ValueError, match="all-or-nothing"):
-        modules.parse_selection("cxr:labels")
+        modules.parse_selection("mimic-iv-cxr:labels")
+
+
+def test_every_extension_name_resolves():
+    """Canonical `mimic-iv-<x>` names, PhysioNet slugs and short names all select the same module."""
+    for m in MODULES.values():
+        assert m.names[0].startswith("mimic-iv-")
+        for n in m.names:
+            assert list(modules.parse_selection(n)) == [m.name]
+    assert list(modules.parse_selection("mimic-iv-mne, mimic-iv-cxr")) == ["mne", "cxr"]
 
 
 def test_stage_common_reuses_the_cache(tmp_path):
@@ -250,3 +336,28 @@ def test_stage_common_reuses_the_cache(tmp_path):
     }
     staging.stage_common(tmp_path / "raw", [entry], [], cache)
     assert (tmp_path / "raw" / "map.csv").read_text() == "a,b\n"
+
+
+def test_download_demo_asks_mimic_demo_mm_for_the_selected_sources(tmp_path, monkeypatch):
+    """`--download-demo` runs `mimic-demo-mm download` for the core plus the extensions' demo sources."""
+    import importlib.util
+    import subprocess
+
+    from MIMIC_IV_MEDS.multimodal import cli
+
+    calls = []
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(
+        subprocess, "run", lambda args, **kw: calls.append(args) or subprocess.CompletedProcess(args, 0)
+    )
+    sel = list(modules.parse_selection("mimic-iv-ed,mimic-iv-mne,mimic-iv-cxr,mimic-iv-wdb"))
+    cli.download_demo(tmp_path, sel, yes=True)
+    [args] = calls
+    assert args[1:6] == ["-m", "mimic_demo_mm", "download", "--out", str(tmp_path)]
+    only = args[args.index("--only") + 1 : args.index("--yes")]
+    # MNE has no demo subset: nothing to fetch for it (the build warns).
+    assert only == ["mimic-iv-demo", "mimic-iv-ed-demo", "mimic-cxr-jpg", "mimic4wdb"]
+
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
+    with pytest.raises(SystemExit, match=r"demo-download"):
+        cli.download_demo(tmp_path, sel, yes=False)

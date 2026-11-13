@@ -46,6 +46,17 @@ dependencies = [
     "sumeds>=0.6.3,<0.7",
 ]
 
+[project.optional-dependencies]
+# `mimic-iv-meds-multimodal --download-demo` runs `mimic-demo-mm download`, which assembles the
+# multimodal MIMIC-IV demo (the 100 demo subjects across ED, Note, ECG, ECHO, CXR-JPG and the
+# waveform database; credentialed sources need a PhysioNet sign-in) in the layout the build reads.
+# Optional: the build reads any folder in PhysioNet's layout, however it was filled. Until
+# mimic-demo-mm is on PyPI, uv takes it from its repository (`[tool.uv.sources]`).
+demo-download = ["mimic-demo-mm"]
+
+[tool.uv.sources]
+mimic-demo-mm = { git = "https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo" }
+
 [dependency-groups]
 # `shfmt-py` bundles the `shfmt` binary that the `mdformat-shfmt` pre-commit
 # hook shells out to; declaring it here (in addition to pinning it under the

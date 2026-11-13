@@ -30,7 +30,7 @@ The opt-in spec **`MIMIC-IV-CXRDB`** is the full `MIMIC-IV` ETL plus three table
 has no table for:
 
 - **Chest radiographs.** One event per image at its acquisition time, with its view position and
-    patient orientation, and one per study with its procedure. Both carry `study_id` and `dicom_id`,
+    patient orientation, and one per study with its procedure. Both carry `cxr_study_id` and `cxr_dicom_id` (MIMIC-CXR's `study_id` and `dicom_id`),
     so a MEDS event can be traced to its MIMIC-CXR-JPG image. This covers 357,507 images and 215,990
     studies of 61,868 MIMIC-IV subjects, including the 61% of images taken outside any inpatient
     admission.
@@ -169,13 +169,13 @@ these rules give for the simulated rows.
 
 ## Tables → events
 
-| Source table                      | Code                                                                  | Time                         | Values and columns                                                  |
-| --------------------------------- | --------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------- |
-| `radiographs` (one row per image) | `CXR//IMAGE//{ViewPosition}//{PatientOrientation}` (`UNK` if missing) | the image's `study_datetime` | `study_id`, `dicom_id`, `hadm_id` (null if not admission-linked)    |
-| `radiographs`                     | `CXR//STUDY//{ProcedureCodeSequence_CodeMeaning}`                     | the study's last image       | `study_id`, `hadm_id`                                               |
-| `radiographs` (14 label columns)  | `CXR_NLP//CHEXPERT//{FINDING}//{POSITIVE,NEGATIVE,UNCERTAIN}`         | the study's last image       | `study_id`, `hadm_id`; a blank label emits nothing                  |
-| `radiology_jev`                   | `CXR_NLP//RADIOLOGY//{report section}//{ontology id}`                 | the study's last image       | `study_id`, `hadm_id`; `concept_class` and parents in code metadata |
-| `discharge_jev`                   | `CXR_NLP//DISCHARGE//{summary section}//{ontology id}`                | `hosp/admissions.dischtime`  | `hadm_id`; `concept_class` and parents in code metadata             |
+| Source table                      | Code                                                                  | Time                         | Values and columns                                                       |
+| --------------------------------- | --------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------ |
+| `radiographs` (one row per image) | `CXR//IMAGE//{ViewPosition}//{PatientOrientation}` (`UNK` if missing) | the image's `study_datetime` | `cxr_study_id`, `cxr_dicom_id`, `hadm_id` (null if not admission-linked) |
+| `radiographs`                     | `CXR//STUDY//{ProcedureCodeSequence_CodeMeaning}`                     | the study's last image       | `cxr_study_id`, `hadm_id`                                                |
+| `radiographs` (14 label columns)  | `CXR_NLP//CHEXPERT//{FINDING}//{POSITIVE,NEGATIVE,UNCERTAIN}`         | the study's last image       | `cxr_study_id`, `hadm_id`; a blank label emits nothing                   |
+| `radiology_jev`                   | `CXR_NLP//RADIOLOGY//{report section}//{ontology id}`                 | the study's last image       | `cxr_study_id`, `hadm_id`; `concept_class` and parents in code metadata  |
+| `discharge_jev`                   | `CXR_NLP//DISCHARGE//{summary section}//{ontology id}`                | `hosp/admissions.dischtime`  | `hadm_id`; `concept_class` and parents in code metadata                  |
 
 Examples:
 

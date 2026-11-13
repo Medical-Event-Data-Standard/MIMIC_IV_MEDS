@@ -294,6 +294,90 @@ def stage_ed(ed: FoundRelease, raw_input: Path, subjects: pl.Series) -> Staged:
     return Staged("ed", stats)
 
 
+def _subject_filtered_csv(src: Path, dst: Path, subjects: pl.Series) -> dict:
+    """Link `src` (a csv[.gz] with `subject_id`) to `dst`, or write only the cohort's rows when it has
+    others."""
+    ids = pl.read_csv(src, columns=["subject_id"], schema_overrides={"subject_id": pl.Int64})["subject_id"]
+    outside = int((~ids.is_in(subjects.implode())).sum())
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if not outside:
+        dst.symlink_to(src.resolve())
+        return {"rows": ids.len(), "rows_outside_core_subjects": 0}
+    with open(src, "rb") as f:
+        kept = stream_subject_rows(f, subjects.to_list())
+    out = dst.with_name(dst.name.removesuffix(".gz").removesuffix(".csv") + ".csv.gz")
+    with gzip.open(out, "wb") as g:
+        kept.with_columns(pl.all().replace("", None)).write_csv(g)
+    return {"rows": ids.len(), "rows_outside_core_subjects": outside}
+
+
+def stage_mne(mne: FoundRelease, raw_input: Path, subjects: pl.Series) -> Staged:
+    """MIMIC-Note-Extract: its tables at the raw-input root, as the `MIMIC-IV-MNE` spec reads them.
+
+    Each table the fragment extracts is linked in, or, when it has rows of subjects outside the core
+    cohort (the full release next to the MIMIC-IV demo), rewritten with only the cohort's rows.
+    """
+    from .compose import fragment
+
+    stats: dict = {}
+    for table in fragment("mne"):
+        src = next(
+            (
+                mne.root / f"{table}{ext}"
+                for ext in (".csv.gz", ".csv")
+                if (mne.root / f"{table}{ext}").is_file()
+            ),
+            None,
+        )
+        if src is None:
+            raise FileNotFoundError(f"MIMIC-Note-Extract table {table}.csv.gz is missing from {mne.root}")
+        s = _subject_filtered_csv(src, raw_input / src.name, subjects)
+        stats[f"{table}_rows"] = s["rows"] - s["rows_outside_core_subjects"]
+        stats["rows_outside_core_subjects"] = (
+            stats.get("rows_outside_core_subjects", 0) + s["rows_outside_core_subjects"]
+        )
+    return Staged("mne", stats)
+
+
+def stage_cxr_db(db: FoundRelease, raw_input: Path, subjects: pl.Series) -> Staged:
+    """MIMIC-CXR-DB: `cxr_db/<table>.parquet`, as the `MIMIC-IV-CXRDB` spec reads them.
+
+    The release's semicolon-delimited CSVs are converted with `prepare_cxr_db.convert_table` (which adds
+    `radiographs.study_end_datetime`); parquet files already there (a prepared download, the simulated
+    release) are used as they are. Rows are restricted to the core cohort: radiographs by subject,
+    report concepts by the kept studies, discharge concepts by the cohort's admissions.
+    """
+    from MIMIC_IV_MEDS.prepare_cxr_db import OUT_SUBDIR, TABLES, convert_table
+
+    out = raw_input / OUT_SUBDIR
+    out.mkdir(parents=True, exist_ok=True)
+    frames = {}
+    for t in TABLES:
+        pq = db.root / OUT_SUBDIR / f"{t}.parquet"
+        if pq.is_file():
+            frames[t] = pl.read_parquet(pq)
+        elif (db.root / f"{t}.csv").is_file():
+            frames[t] = convert_table(db.root / f"{t}.csv", out / f"{t}.parquet")
+        else:
+            raise FileNotFoundError(f"MIMIC-CXR-DB: neither {pq} nor {db.root / f'{t}.csv'} exists")
+    adm = raw_input / "hosp" / "admissions.csv.gz"
+    hadm = pl.read_csv(adm, columns=["subject_id", "hadm_id"]).filter(
+        pl.col("subject_id").is_in(subjects.implode())
+    )["hadm_id"]
+    rad = frames["radiographs"].filter(pl.col("subject_id").cast(pl.Int64).is_in(subjects.implode()))
+    kept = {
+        "radiographs": rad,
+        "radiology_jev": frames["radiology_jev"].filter(pl.col("study_id").is_in(rad["study_id"].implode())),
+        "discharge_jev": frames["discharge_jev"].filter(pl.col("hadm_id").is_in(hadm.implode())),
+    }
+    stats = {}
+    for t, df in kept.items():
+        df.write_parquet(out / f"{t}.parquet")
+        stats[f"{t}_rows"] = df.height
+        stats[f"{t}_rows_outside_core_cohort"] = frames[t].height - df.height
+    return Staged("cxr_db", stats)
+
+
 #: `(table, note_type) -> (code, description)`; other note types get `NOTE//<TABLE>//<type>`.
 NOTE_CODES = {
     ("discharge", "DS"): (
@@ -328,7 +412,9 @@ def stage_note(note: FoundRelease, raw_input: Path, subjects: pl.Series) -> Stag
         fp = note.root / "note" / f"{table}.csv.gz"
         if not fp.is_file():
             if note.explicit:
-                raise FileNotFoundError(f"--modules note:{table} asked for {fp}, which does not exist")
+                raise FileNotFoundError(
+                    f"--extensions mimic-iv-note:{table} asked for {fp}, which does not exist"
+                )
             stats[table] = {"present": False}
             continue
         df = pl.read_csv(fp, infer_schema=False).with_columns(
@@ -593,7 +679,7 @@ def stage_echo(echo: FoundRelease, raw_input: Path, subjects: pl.Series, workers
         measurements = stage_echo_measurements(echo, raw_input, subjects)
         if not measurements["present"] and echo.explicit:
             raise FileNotFoundError(
-                f"--modules echo:measurements: none of {MEASUREMENT_FILES} in {echo.root}"
+                f"--extensions mimic-iv-echo:measurements: none of {MEASUREMENT_FILES} in {echo.root}"
             )
     has_list = any((echo.root / n).is_file() for n in ("echo-record-list.csv", "echo-record-list.csv.gz"))
     if not echo.wants("dicom") or (not has_list and not echo.explicit):
@@ -642,13 +728,19 @@ def stage_echo(echo: FoundRelease, raw_input: Path, subjects: pl.Series, workers
 
 
 def stage_cxr(cxr: FoundRelease, raw_input: Path, subjects: pl.Series, workers: int) -> Staged:
-    """`cxr/images.parquet`: one `CXR//IMAGE//<ViewPosition>` row per chest radiograph JPG.
+    """`cxr/images.parquet`: one `CXR//IMAGE//<ViewPosition>//<PatientOrientation>` row per JPG.
+
+    The code is MIMIC-CXR-DB's image code (`UNK` for a missing value), so the same image is coded
+    the same way whichever of the two releases it comes from; with both in the build, these linked
+    events stand for the images and CXR-DB adds the rest (see `Module.yields_to`).
 
     Timed at the image's `StudyDate` + `StudyTime` (DICOM `HHMMSS.fff`, leading zeros dropped in
     the CSV). The CheXpert labels are not extracted: they are mined from the report, which exists
     only after the images, and MIMIC-CXR-JPG gives no report time to place them at.
     """
     df = read_table(cxr.root, "mimic-cxr-2.0.0-metadata.csv.gz", "mimic-cxr-2.0.0-metadata.csv")
+    if "PatientOrientationCodeSequence_CodeMeaning" not in df.columns:
+        df = df.with_columns(pl.lit(None, pl.String).alias("PatientOrientationCodeSequence_CodeMeaning"))
     hhmmss = pl.col("StudyTime").str.strip_chars().str.split(".").list.first().str.zfill(6)
     df = df.select(
         pl.col("subject_id").cast(pl.Int64),
@@ -668,11 +760,16 @@ def stage_cxr(cxr: FoundRelease, raw_input: Path, subjects: pl.Series, workers: 
         (pl.col("StudyDate").str.strip_chars() + hhmmss)
         .str.strptime(pl.Datetime("us"), "%Y%m%d%H%M%S", strict=False)
         .alias("time"),
-        pl.col("ViewPosition").str.strip_chars().replace("", None).fill_null("UNKNOWN").alias("view"),
+        pl.col("ViewPosition").str.strip_chars().replace("", None).fill_null("UNK").alias("view"),
+        pl.col("PatientOrientationCodeSequence_CodeMeaning")
+        .str.strip_chars()
+        .replace("", None)
+        .fill_null("UNK")
+        .alias("orientation"),
     ).with_columns(
         pl.col("study_id").alias("cxr_study_id"),
         pl.col("object_id").alias("cxr_dicom_id"),
-        (pl.lit("CXR//IMAGE//") + pl.col("view")).alias("code"),
+        (pl.lit("CXR//IMAGE//") + pl.col("view") + "//" + pl.col("orientation")).alias("code"),
     )
     df = _single_file_objects(cxr, df, ".jpg", workers)
     return _finish_objects(
@@ -680,7 +777,7 @@ def stage_cxr(cxr: FoundRelease, raw_input: Path, subjects: pl.Series, workers: 
         df,
         subjects,
         raw_input / "cxr" / "images.parquet",
-        ["subject_id", "code", "time", "view", "cxr_study_id", "cxr_dicom_id", "link"],
+        ["subject_id", "code", "time", "view", "orientation", "cxr_study_id", "cxr_dicom_id", "link"],
         "JPEG",
     )
 
@@ -869,3 +966,5 @@ def stage_waveform(wdb: FoundRelease, raw_input: Path, subjects: pl.Series, work
 
 
 OBJECT_STAGERS = {"ecg": stage_ecg, "echo": stage_echo, "cxr": stage_cxr, "waveform": stage_waveform}
+#: Extensions without objects: `(found, raw_input, subjects) -> Staged`.
+TABLE_STAGERS = {"ed": stage_ed, "note": stage_note, "mne": stage_mne, "cxr_db": stage_cxr_db}

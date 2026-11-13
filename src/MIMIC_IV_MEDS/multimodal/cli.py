@@ -1,11 +1,13 @@
-"""`mimic-iv-meds-multimodal`: build one MEDS dataset from MIMIC-IV plus any combination of modules.
+"""`mimic-iv-meds-multimodal`: build one MEDS dataset from MIMIC-IV plus any combination of extensions.
 
-    mimic-iv-meds-multimodal --root /data/MIMIC-IV_Multimodal_Demo --output-dir /data/meds_mm \\
-        --modules ed,note,ecg,echo,cxr --link-mode copy
+    mimic-iv-meds-multimodal --root /data/mimic-demo-multimodal --output-dir /data/meds_mm \\
+        --extensions mimic-iv-ed,mimic-iv-note,mimic-iv-mne,mimic-iv-ecg,mimic-iv-echo,mimic-iv-cxr
 
-`--root` holds the PhysioNet releases side by side, in PhysioNet's own layout (see `modules.py`):
-the core MIMIC-IV (demo or full) is required; each module in `--modules` must be there too. The
-output is a MEDS root with the objects inside it:
+`--root` (repeatable) holds the PhysioNet releases side by side, in PhysioNet's own layouts (see
+`modules.py`), such as the folder `mimic-demo-mm download` fills: the core MIMIC-IV (demo or full)
+is required; each extension in `--extensions` must be there too (`--list-extensions` lists them).
+`--download-demo` first runs that downloader (the optional `mimic-demo-mm` package) for the
+extensions asked for. The output is a MEDS root with the objects inside it:
 
     <output-dir>/
       data/{train,tuning,held_out}/*.parquet   # one event per note / ECG / echo DICOM / CXR image
@@ -36,7 +38,7 @@ from pathlib import Path
 import polars as pl
 
 from . import compose, finalize, staging
-from .modules import CORE, MODULES, describe, find_release, parse_selection
+from .modules import CORE, MODULES, NAMES, describe, find_release, parse_selection
 
 logger = logging.getLogger("MIMIC_IV_MEDS.multimodal")
 
@@ -44,15 +46,30 @@ ORDER = list(MODULES)  # canonical module order, whatever order they are asked i
 WORK = ".multimodal"
 
 
+#: Extension -> the `mimic-demo-mm` sources that hold its demo subset (MNE and CXR-DB have none).
+DEMO_DOWNLOAD_SOURCES = {
+    "core": ("mimic-iv-demo",),
+    "ed": ("mimic-iv-ed-demo",),
+    "note": ("mimic-iv-note",),
+    "ecg": ("mimic-iv-ecg-demo",),
+    "echo": ("mimic-iv-echo",),
+    "cxr": ("mimic-cxr-jpg",),
+    "waveform": ("mimic4wdb",),
+}
+
+
 def _kv(values: list[str], flag: str) -> dict[str, str]:
+    """`<extension>=<value>` pairs, keyed by internal module name (`core` for MIMIC-IV itself)."""
     out = {}
     for v in values:
         k, sep, val = v.partition("=")
-        if not sep or k not in ("core", *MODULES):
+        name = "core" if k in ("core", "mimic-iv", "mimiciv") else NAMES.get(k)
+        if not sep or name is None:
             raise SystemExit(
-                f"{flag} takes <module>=<value> with module one of core,{','.join(MODULES)}; got {v!r}"
+                f"{flag} takes <extension>=<value> with extension core or one of "
+                f"{','.join(m.names[0] for m in MODULES.values())}; got {v!r}"
             )
-        out[k] = val
+        out[name] = val
     return out
 
 
@@ -62,16 +79,40 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description=__doc__.split("\n\n")[0],
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--root", type=Path, help="folder holding the PhysioNet releases")
+    p.add_argument(
+        "--root",
+        type=Path,
+        action="append",
+        default=[],
+        help="folder holding the PhysioNet releases (repeatable: every one is searched; add this "
+        "repository's data/synthetic_demo to fill MNE and CXR-DB with simulated data)",
+    )
     p.add_argument("--output-dir", type=Path)
     p.add_argument(
+        "--extensions",
         "--modules",
+        dest="modules",
         default="",
-        help=f"comma-separated, any of: {','.join(MODULES)}, or 'all'; empty for the core alone. "
-        "A module can be narrowed to some of its parts: note:radiology, echo:measurements, "
-        "echo:dicom+measurements (see --list-modules)",
+        help=f"comma-separated, any of: {','.join(m.names[0] for m in MODULES.values())}, or 'all'; "
+        "empty for MIMIC-IV alone. An extension can be narrowed to some of its parts: "
+        "mimic-iv-note:radiology, mimic-iv-echo:measurements (see --list-extensions)",
     )
-    p.add_argument("--list-modules", action="store_true", help="list the modules, their parts and releases")
+    p.add_argument(
+        "--list-extensions",
+        "--list-modules",
+        dest="list_modules",
+        action="store_true",
+        help="list the extensions, their names, parts and releases",
+    )
+    p.add_argument(
+        "--download-demo",
+        action="store_true",
+        help="first download the multimodal demo for these extensions into the first --root, with "
+        "`mimic-demo-mm download` (install it with the `demo-download` extra)",
+    )
+    p.add_argument(
+        "--yes", "-y", action="store_true", help="with --download-demo: don't ask before downloading"
+    )
     p.add_argument(
         "--link-mode",
         choices=finalize.LINK_MODES,
@@ -119,7 +160,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     if a.list_modules:
         print(describe())
         raise SystemExit(0)
-    if a.root is None or a.output_dir is None:
+    if not a.root or a.output_dir is None:
         p.error("--root and --output-dir are required")
     try:
         a.modules = parse_selection(a.modules)
@@ -160,17 +201,49 @@ def run_meds_extract(spec_fp: Path, out: Path, raw_input: Path, enrich: bool, cl
         raise SystemExit(f"meds-extract-run failed (exit {rc}); see {out}/.logs")
 
 
+def download_demo(root: Path, modules: list[str], yes: bool) -> None:
+    """Fill `root` with the multimodal demo's sources for `modules`, via the `mimic-demo-mm` package."""
+    import importlib.util
+
+    if importlib.util.find_spec("mimic_demo_mm") is None:
+        raise SystemExit(
+            "--download-demo needs the mimic-demo-mm package: pip install 'MIMIC_IV_MEDS[demo-download]' "
+            "(or run `uvx --from git+https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo mimic-demo-mm "
+            f"download --out {root}` yourself and drop --download-demo)"
+        )
+    sources = [s for m in ("core", *modules) for s in DEMO_DOWNLOAD_SOURCES.get(m, ())]
+    if missing := [MODULES[m].names[0] for m in modules if m not in DEMO_DOWNLOAD_SOURCES]:
+        logger.warning(
+            f"the multimodal demo has no {', '.join(missing)}; add a --root with a release of it "
+            "(e.g. this repository's data/synthetic_demo for simulated data)"
+        )
+    args = [sys.executable, "-m", "mimic_demo_mm", "download", "--out", str(root), "--only", *sources]
+    if yes:
+        args.append("--yes")
+    logger.info(f"downloading the multimodal demo ({', '.join(sources)}) into {root}")
+    # exit 1 means the file check found something incomplete; the release search below will tell.
+    if (rc := subprocess.run(args).returncode) not in (0, 1):
+        raise SystemExit(f"mimic-demo-mm download failed (exit {rc})")
+
+
 def build(a: argparse.Namespace) -> Path:
-    root, out = a.root.resolve(), a.output_dir.resolve()
-    core = find_release(CORE, root, a.path.get("core"), a.version.get("core"))
+    roots, out = [r.resolve() for r in a.root], a.output_dir.resolve()
+    if a.download_demo:
+        roots[0].mkdir(parents=True, exist_ok=True)
+        download_demo(roots[0], list(a.modules), a.yes)
+    core = find_release(CORE, roots, a.path.get("core"), a.version.get("core"))
     found = [
-        find_release(MODULES[m], root, a.path.get(m), a.version.get(m), parts, explicit)
+        find_release(MODULES[m], roots, a.path.get(m), a.version.get(m), parts, explicit)
         for m, (parts, explicit) in a.modules.items()
     ]
     for f in [core, *found]:
-        logger.info(
-            f"{f.module.name:>4}: {f.tag} ({'demo' if f.release.demo else 'full'}, {f.release.license})"
-        )
+        kind = "SYNTHETIC" if f.synthetic else "demo" if f.release.demo else "full"
+        logger.info(f"{f.module.names[0]:>16}: {f.tag} ({kind}, {f.license}) at {f.root}")
+        if f.synthetic:
+            logger.warning(
+                f"{f.module.names[0]} is SIMULATED data ({f.root}): for pipeline testing and tutorials "
+                "only, not for research; dataset.json and sources.json say so"
+            )
 
     _prepare_output(out, a.overwrite)
     work = out / WORK
@@ -183,13 +256,11 @@ def build(a: argparse.Namespace) -> Path:
     subjects = staging.cohort_subjects(core)
     for f in found:
         name = f.module.name
-        if name == "ed":
-            staged[name] = staging.stage_ed(f, raw_input, subjects)
-        elif name == "note":
-            staged[name] = staging.stage_note(f, raw_input, subjects)
+        if name in staging.TABLE_STAGERS:
+            staged[name] = staging.TABLE_STAGERS[name](f, raw_input, subjects)
         else:
             staged[name] = staging.OBJECT_STAGERS[name](f, raw_input, subjects, a.workers)
-        logger.info(f"{name:>4}: staged {staged[name].stats}")
+        logger.info(f"{f.module.names[0]:>16}: staged {staged[name].stats}")
 
     skip = set().union(*(s.skip_tables for s in staged.values()))
     spec_fp = compose.write_spec(compose.compose(core, found, skip), work / "spec.yaml")
