@@ -130,7 +130,7 @@ MODULES: dict[str, Module] = {
             releases=(Release("mimic-iv-echo", False, PHYSIONET_CREDENTIALED),),
             marker="echo-record-list.csv",
             link_column="echo_link",
-            raw_source_id_columns=("echo_study_id",),
+            raw_source_id_columns=("echo_study_id", "echo_measurement_id"),
         ),
         Module(
             name="cxr",

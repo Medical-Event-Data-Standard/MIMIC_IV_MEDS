@@ -45,12 +45,16 @@ def fragment(module: str) -> dict:
     return {k: v for k, v in yaml.safe_load(text).items() if k not in RESERVED}
 
 
-def compose(core: FoundRelease, found: list[FoundRelease]) -> dict:
-    """The spec for `core` plus the modules in `found` (in that order)."""
+def compose(core: FoundRelease, found: list[FoundRelease], skip_tables: set[str] = frozenset()) -> dict:
+    """The spec for `core` plus the modules in `found` (in that order), without `skip_tables`.
+
+    `skip_tables` are optional fragment tables whose raw input the build did not find (e.g. the echo
+    measurements); MEDS-Extract fails on a configured table without input, so they are left out.
+    """
     base = base_spec()
     tables = {k: v for k, v in base.items() if k not in RESERVED}
     for f in found:
-        frag = fragment(f.module.name)
+        frag = {k: v for k, v in fragment(f.module.name).items() if k not in skip_tables}
         if clash := sorted(set(frag) & set(tables)):
             raise ValueError(f"module {f.module.name} redefines tables {clash}")
         tables.update(frag)

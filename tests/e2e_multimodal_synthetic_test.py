@@ -81,6 +81,46 @@ def synthetic_root(demo_raw_dir: Path, tmp_path_factory) -> tuple[Path, list[int
         _write(echo / rel, f"DICM{study}{n}".encode())
         rows.append({"subject_id": subj, "study_id": study, "acquisition_datetime": t, "dicom_filepath": rel})
     _csv(echo / "echo-record-list.csv", pl.DataFrame(rows))
+    # Like the real table, it holds patients outside the cohort; measurement 7001 belongs to study 90000001.
+    _csv(
+        echo / "echo-study-list.csv",
+        pl.DataFrame(
+            {
+                "subject_id": [s[0]],
+                "study_id": [90000001],
+                "study_datetime": ["2150-02-01 08:00:00"],
+                "measurement_id": [7001],
+                "measurement_datetime": ["2150-02-01 09:00:00"],
+                "note_id": [None],
+                "note_seq": [None],
+                "note_charttime": [None],
+            }
+        ),
+    )
+    _csv(
+        echo / "structured-measurement.csv.gz",
+        pl.DataFrame(
+            {
+                "subject_id": [s[0], s[0], s[2], s[2], outsider],
+                "measurement_id": [7001, 7001, 7002, 7002, 7003],
+                "measurement_datetime": ["2150-02-01 09:00:00"] * 2
+                + ["2150-02-05 12:00:00"] * 2
+                + ["2150-02-06 12:00:00"],
+                "test_type": ["TTE", "TTE", "TEE", "TEE", "TTE"],
+                "measurement": ["lvef", "lv_size", "lvef", "rvsp", "lvef"],
+                "measurement_description": [
+                    "LV ejection fraction",
+                    "LV cavity size",
+                    "LV ejection fraction",
+                    "RV systolic pressure",
+                    "LV ejection fraction",
+                ],
+                "result": ["55", "Normal (<5.6cm)", "60.5", "", "40"],
+                "unit": ["%", "", "%", "mmHg", "%"],
+            }
+        ),
+        gz=True,
+    )
 
     cxr = root / "mimic-cxr-jpg" / "2.1.0"
     rows = []
@@ -204,7 +244,7 @@ def test_ecg(built):
 
 def test_echo(built):
     out, s = built
-    ev = _events(out, "ECHO//")
+    ev = _events(out, "ECHO//DICOM")
     assert ev.select("subject_id", "echo_study_id", pl.col("time").dt.strftime(TS)).rows() == [
         (s[0], 90000001, "2150-02-01 08:30:00"),
         (s[2], 90000002, "2150-02-02 09:00:00"),
@@ -212,6 +252,40 @@ def test_echo(built):
     for link, study in ev.select("echo_link", "echo_study_id").rows():
         assert link.startswith("echo/") and link.endswith(".dcm")
         assert (out / link).read_bytes().startswith(f"DICM{study}".encode())
+
+
+def test_echo_measurements(built):
+    out, s = built
+    ev = _events(out, "ECHO//MEASUREMENT//")
+    cols = [
+        "subject_id",
+        "code",
+        "numeric_value",
+        "text_value",
+        "unit",
+        "echo_test_type",
+        "echo_measurement_id",
+        "echo_study_id",
+    ]
+    assert ev.select(pl.col("time").dt.strftime(TS), *cols).rows() == [
+        (
+            "2150-02-01 09:00:00",
+            s[0],
+            "ECHO//MEASUREMENT//lv_size",
+            None,
+            "Normal (<5.6cm)",
+            None,
+            "TTE",
+            7001,
+            90000001,
+        ),
+        ("2150-02-01 09:00:00", s[0], "ECHO//MEASUREMENT//lvef", 55.0, None, "%", "TTE", 7001, 90000001),
+        ("2150-02-05 12:00:00", s[2], "ECHO//MEASUREMENT//lvef", 60.5, None, "%", "TEE", 7002, None),
+    ]
+    codes = pl.read_parquet(out / "metadata" / "codes.parquet").filter(
+        pl.col("code") == "ECHO//MEASUREMENT//lvef"
+    )
+    assert "LV ejection fraction" in codes["description"].item()
 
 
 def test_cxr(built):
@@ -274,7 +348,10 @@ def test_objects_and_sources(built, synthetic_root):
     assert sources["modules"] == ["core", "note", "ecg", "echo", "cxr"]
     by = {x["module"]: x for x in sources["sources"]}
     assert {"listed": 3, "missing_on_disk": 1, "emitted": 2}.items() <= by["ecg"]["staging"].items()
-    assert by["echo"]["staging"]["outside_core_subjects"] == 1
+    assert by["echo"]["staging"]["dicoms"]["outside_core_subjects"] == 1
+    assert {"cohort_rows": 4, "empty_result": 1, "emitted": 3, "linked_to_study": 2}.items() <= by["echo"][
+        "staging"
+    ]["measurements"].items()
     assert by["cxr"]["staging"]["distinct_objects"] == 2
     assert by["cxr"]["objects"] == {"objects": 2, "files_written": 2, "bytes": 12}
     assert by["note"]["staging"]["radiology"]["missing_storetime"] == 1

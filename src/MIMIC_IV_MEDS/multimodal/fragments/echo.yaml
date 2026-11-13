@@ -19,3 +19,22 @@ echo/records:
           'Echocardiogram DICOM file (mostly cine loops) from MIMIC-IV-ECHO, timed at its acquisition
           (echo-record-list.acquisition_datetime). echo_link is the file relative to the MEDS root;
           echo_study_id is the echo study'
+
+# The measurements of each echo report (MIMIC-IV-ECHO `structured-measurement`), staged by
+# `staging.stage_echo_measurements`: streamed from the csv.gz and filtered to the core cohort, rows
+# without a result dropped, numeric results in numeric_value and the rest in text_value. Left out of
+# the spec when the release folder has no measurement table.
+echo/measurements:
+  measurement:
+    code: $code
+    time: '$time::"%Y-%m-%d %H:%M:%S"'
+    numeric_value: $numeric_value
+    text_value: $text_value
+    unit: $unit
+    echo_test_type: $echo_test_type
+    echo_measurement_id: $echo_measurement_id
+    echo_study_id: $echo_study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Echocardiogram report measurement (MIMIC-IV-ECHO structured-measurement): {$description}"

@@ -182,7 +182,8 @@ def build(a: argparse.Namespace) -> Path:
             staged[name] = staging.OBJECT_STAGERS[name](f, raw_input, subjects, a.workers)
         logger.info(f"{name:>4}: staged {staged[name].stats}")
 
-    spec_fp = compose.write_spec(compose.compose(core, found), work / "spec.yaml")
+    skip = set().union(*(s.skip_tables for s in staged.values()))
+    spec_fp = compose.write_spec(compose.compose(core, found, skip), work / "spec.yaml")
     run_meds_extract(spec_fp, out, raw_input, enrich=not a.no_enrich, cleanup=not a.keep_staging)
 
     manifests = [s.objects for s in staged.values() if s.objects is not None]

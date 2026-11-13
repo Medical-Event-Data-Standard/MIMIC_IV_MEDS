@@ -313,14 +313,14 @@ mimic-iv-meds-multimodal --root /data/MIMIC-IV_Multimodal_Demo --output-dir $MED
 # --no-enrich                        skip the suMEDS code-metadata step (offline)
 ```
 
-| Module | Release (demo / full)                | Events                                                                                | Time                        |
-| ------ | ------------------------------------ | ------------------------------------------------------------------------------------- | --------------------------- |
-| core   | `mimic-iv-demo` / `mimiciv`          | the `MIMIC-IV` spec, unchanged                                                        | as in that spec             |
-| `ed`   | `mimic-iv-ed-demo` / `mimic-iv-ed`   | the `MIMIC-IV-ED` tables (`ED//…`)                                                    | as in that spec             |
-| `note` | `mimic-iv-note`                      | `NOTE//DISCHARGE_SUMMARY`, `NOTE//RADIOLOGY_REPORT[//ADDENDUM]`, text in `text_value` | `max(charttime, storetime)` |
-| `ecg`  | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, `ecg_link`                                      | `ecg_time` (acquisition)    |
-| `echo` | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, `echo_link`                                        | `acquisition_datetime`      |
-| `cxr`  | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>`, one per JPG, `cxr_link`                                 | `StudyDate` + `StudyTime`   |
+| Module | Release (demo / full)                | Events                                                                                                                        | Time                                           |
+| ------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| core   | `mimic-iv-demo` / `mimiciv`          | the `MIMIC-IV` spec, unchanged                                                                                                | as in that spec                                |
+| `ed`   | `mimic-iv-ed-demo` / `mimic-iv-ed`   | the `MIMIC-IV-ED` tables (`ED//…`)                                                                                            | as in that spec                                |
+| `note` | `mimic-iv-note`                      | `NOTE//DISCHARGE_SUMMARY`, `NOTE//RADIOLOGY_REPORT[//ADDENDUM]`, text in `text_value`                                         | `max(charttime, storetime)`                    |
+| `ecg`  | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, `ecg_link`                                                                              | `ecg_time` (acquisition)                       |
+| `echo` | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, `echo_link`; `ECHO//MEASUREMENT//<measurement>` from `structured-measurement` (if present) | `acquisition_datetime`; `measurement_datetime` |
+| `cxr`  | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>`, one per JPG, `cxr_link`                                                                         | `StudyDate` + `StudyTime`                      |
 
 Objects (waveforms, DICOMs, JPGs) are stored inside the MEDS root under their SHA-256, in their
 original formats, and each object event names its file in a link column relative to that root:
@@ -344,15 +344,20 @@ have no MEDS or MEDS-Extract counterpart yet; they are written by
 `src/MIMIC_IV_MEDS/multimodal/finalize.py`, kept self-contained so they can move upstream as a
 post-stage.
 
-Every module is restricted to the subjects of the core's `hosp/patients`, so a module can never
-add subjects or reshuffle the core's splits. An object listed in a record list but not (fully) on
+Every module is restricted to the subjects of the core's `hosp/patients` (for the demo: its 100
+patients), whether its files hold only those subjects or the whole release, so a module can never
+add subjects or reshuffle the core's splits. Tables too big to load whole, like MIMIC-IV-ECHO's
+`structured-measurement.csv.gz` (28 M rows for all patients), stay compressed and are streamed,
+keeping only the cohort's rows. An object listed in a record list but not (fully) on
 disk gets no event: no link ever dangles, `sources.json` counts what was skipped, and re-running
 after a download completes picks it up. On the MIMIC-IV demo subjects (100) the build adds 2,042
-notes, 659 ECGs, 411 echo DICOMs and 566 chest X-rays.
+notes, 659 ECGs, 411 echo DICOMs, 6,820 echo measurements (58 subjects) and 566 chest X-rays.
 
 Caveats: the ECG time is the ECG machine's clock, which the release says was mostly not
-synchronized with the hospital's. The CheXpert labels and the echo measurements are not extracted
-yet: the labels are mined from the report, which MIMIC-CXR-JPG does not time. Notes are timed at
+synchronized with the hospital's. The CheXpert labels are not extracted: they are mined from the
+report, which MIMIC-CXR-JPG does not time. Echo measurements with an empty `result` (two thirds of
+the rows: blank fields of the report form) get no event; most measurements belong to echos whose
+DICOMs are not released, so only some carry an `echo_study_id`. Notes are timed at
 when they were saved, not when the care happened: the median gap is about 20 h for discharge
 summaries and 2.4 h for radiology reports on the demo subjects.
 

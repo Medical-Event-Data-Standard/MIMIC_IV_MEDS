@@ -20,9 +20,13 @@ Nothing here prints row values: only counts.
 
 from __future__ import annotations
 
+import csv
+import gzip
 import hashlib
+import io
 import logging
 import urllib.request
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -46,6 +50,8 @@ class Staged:
     stats: dict = field(default_factory=dict)
     #: One row per source object (see `OBJECT_SCHEMA`), or None for table-only modules.
     objects: pl.DataFrame | None = None
+    #: Fragment tables this module could not stage (an optional raw table is absent); left out of the spec.
+    skip_tables: set[str] = field(default_factory=set)
 
 
 #: Columns of the object manifest (and of `metadata/objects.parquet`, see `finalize.py`).
@@ -152,6 +158,42 @@ def read_table(root: Path, *names: str) -> pl.DataFrame:
         if (root / name).is_file():
             return pl.read_csv(root / name, infer_schema=False)
     raise FileNotFoundError(f"none of {names} under {root}")
+
+
+def stream_subject_rows(
+    stream: io.BufferedIOBase, subjects: Iterable[int], batch_rows: int = 1_000_000
+) -> pl.DataFrame:
+    r"""Read a CSV (gzipped or not) from a byte stream, keeping only the rows of `subjects`; all strings.
+
+    For the tables that are too big to load whole and hold every patient of the release (MIMIC-IV-ECHO's
+    `structured-measurement.csv.gz`: 28 M rows, 190 MB compressed): rows are parsed one at a time and
+    only the cohort's are kept, so memory follows the cohort, not the file. The stream can be a local
+    file or an HTTP response, so a download can filter the same way without storing the whole table.
+    `csv` handles quoted commas and line breaks.
+
+    Examples:
+        >>> raw = b"subject_id,x\n1,a\n2,\"b, c\"\n3,d\n2,e\n"
+        >>> stream_subject_rows(io.BytesIO(gzip.compress(raw)), [2]).rows()
+        [('2', 'b, c'), ('2', 'e')]
+        >>> stream_subject_rows(io.BytesIO(raw), [], batch_rows=1).height
+        0
+    """
+    keep = {str(s) for s in subjects}
+    buffered = io.BufferedReader(stream) if not isinstance(stream, io.BufferedReader) else stream
+    if buffered.peek(2)[:2] == b"\x1f\x8b":
+        buffered = gzip.GzipFile(fileobj=buffered)
+    reader = csv.reader(io.TextIOWrapper(buffered, encoding="utf-8", newline=""))
+    header = next(reader)
+    col = header.index("subject_id")
+    frames, rows = [], []
+    for row in reader:
+        if row and row[col] in keep:
+            rows.append(row)
+            if len(rows) >= batch_rows:
+                frames.append(pl.DataFrame(rows, schema=header, orient="row"))
+                rows = []
+    frames.append(pl.DataFrame(rows, schema=dict.fromkeys(header, pl.String), orient="row"))
+    return pl.concat(frames)
 
 
 def cohort_subjects(core: FoundRelease) -> pl.Series:
@@ -435,12 +477,91 @@ def stage_ecg(ecg: FoundRelease, raw_input: Path, subjects: pl.Series, workers: 
     )
 
 
+MEASUREMENT_FILES = (
+    "structured-measurement.csv.gz",
+    "structured_measurement.csv.gz",
+    "structured-measurement.csv",
+    "structured_measurement.csv",
+)
+_NUMBER = r"^[-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)$"
+
+
+def stage_echo_measurements(echo: FoundRelease, raw_input: Path, subjects: pl.Series) -> dict:
+    """`echo/measurements.parquet`: one `ECHO//MEASUREMENT//<measurement>` row per reported measurement.
+
+    From MIMIC-IV-ECHO's `structured-measurement` table, the measurements of each echo report (it covers
+    every echo of the release's patients, most of them without released DICOMs). The table holds every
+    patient, so it is streamed and filtered to the core cohort (`stream_subject_rows`). Rows with an
+    empty `result` are blank fields of the report form and get no event. A numeric `result` goes to
+    `numeric_value`, any other (`Normal (<1.2cm)`) to `text_value`, under the same code; the unit is
+    the code modifier `unit`, as for labs. Timed at `measurement_datetime`. `echo_study_id` is set
+    where `echo-study-list` links the measurement to a study with DICOMs.
+    """
+    fp = next((echo.root / n for n in MEASUREMENT_FILES if (echo.root / n).is_file()), None)
+    if fp is None:
+        return {"present": False}
+    logger.info(f"echo: streaming {fp.name} for the cohort's {subjects.len()} subjects")
+    with open(fp, "rb") as f:
+        df = stream_subject_rows(f, subjects.to_list())
+    result = pl.col("result").str.strip_chars()
+    df = df.with_columns(
+        pl.col("subject_id").cast(pl.Int64),
+        pl.col("measurement_id").cast(pl.Int64),
+        parse_time(pl.col("measurement_datetime")).alias("_time"),
+        result.replace("", None).alias("result"),
+        pl.col("unit").str.strip_chars().replace("", None).alias("unit"),
+        pl.col("test_type").str.strip_chars().replace("", None).alias("echo_test_type"),
+    )
+    try:
+        links = read_table(echo.root, "echo-study-list.csv", "echo-study-list.csv.gz").select(
+            pl.col("measurement_id").cast(pl.Int64, strict=False), pl.col("study_id").cast(pl.Int64)
+        )
+    except FileNotFoundError:
+        links = pl.DataFrame(schema={"measurement_id": pl.Int64, "study_id": pl.Int64})
+    links = links.drop_nulls().unique("measurement_id", keep="any")
+    is_number = pl.col("result").str.contains(_NUMBER)
+    kept = (
+        df.filter(pl.col("result").is_not_null() & pl.col("_time").is_not_null())
+        .join(links, on="measurement_id", how="left")
+        .select(
+            "subject_id",
+            (pl.lit("ECHO//MEASUREMENT//") + pl.col("measurement").str.strip_chars()).alias("code"),
+            pl.col("_time").dt.strftime(TIME_FMT).alias("time"),
+            pl.when(is_number).then(pl.col("result").cast(pl.Float64, strict=False)).alias("numeric_value"),
+            pl.when(~is_number).then(pl.col("result")).alias("text_value"),
+            "unit",
+            pl.col("measurement_description").str.strip_chars().alias("description"),
+            "echo_test_type",
+            pl.col("measurement_id").alias("echo_measurement_id"),
+            pl.col("study_id").alias("echo_study_id"),
+        )
+    )
+    out = raw_input / "echo" / "measurements.parquet"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    kept.write_parquet(out)
+    return {
+        "present": True,
+        "file": fp.name,
+        "cohort_rows": df.height,
+        "empty_result": int(df["result"].is_null().sum()),
+        "unparsable_time": int(df["_time"].is_null().sum()),
+        "emitted": kept.height,
+        "emitted_numeric": int(kept["numeric_value"].is_not_null().sum()),
+        "emitted_text": int(kept["text_value"].is_not_null().sum()),
+        "linked_to_study": int(kept["echo_study_id"].is_not_null().sum()),
+        "subjects": kept["subject_id"].n_unique(),
+        "codes": kept["code"].n_unique(),
+    }
+
+
 def stage_echo(echo: FoundRelease, raw_input: Path, subjects: pl.Series, workers: int) -> Staged:
-    """`echo/records.parquet`: one `ECHO//DICOM` row per echocardiogram DICOM file.
+    """`echo/records.parquet`: one `ECHO//DICOM` row per echocardiogram DICOM file, plus the measurements.
 
     Timed at `echo-record-list.acquisition_datetime`. Most files are cine loops, some single frames; the code
-    does not say which because telling them apart means reading every DICOM header.
+    does not say which because telling them apart means reading every DICOM header. The measurements
+    (`stage_echo_measurements`) are optional: without the table the spec leaves `echo/measurements` out.
     """
+    measurements = stage_echo_measurements(echo, raw_input, subjects)
     df = (
         read_table(echo.root, "echo-record-list.csv", "echo-record-list.csv.gz")
         .select(
@@ -462,7 +583,7 @@ def stage_echo(echo: FoundRelease, raw_input: Path, subjects: pl.Series, workers
         )
     )
     df = _single_file_objects(echo, df, ".dcm", workers)
-    return _finish_objects(
+    staged = _finish_objects(
         echo,
         df,
         subjects,
@@ -470,6 +591,10 @@ def stage_echo(echo: FoundRelease, raw_input: Path, subjects: pl.Series, workers
         ["subject_id", "code", "time", "echo_study_id", "link"],
         "DICOM",
     )
+    staged.stats = {"dicoms": staged.stats, "measurements": measurements}
+    if not measurements["present"]:
+        staged.skip_tables.add("echo/measurements")
+    return staged
 
 
 def stage_cxr(cxr: FoundRelease, raw_input: Path, subjects: pl.Series, workers: int) -> Staged:
