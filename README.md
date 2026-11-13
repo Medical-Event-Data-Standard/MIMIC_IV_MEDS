@@ -298,7 +298,7 @@ ED detail exists only for 2011–2019, so its presence is a proxy for calendar p
 visits with the base's `TRANSFER_TO//ED//…`, not with `ED//ARRIVAL`. The modelling decisions,
 caveats and validation are in [`docs/extensions/ed.md`](docs/extensions/ed.md).
 
-## Multimodal build: MIMIC-IV plus any combination of ED, notes, ECG, echo and chest X-rays
+## Multimodal build: MIMIC-IV plus any combination of ED, notes, ECG, echo, chest X-rays and waveforms
 
 `mimic-iv-meds-multimodal` builds one MEDS dataset from local copies of MIMIC-IV and any subset of
 its linked PhysioNet modules. Unlike the `spec=` runs above it downloads nothing: point it at a
@@ -306,21 +306,21 @@ folder holding the releases side by side, in PhysioNet's own layout (`<slug>/<ve
 `wget -r` leaves it, or `<slug>-<version>/` as the ZIP download does).
 
 ```bash
-mimic-iv-meds-multimodal --root /data/MIMIC-IV_Multimodal_Demo --output-dir $MEDS_OUTPUT_DIR \
-	--modules ed,note,ecg,echo,cxr # any subset, or `all`; empty for MIMIC-IV alone
-# --link-mode copy|hardlink|symlink  how objects get into the MEDS root (default copy)
-# --path cxr=/elsewhere/mimic-cxr-jpg/2.1.0   when a release is not under --root
-# --no-enrich                        skip the suMEDS code-metadata step (offline)
+# --modules: any subset of ed,note,ecg,echo,cxr,waveform, or `all`; empty for MIMIC-IV alone.
+# Optional: --link-mode copy|hardlink|symlink (how objects get into the MEDS root; default copy),
+# --path cxr=/elsewhere/mimic-cxr-jpg/2.1.0 (a release not under --root), --no-enrich (offline).
+mimic-iv-meds-multimodal --root /data/MIMIC-IV_Multimodal_Demo --output-dir $MEDS_OUTPUT_DIR --modules all
 ```
 
-| Module | Release (demo / full)                | Events                                                                                                                        | Time                                           |
-| ------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| core   | `mimic-iv-demo` / `mimiciv`          | the `MIMIC-IV` spec, unchanged                                                                                                | as in that spec                                |
-| `ed`   | `mimic-iv-ed-demo` / `mimic-iv-ed`   | the `MIMIC-IV-ED` tables (`ED//…`)                                                                                            | as in that spec                                |
-| `note` | `mimic-iv-note`                      | `NOTE//DISCHARGE_SUMMARY`, `NOTE//RADIOLOGY_REPORT[//ADDENDUM]`, text in `text_value`                                         | `max(charttime, storetime)`                    |
-| `ecg`  | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, `ecg_link`                                                                              | `ecg_time` (acquisition)                       |
-| `echo` | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, `echo_link`; `ECHO//MEASUREMENT//<measurement>` from `structured-measurement` (if present) | `acquisition_datetime`; `measurement_datetime` |
-| `cxr`  | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>`, one per JPG, `cxr_link`                                                                         | `StudyDate` + `StudyTime`                      |
+| Module     | Release (demo / full)                | Events                                                                                                                        | Time                                           |
+| ---------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| core       | `mimic-iv-demo` / `mimiciv`          | the `MIMIC-IV` spec, unchanged                                                                                                | as in that spec                                |
+| `ed`       | `mimic-iv-ed-demo` / `mimic-iv-ed`   | the `MIMIC-IV-ED` tables (`ED//…`)                                                                                            | as in that spec                                |
+| `note`     | `mimic-iv-note`                      | `NOTE//DISCHARGE_SUMMARY`, `NOTE//RADIOLOGY_REPORT[//ADDENDUM]`, text in `text_value`                                         | `max(charttime, storetime)`                    |
+| `ecg`      | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, `ecg_link`                                                                              | `ecg_time` (acquisition)                       |
+| `echo`     | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, `echo_link`; `ECHO//MEASUREMENT//<measurement>` from `structured-measurement` (if present) | `acquisition_datetime`; `measurement_datetime` |
+| `cxr`      | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>`, one per JPG, `cxr_link`                                                                         | `StudyDate` + `StudyTime`                      |
+| `waveform` | `mimic4wdb`                          | `WAVEFORM//SEGMENT` per continuous segment and `WAVEFORM//RECORD` per multi-segment record, `waveform_link`                   | the **end** of the linked data                 |
 
 Objects (waveforms, DICOMs, JPGs) are stored inside the MEDS root under their SHA-256, in their
 original formats, and each object event names its file in a link column relative to that root:
@@ -333,6 +333,7 @@ $MEDS_OUTPUT_DIR/
   ecg/<sha[:2]>/<sha>/<record>.hea, .dat   # wfdb.rdrecord(root / ecg_link)
   echo/<sha[:2]>/<sha>.dcm
   cxr/<sha[:2]>/<sha>.jpg
+  waveform/<sha[:2]>/<sha>/<record>.hea, <record>_NNNN.hea/.dat, <record>n.csv.gz   # a whole record
 ```
 
 `metadata/dataset.json` says which combination this is: `dataset_name` is e.g.
@@ -351,7 +352,18 @@ add subjects or reshuffle the core's splits. Tables too big to load whole, like 
 keeping only the cohort's rows. An object listed in a record list but not (fully) on
 disk gets no event: no link ever dangles, `sources.json` counts what was skipped, and re-running
 after a download completes picks it up. On the MIMIC-IV demo subjects (100) the build adds 2,042
-notes, 659 ECGs, 411 echo DICOMs, 6,820 echo measurements (58 subjects) and 566 chest X-rays.
+notes, 659 ECGs, 411 echo DICOMs, 6,820 echo measurements (58 subjects), 566 chest X-rays and
+5 bedside-monitor waveform records (4 subjects, 60 segments, 190 h).
+
+**Loader rule: a link's data becomes available at its event's `time`, and a loader reads only the
+record the link names.** Every object event is timed when its data is complete, so a model that,
+at prediction time *t*, loads only the links of events with `time <= t` never sees later data. This
+matters most for waveforms: a record spans an ICU stay (days), and its folder also holds its later
+segments and its numerics (`<record>n.csv.gz`, ~1 Hz HR, SpO2, NBP, …). `WAVEFORM//SEGMENT` is
+timed at the end of its segment and its link is a WFDB record of that segment alone;
+`WAVEFORM//RECORD`, the only event linking to the whole record (and so the only way to its
+numerics), is timed at the end of the record. `waveform_duration_s` gives each window,
+`[time - duration, time]`. Do not list or glob a link's folder.
 
 Caveats: the ECG time is the ECG machine's clock, which the release says was mostly not
 synchronized with the hospital's. The CheXpert labels are not extracted: they are mined from the

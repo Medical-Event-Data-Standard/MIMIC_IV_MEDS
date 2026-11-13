@@ -1,0 +1,28 @@
+# Multimodal module `waveform`: the MIMIC-IV Waveform Database (bedside monitor waveforms, WFDB).
+#   https://physionet.org/content/mimic4wdb/0.1.0/
+#
+# Composed into the multimodal spec by `MIMIC_IV_MEDS.multimodal`; not a spec on its own. It reads
+# `waveform/segments.parquet`, which `staging.stage_waveform` builds from the release's RECORDS and
+# the records' WFDB headers. A record spans an ICU stay (days), so every event is timed at the END
+# of the data it links to; `waveform_duration_s` gives the window, [time - duration, time].
+#
+# `waveform_link` is an additional value modality column: a WFDB record name relative to the MEDS
+# root, `waveform/<sha[:2]>/<sha>/<segment or record>`, so `wfdb.rdrecord(meds_root / link)` reads
+# it. The record's numerics (`<record>n.csv.gz`, ~1 Hz vitals) sit in the same folder.
+waveform/segments:
+  waveform:
+    code: $code
+    time: '$time::"%Y-%m-%d %H:%M:%S"'
+    waveform_link: $link
+    hadm_id: $hadm_id
+    waveform_record_id: $waveform_record_id
+    waveform_segment: $waveform_segment
+    waveform_duration_s: $waveform_duration_s
+    _metadata:
+      _self:
+        description: >-
+          'Bedside monitor waveform data (MIMIC-IV Waveform Database, WFDB), timed at the end of the
+          linked data: WAVEFORM//SEGMENT is one continuous segment, WAVEFORM//RECORD a whole
+          multi-segment record (with its numerics file alongside). waveform_link is the WFDB record
+          relative to the MEDS root; waveform_duration_s is how long it lasts. Loaders: read only the
+          linked record, and only from this event time on (its folder also holds later data)'

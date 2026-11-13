@@ -142,6 +142,37 @@ def synthetic_root(demo_raw_dir: Path, tmp_path_factory) -> tuple[Path, list[int
         )
     _csv(cxr / "mimic-cxr-2.0.0-metadata.csv", pl.DataFrame(rows))
 
+    # MIMIC-IV Waveform Database: RECORDS lists every patient's folder (one outside the cohort, one not
+    # downloaded); one record of two segments with a gap, preceded by a zero-length layout segment.
+    wdb = root / "mimic4wdb" / "0.1.0"
+    pdir = f"waves/p{str(s[0])[:3]}/p{s[0]}"
+    (wdb / "waves").mkdir(parents=True)
+    (wdb / "RECORDS").write_text(f"{pdir}/\nwaves/p999/p{outsider}/\nwaves/p{str(s[2])[:3]}/p{s[2]}/\n")
+    _write(wdb / pdir / "RECORDS", b"88000001/88000001\n")
+    rec = wdb / pdir / "88000001"
+    _write(
+        rec / "88000001.hea",
+        (
+            "#wfdb 10.7\n88000001/4 2 62.5/999.9 1250 23:59:58.500 31/12/2150\n"
+            "88000001_0000 0\n88000001_0001 625\n~ 125\n88000001_0002 500\n"
+            f"# subject_id {s[0]}\n# hadm_id 21000001\n"
+        ).encode(),
+    )
+    _write(
+        rec / "88000001_0000.hea",
+        b"88000001_0000 2 62.5 0\n~ 1x1 200/mV 16 0 0 0 0 II\n~ 1x1 200/mV 16 0 0 0 0 V\n",
+    )
+    for seg, n in (("0001", 625), ("0002", 500)):
+        _write(
+            rec / f"88000001_{seg}.hea",
+            (
+                f"88000001_{seg} 2 62.5 {n}\n88000001_{seg}e.dat 516 200/mV 16 0 0 0 0 II\n"
+                f"88000001_{seg}e.dat 516 200/mV 16 0 0 0 0 V\n"
+            ).encode(),
+        )
+        _write(rec / f"88000001_{seg}e.dat", seg.encode() * 8)
+    _write(rec / "88000001n.csv.gz", gzip.compress(b'"time","HR [bpm]"\n0,80\n'))
+
     note = root / "mimic-iv-note" / "2.2" / "note"
     _csv(
         note / "discharge.csv.gz",
@@ -189,7 +220,7 @@ def built(synthetic_root, demo_raw_dir, tmp_path_factory) -> tuple[Path, list[in
         "--output-dir",
         str(out),
         "--modules",
-        "note,ecg,echo,cxr",
+        "note,ecg,echo,cxr,waveform",
         "--common-dir",
         str(demo_raw_dir),
         "--no-enrich",
@@ -211,16 +242,17 @@ def _events(out: Path, prefix: str) -> pl.DataFrame:
 def test_dataset_json(built):
     out, _ = built
     meta = json.loads((out / "metadata" / "dataset.json").read_text())
-    assert meta["dataset_name"] == "MIMIC-IV+Note+ECG+ECHO+CXR"
+    assert meta["dataset_name"] == "MIMIC-IV+Note+ECG+ECHO+CXR+WDB"
     assert meta["dataset_version"].split(",") == [
         "mimic-iv-demo/2.2",
         "mimic-iv-note/2.2",
         "mimic-iv-ecg-demo/0.1",
         "mimic-iv-echo/1.0.1",
         "mimic-cxr-jpg/2.1.0",
+        "mimic4wdb/0.1.0",
     ]
     assert meta["license"] == "PhysioNet Credentialed Health Data License 1.5.0"
-    assert meta["additional_value_modality_columns"] == ["ecg_link", "echo_link", "cxr_link"]
+    assert meta["additional_value_modality_columns"] == ["ecg_link", "echo_link", "cxr_link", "waveform_link"]
     assert {"note_id", "ecg_study_id", "echo_study_id", "cxr_study_id", "cxr_dicom_id"} <= set(
         meta["raw_source_id_columns"]
     )
@@ -288,6 +320,37 @@ def test_echo_measurements(built):
     assert "LV ejection fraction" in codes["description"].item()
 
 
+def test_waveform(built):
+    out, s = built
+    ev = _events(out, "WAVEFORM//")
+    cols = ["subject_id", "code", "hadm_id", "waveform_record_id", "waveform_segment", "waveform_duration_s"]
+    # Each event at the END of the data it links to: 23:59:58.5 + 625/62.5 s, + (750 + 500)/62.5 s.
+    assert ev.select(pl.col("time").dt.strftime(TS), *cols).sort("time", "code").rows() == [
+        ("2151-01-01 00:00:08", s[0], "WAVEFORM//SEGMENT", 21000001, 88000001, "88000001_0001", 10.0),
+        ("2151-01-01 00:00:18", s[0], "WAVEFORM//RECORD", 21000001, 88000001, None, 20.0),
+        ("2151-01-01 00:00:18", s[0], "WAVEFORM//SEGMENT", 21000001, 88000001, "88000001_0002", 8.0),
+    ]
+    links = ev["waveform_link"].to_list()
+    folder = {str(Path(x).parent) for x in links}
+    assert len(folder) == 1  # one record folder; its records keep their names
+    folder = out / folder.pop()
+    expected = ["88000001.hea", "88000001_0000.hea", "88000001_0001.hea", "88000001_0002.hea"]
+    expected += ["88000001_0001e.dat", "88000001_0002e.dat", "88000001n.csv.gz"]
+    assert sorted(p.name for p in folder.iterdir()) == sorted(expected)
+    for link in links:
+        assert (out / f"{link}.hea").is_file()
+    sources = json.loads((out / "metadata" / "sources.json").read_text())
+    staged = next(x for x in sources["sources"] if x["module"] == "waveform")["staging"]
+    assert {
+        "listed_patients": 3,
+        "patients_outside_core_subjects": 1,
+        "patients_not_on_disk": 1,
+        "records": 1,
+        "segment_events": 2,
+        "record_events": 1,
+    }.items() <= staged.items()
+
+
 def test_cxr(built):
     out, s = built
     ev = _events(out, "CXR//")
@@ -333,19 +396,26 @@ def test_objects_and_sources(built, synthetic_root):
     out, _ = built
     root, _ = synthetic_root
     objects = pl.read_parquet(out / "metadata" / "objects.parquet")
-    assert objects.group_by("modality").len().sort("modality").rows() == [("cxr", 3), ("ecg", 2), ("echo", 2)]
+    assert objects.group_by("modality").len().sort("modality").rows() == [
+        ("cxr", 3),
+        ("ecg", 2),
+        ("echo", 2),
+        ("waveform", 1),
+    ]
     for row in objects.iter_rows(named=True):
         src_root = {
             "ecg": root / "mimic-iv-ecg-demo-diagnostic-electrocardiogram-matched-subset-demo-0.1",
             "echo": root / "mimic-iv-echo" / "1.0.1",
             "cxr": root / "mimic-cxr-jpg" / "2.1.0",
+            "waveform": root / "mimic4wdb" / "0.1.0",
         }[row["modality"]]
-        if row["modality"] != "ecg":
+        if row["modality"] in ("echo", "cxr"):
             assert hashlib.sha256((src_root / row["files"][0]).read_bytes()).hexdigest() == row["sha256"]
         assert sum((src_root / f).stat().st_size for f in row["files"]) == row["size_bytes"]
 
     sources = json.loads((out / "metadata" / "sources.json").read_text())
-    assert sources["modules"] == ["core", "note", "ecg", "echo", "cxr"]
+    assert sources["modules"] == ["core", "note", "ecg", "echo", "cxr", "waveform"]
+    assert "only the record or file the link names" in sources["loader_rule"]
     by = {x["module"]: x for x in sources["sources"]}
     assert {"listed": 3, "missing_on_disk": 1, "emitted": 2}.items() <= by["ecg"]["staging"].items()
     assert by["echo"]["staging"]["dicoms"]["outside_core_subjects"] == 1

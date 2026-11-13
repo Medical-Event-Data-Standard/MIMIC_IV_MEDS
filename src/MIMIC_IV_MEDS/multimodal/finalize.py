@@ -30,6 +30,16 @@ from .staging import OBJECT_SCHEMA, Staged
 
 LINK_MODES = ("copy", "hardlink", "symlink")
 
+#: How a model may use the link columns without seeing the future; written to `sources.json`.
+LOADER_RULE = (
+    "A link's data is available from its event's `time` on, never before, and a loader reads only the "
+    "record or file the link names. Every object event is timed when its data is complete (a waveform "
+    "segment or record at its end; `waveform_duration_s` gives the window [time - duration, time]). A "
+    "waveform record folder also holds its later segments and its numerics: do not list or glob a link's "
+    "folder; the whole record and its numerics are reachable only through WAVEFORM//RECORD, at the "
+    "record's end."
+)
+
 
 def _place(src: Path, dest: Path, mode: str) -> bool:
     """Put `src` at `dest`; False when `dest` already holds it (a re-run, or a duplicate object)."""
@@ -107,6 +117,7 @@ def write_sources(
         "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "modules": [core.module.name, *(f.module.name for f in found)],
         "object_link_mode": link_mode,
+        "loader_rule": LOADER_RULE,
         "notes": (
             "Releases whose `release` is `full` may be a subset of that release (e.g. only the MIMIC-IV "
             "demo subjects); `staging` counts what each contributed. Object links are relative to the "
@@ -122,10 +133,14 @@ def write_sources(
 def check_links(meds_root: Path, link_columns: list[str]) -> dict[str, int]:
     """Count the links in `data/` per column; raise if any is unknown to objects.parquet or missing on
     disk."""
-    known = set()
+    known, folders = set(), set()
     objects_fp = meds_root / "metadata" / "objects.parquet"
     if objects_fp.exists():
-        known = set(pl.read_parquet(objects_fp, columns=["link"])["link"])
+        objects = pl.read_parquet(objects_fp, columns=["link", "files"])
+        known = set(objects["link"])
+        # A multi-file object is a folder of WFDB records (a waveform record's segments sit next to it):
+        # a link to any record in that folder belongs to the object.
+        folders = {str(Path(x).parent) for x, f in objects.iter_rows() if len(f) > 1}
     data = pl.scan_parquet(meds_root / "data" / "**" / "*.parquet")
     present = set(data.collect_schema().names())
     counts = {}
@@ -133,7 +148,7 @@ def check_links(meds_root: Path, link_columns: list[str]) -> dict[str, int]:
         if col not in present:
             raise ValueError(f"{col} is declared but not in data/")
         links = data.select(pl.col(col).drop_nulls().unique()).collect()[col].to_list()
-        unknown = [x for x in links if x not in known]
+        unknown = [x for x in links if x not in known and str(Path(x).parent) not in folders]
         # An ECG link names a WFDB record (no extension); its header is `<link>.hea`.
         missing = [x for x in links if not ((meds_root / x).exists() or (meds_root / f"{x}.hea").exists())]
         if unknown or missing:

@@ -141,6 +141,15 @@ MODULES: dict[str, Module] = {
             link_column="cxr_link",
             raw_source_id_columns=("cxr_study_id", "cxr_dicom_id"),
         ),
+        Module(
+            name="waveform",
+            label="WDB",
+            title="MIMIC-IV Waveform Database (bedside monitor waveforms and numerics, WFDB)",
+            releases=(Release("mimic4wdb", False, ODBL),),
+            marker=("waves",),
+            link_column="waveform_link",
+            raw_source_id_columns=("waveform_record_id",),
+        ),
     )
 }
 

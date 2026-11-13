@@ -29,6 +29,7 @@ import urllib.request
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import polars as pl
@@ -641,4 +642,173 @@ def stage_cxr(cxr: FoundRelease, raw_input: Path, subjects: pl.Series, workers: 
     )
 
 
-OBJECT_STAGERS = {"ecg": stage_ecg, "echo": stage_echo, "cxr": stage_cxr}
+@dataclass
+class WfdbMaster:
+    """What a WFDB multi-segment master header says (only what the build needs)."""
+
+    name: str
+    fs: float  # frames per second
+    n_samples: int
+    start: datetime | None
+    #: `(segment name or "~" for a gap, samples)`, in order.
+    segments: list[tuple[str, int]]
+    info: dict[str, str]
+
+
+def parse_wfdb_master(text: str) -> WfdbMaster:
+    r"""Parse a multi-segment WFDB header: record line, segment lines, `# key value` info lines.
+
+    Examples:
+        >>> m = parse_wfdb_master(
+        ...     "#wfdb 10.7\n"
+        ...     "8000/3 7 62.5/999.9 1250 23:59:58.500 31/12/2150\n"
+        ...     "8000_0000 0\n8000_0001 625\n~ 125\n8000_0002 500\n"
+        ...     "# subject_id 10000032\n# hadm_id 22595853\n"
+        ... )
+        >>> m.name, m.fs, m.n_samples, m.start
+        ('8000', 62.5, 1250, datetime.datetime(2150, 12, 31, 23, 59, 58, 500000))
+        >>> m.segments
+        [('8000_0000', 0), ('8000_0001', 625), ('~', 125), ('8000_0002', 500)]
+        >>> m.info
+        {'subject_id': '10000032', 'hadm_id': '22595853'}
+    """
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    info = {}
+    for ln in lines:
+        if ln.startswith("#"):
+            key, _, value = ln.lstrip("#").strip().partition(" ")
+            if key != "wfdb":
+                info[key] = value.strip()
+    body = [ln for ln in lines if not ln.startswith("#")]
+    rec = body[0].split()
+    start = None
+    if len(rec) >= 6:
+        for fmt in ("%H:%M:%S.%f %d/%m/%Y", "%H:%M:%S %d/%m/%Y"):
+            try:
+                start = datetime.strptime(f"{rec[4]} {rec[5]}", fmt)
+                break
+            except ValueError:
+                pass
+    segments = [(tok[0], int(tok[1])) for tok in (ln.split() for ln in body[1:])]
+    return WfdbMaster(rec[0].split("/")[0], float(rec[2].split("/")[0]), int(rec[3]), start, segments, info)
+
+
+def _segment_files(hea: Path) -> list[str]:
+    """The signal files a segment header names (`~` marks a signal absent from the segment)."""
+    files = []
+    for ln in hea.read_text().splitlines()[1:]:
+        tok = ln.split()
+        if tok and not ln.startswith("#") and tok[0] != "~" and tok[0] not in files:
+            files.append(tok[0])
+    return files
+
+
+def stage_waveform(wdb: FoundRelease, raw_input: Path, subjects: pl.Series, workers: int) -> Staged:
+    """`waveform/segments.parquet`: bedside-monitor waveforms of the MIMIC-IV Waveform Database.
+
+    A record is a WFDB multi-segment record of one ICU stay (days long): a master header, one header
+    plus signal files per segment (gaps between them), and a numerics table (`<record>n.csv.gz`,
+    ~1 Hz vitals). The record folder, with its original file names, is one object under its SHA-256;
+    it gets two kinds of event, each **timed at the end** of the data it links to, because data that
+    spans days cannot be put at its start without showing a model the future:
+
+    - `WAVEFORM//SEGMENT` per segment with signal data, linking to that segment (a WFDB record of its
+      own), with `waveform_duration_s` so the window is `[time - duration, time]`;
+    - `WAVEFORM//RECORD` at the end of the record, linking to the whole multi-segment record (and so
+      to its numerics, which sit next to it).
+
+    The release's `RECORDS` lists every patient's folder; only the core cohort's are used, and only
+    records whose master header is on disk.
+    """
+    sums = read_sha256sums(wdb.root)
+    subject_dirs = [
+        ln.strip().rstrip("/") for ln in (wdb.root / "RECORDS").read_text().splitlines() if ln.strip()
+    ]
+    cohort = set(subjects.to_list())
+    stats = {
+        "listed_patients": len(subject_dirs),
+        "patients_outside_core_subjects": 0,
+        "patients_not_on_disk": 0,
+    }
+    stats |= {"records": 0, "records_missing_on_disk": 0, "records_without_start_time": 0}
+    rows, objects = [], []
+    for sd in subject_dirs:
+        subject = int(Path(sd).name.lstrip("p"))
+        if subject not in cohort:
+            stats["patients_outside_core_subjects"] += 1
+            continue
+        pdir = wdb.root / sd
+        if not (pdir / "RECORDS").is_file():
+            stats["patients_not_on_disk"] += 1
+            continue
+        for rec_rel in (ln.strip() for ln in (pdir / "RECORDS").read_text().splitlines() if ln.strip()):
+            master = pdir / f"{rec_rel}.hea"
+            if not master.is_file():
+                stats["records_missing_on_disk"] += 1
+                continue
+            m = parse_wfdb_master(master.read_text())
+            if m.start is None:
+                stats["records_without_start_time"] += 1
+                continue
+            stats["records"] += 1
+            rdir = master.parent
+            files = sorted(p for p in rdir.iterdir() if p.is_file() and not p.name.startswith("."))
+            rels = [p.relative_to(wdb.root).as_posix() for p in files]
+            digests = hash_files(wdb.root, rels, sums, workers)
+            digest = object_digest(digests)
+            folder = f"waveform/{digest[:2]}/{digest}"
+            hadm = int(m.info["hadm_id"]) if m.info.get("hadm_id", "").isdigit() else None
+            record_id = int(m.name) if m.name.isdigit() else None
+            offset = 0
+            for seg, n in m.segments:
+                offset += n  # samples up to the end of this entry; gaps (`~`) count too
+                if (
+                    seg == "~"
+                    or n == 0
+                    or not (rdir / f"{seg}.hea").is_file()
+                    or not _segment_files(rdir / f"{seg}.hea")
+                ):
+                    continue
+                rows.append({
+                    "subject_id": subject, "code": "WAVEFORM//SEGMENT",
+                    "time": m.start + timedelta(seconds=offset / m.fs), "link": f"{folder}/{seg}",
+                    "hadm_id": hadm, "waveform_record_id": record_id, "waveform_segment": seg,
+                    "waveform_duration_s": n / m.fs,
+                })  # fmt: skip
+            rows.append({
+                "subject_id": subject, "code": "WAVEFORM//RECORD",
+                "time": m.start + timedelta(seconds=m.n_samples / m.fs), "link": f"{folder}/{m.name}",
+                "hadm_id": hadm, "waveform_record_id": record_id, "waveform_segment": None,
+                "waveform_duration_s": m.n_samples / m.fs,
+            })  # fmt: skip
+            objects.append({
+                "link": f"{folder}/{m.name}", "modality": "waveform", "format": "WFDB multi-segment",
+                "sha256": digest, "size_bytes": sum(p.stat().st_size for p in files), "files": rels,
+                "source_project": wdb.release.project, "source_version": wdb.version,
+                "source_path": (Path(sd) / rec_rel).as_posix(), "subject_id": subject,
+                "study_id": record_id, "object_id": m.name,
+            })  # fmt: skip
+    schema = {
+        "subject_id": pl.Int64, "code": pl.String, "time": pl.Datetime("us"), "link": pl.String,
+        "hadm_id": pl.Int64, "waveform_record_id": pl.Int64, "waveform_segment": pl.String,
+        "waveform_duration_s": pl.Float64,
+    }  # fmt: skip
+    events = pl.DataFrame(rows, schema=schema, orient="row").with_columns(
+        pl.col("time").dt.strftime(TIME_FMT)
+    )
+    out = raw_input / "waveform" / "segments.parquet"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    events.write_parquet(out)
+    stats |= {
+        "segment_events": int((events["code"] == "WAVEFORM//SEGMENT").sum()),
+        "record_events": len(objects),
+    }
+    if stats["records_missing_on_disk"]:
+        logger.warning(
+            f"waveform: {stats['records_missing_on_disk']} listed records of cohort patients are not on disk"
+        )
+    return Staged("waveform", stats, pl.DataFrame(objects, schema=OBJECT_SCHEMA, orient="row") if objects else
+                  pl.DataFrame(schema=OBJECT_SCHEMA))  # fmt: skip
+
+
+OBJECT_STAGERS = {"ecg": stage_ecg, "echo": stage_echo, "cxr": stage_cxr, "waveform": stage_waveform}
