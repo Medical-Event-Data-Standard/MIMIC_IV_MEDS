@@ -94,7 +94,13 @@ def test_compose_every_combination(combo):
     etl = spec["etl"]
     assert etl["dataset_name"] == "+".join(["MIMIC-IV", *(MODULES[m].label for m in combo)])
     assert etl["raw_dataset_version"].split(",") == [f.tag for f in [core, *found]]
-    links = [MODULES[m].link_column for m in combo if MODULES[m].link_column]
+    expected_links = {
+        "ecg": ["ecg_link"],
+        "echo": ["echo_link"],
+        "cxr": ["cxr_link"],
+        "waveform": ["waveform_link"],
+    }
+    links = [c for m in combo for c in expected_links.get(m, [])]
     assert etl.get("additional_value_modality_columns", []) == links
     credentialed = any(f.release.credentialed for f in found)
     assert etl["license"] == (PHYSIONET_CREDENTIALED if credentialed else ODBL)
@@ -160,3 +166,87 @@ def test_stage_ed_filters_to_the_cohort_and_keeps_empty_cells_null(tmp_path):
     raw2 = tmp_path / "raw2"
     assert not staging.stage_ed(found, raw2, pl.Series([1, 2])).stats["filtered"]
     assert (raw2 / "ed").is_symlink()
+
+
+@pytest.mark.parametrize(
+    "selection, skip, name, links, raw_extra, absent",
+    [
+        # Only the measurements: no DICOM table, no echo_link, but the measurement ids.
+        (
+            "echo:measurements",
+            set(),
+            "MIMIC-IV+ECHO(measurements)",
+            [],
+            ["echo_measurement_id", "echo_study_id"],
+            ["echo/records"],
+        ),
+        # Both parts asked for by name is the whole module: plain label.
+        (
+            "echo:dicom+measurements",
+            set(),
+            "MIMIC-IV+ECHO",
+            ["echo_link"],
+            ["echo_study_id", "echo_measurement_id"],
+            [],
+        ),
+        # Default (all parts) but the measurement table was not found: its columns are not declared.
+        (
+            "echo",
+            {"echo/measurements"},
+            "MIMIC-IV+ECHO",
+            ["echo_link"],
+            ["echo_study_id"],
+            ["echo/measurements"],
+        ),
+        (
+            "note:radiology,ecg",
+            set(),
+            "MIMIC-IV+Note(radiology)+ECG",
+            ["ecg_link"],
+            ["note_id", "ecg_study_id"],
+            [],
+        ),
+    ],
+)
+def test_compose_parts(selection, skip, name, links, raw_extra, absent):
+    core = _found("core", demo=True)
+    found = [
+        modules.FoundRelease(MODULES[m], _found(m).release, "9.9", Path("/nowhere"), parts, explicit)
+        for m, (parts, explicit) in modules.parse_selection(selection).items()
+    ]
+    spec = compose.compose(core, found, skip)
+    etl = spec["etl"]
+    assert etl["dataset_name"] == name
+    assert etl.get("additional_value_modality_columns", []) == links
+    assert (
+        etl["raw_source_id_columns"][len(compose.base_spec()["etl"]["raw_source_id_columns"]) :] == raw_extra
+    )
+    for table in absent:
+        assert table not in spec
+
+
+def test_parse_selection_errors():
+    with pytest.raises(ValueError, match="unknown module"):
+        modules.parse_selection("ecg,mri")
+    with pytest.raises(ValueError, match="all-or-nothing"):
+        modules.parse_selection("cxr:labels")
+
+
+def test_stage_common_reuses_the_cache(tmp_path):
+    """A concept map already in the cache (with the right SHA-256) is linked, not downloaded again."""
+    import hashlib
+
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    (cache / "map.csv").write_text("a,b\n")
+    entry = {
+        "urls": [
+            {
+                "url": "http://invalid.invalid/map.csv",  # would fail if fetched
+                "rel_path": "map.csv",
+                "sha256": hashlib.sha256(b"a,b\n").hexdigest(),
+            }
+        ]
+    }
+    staging.stage_common(tmp_path / "raw", [entry], [], cache)
+    assert (tmp_path / "raw" / "map.csv").read_text() == "a,b\n"

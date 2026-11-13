@@ -53,6 +53,10 @@ def compose(core: FoundRelease, found: list[FoundRelease], skip_tables: set[str]
     """
     base = base_spec()
     tables = {k: v for k, v in base.items() if k not in RESERVED}
+    # Parts not asked for contribute nothing, whether or not staging reported their tables.
+    skip_tables = set(skip_tables) | {
+        t for f in found for p in f.module.parts if not f.wants(p.name) for t in p.tables
+    }
     for f in found:
         frag = {k: v for k, v in fragment(f.module.name).items() if k not in skip_tables}
         if clash := sorted(set(frag) & set(tables)):
@@ -61,17 +65,46 @@ def compose(core: FoundRelease, found: list[FoundRelease], skip_tables: set[str]
 
     releases = [core, *found]
     etl = dict(base["etl"])
-    etl["dataset_name"] = "+".join([core.module.label, *(f.module.label for f in found)])
+    etl["dataset_name"] = "+".join([core.module.label, *(f.label for f in found)])
     etl["raw_dataset_version"] = ",".join(r.tag for r in releases)
     etl["license"] = PHYSIONET_CREDENTIALED if any(r.release.credentialed for r in releases) else ODBL
-    links = [f.module.link_column for f in found if f.module.link_column]
+    links = link_columns(found, skip_tables)
     if links:
         etl["additional_value_modality_columns"] = links
-    etl["raw_source_id_columns"] = [
-        *etl.get("raw_source_id_columns", []),
-        *(c for f in found for c in f.module.raw_source_id_columns),
-    ]
+    raw_ids = list(etl.get("raw_source_id_columns", []))
+    for f in found:
+        raw_ids += [c for c in module_columns(f, skip_tables)[1] if c not in raw_ids]
+    etl["raw_source_id_columns"] = raw_ids
     return {"etl": etl, **tables}
+
+
+def active_parts(f: FoundRelease, skip_tables: set[str] = frozenset()) -> tuple[str, ...]:
+    """The parts of `f` that were asked for and built (a part whose tables were all skipped was not)."""
+    return tuple(
+        p.name
+        for p in f.module.parts
+        if f.wants(p.name) and not (p.tables and set(p.tables) <= set(skip_tables))
+    )
+
+
+def module_columns(f: FoundRelease, skip_tables: set[str] = frozenset()) -> tuple[list[str], list[str]]:
+    """`(link columns, raw source id columns)` that `f` puts in the data, given what was built.
+
+    MEDS-Extract rejects a `dataset.json` category naming a column its output lacks, so a part that was
+    not built must not contribute its columns.
+    """
+    links = [f.module.link_column] if f.module.link_column else []
+    raw = list(f.module.raw_source_id_columns)
+    active = set(active_parts(f, skip_tables))
+    for p in f.module.parts:
+        if p.name in active:
+            links += [p.link_column] if p.link_column and p.link_column not in links else []
+            raw += [c for c in p.raw_source_id_columns if c not in raw]
+    return links, raw
+
+
+def link_columns(found: list[FoundRelease], skip_tables: set[str] = frozenset()) -> list[str]:
+    return [c for f in found for c in module_columns(f, skip_tables)[0]]
 
 
 def common_sources() -> list[dict]:

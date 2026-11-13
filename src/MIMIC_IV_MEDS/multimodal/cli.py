@@ -36,7 +36,7 @@ from pathlib import Path
 import polars as pl
 
 from . import compose, finalize, staging
-from .modules import CORE, MODULES, find_release
+from .modules import CORE, MODULES, describe, find_release, parse_selection
 
 logger = logging.getLogger("MIMIC_IV_MEDS.multimodal")
 
@@ -62,13 +62,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description=__doc__.split("\n\n")[0],
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--root", type=Path, required=True, help="folder holding the PhysioNet releases")
-    p.add_argument("--output-dir", type=Path, required=True)
+    p.add_argument("--root", type=Path, help="folder holding the PhysioNet releases")
+    p.add_argument("--output-dir", type=Path)
     p.add_argument(
         "--modules",
         default="",
-        help=f"comma-separated, any of: {','.join(MODULES)} ('all' for every one; empty for the core alone)",
+        help=f"comma-separated, any of: {','.join(MODULES)}, or 'all'; empty for the core alone. "
+        "A module can be narrowed to some of its parts: note:radiology, echo:measurements, "
+        "echo:dicom+measurements (see --list-modules)",
     )
+    p.add_argument("--list-modules", action="store_true", help="list the modules, their parts and releases")
     p.add_argument(
         "--link-mode",
         choices=finalize.LINK_MODES,
@@ -113,12 +116,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=f"keep <output-dir>/{WORK}/raw_input and MEDS-Extract's per-stage intermediate output",
     )
     a = p.parse_args(argv)
-    mods = [m.strip() for m in a.modules.split(",") if m.strip()]
-    if mods == ["all"]:
-        mods = list(MODULES)
-    if bad := [m for m in mods if m not in MODULES]:
-        p.error(f"unknown module(s) {bad}; choose from {','.join(MODULES)}")
-    a.modules = sorted(set(mods), key=ORDER.index)
+    if a.list_modules:
+        print(describe())
+        raise SystemExit(0)
+    if a.root is None or a.output_dir is None:
+        p.error("--root and --output-dir are required")
+    try:
+        a.modules = parse_selection(a.modules)
+    except ValueError as e:
+        p.error(str(e))
     a.path = {k: Path(v) for k, v in _kv(a.path, "--path").items()}
     a.version = _kv(a.version, "--version")
     return a
@@ -157,7 +163,10 @@ def run_meds_extract(spec_fp: Path, out: Path, raw_input: Path, enrich: bool, cl
 def build(a: argparse.Namespace) -> Path:
     root, out = a.root.resolve(), a.output_dir.resolve()
     core = find_release(CORE, root, a.path.get("core"), a.version.get("core"))
-    found = [find_release(MODULES[m], root, a.path.get(m), a.version.get(m)) for m in a.modules]
+    found = [
+        find_release(MODULES[m], root, a.path.get(m), a.version.get(m), parts, explicit)
+        for m, (parts, explicit) in a.modules.items()
+    ]
     for f in [core, *found]:
         logger.info(
             f"{f.module.name:>4}: {f.tag} ({'demo' if f.release.demo else 'full'}, {f.release.license})"
@@ -190,8 +199,9 @@ def build(a: argparse.Namespace) -> Path:
     objects = pl.concat(manifests) if manifests else pl.DataFrame(schema=staging.OBJECT_SCHEMA)
     placed = finalize.place_objects(objects, {f.module.name: f.root for f in found}, out, a.link_mode)
     finalize.write_objects_table(objects, out)
-    finalize.write_sources(out, core, found, staged, placed, a.link_mode)
-    link_cols = [f.module.link_column for f in found if f.module.link_column]
+    finalize.write_sources(out, core, found, staged, placed, a.link_mode, skip)
+    finalize.add_source_datasets(out, core, found, skip)
+    link_cols = compose.link_columns(found, skip)
     finalize.check_dataset_json(out, link_cols)
     for col, n in finalize.check_links(out, link_cols).items():
         logger.info(f"{col}: {n} distinct links, all resolve")

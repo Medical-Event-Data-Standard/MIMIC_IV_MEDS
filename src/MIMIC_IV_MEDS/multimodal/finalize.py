@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -25,6 +26,7 @@ from pathlib import Path
 
 import polars as pl
 
+from . import compose
 from .modules import FoundRelease
 from .staging import OBJECT_SCHEMA, Staged
 
@@ -92,6 +94,39 @@ def write_objects_table(objects: pl.DataFrame, meds_root: Path) -> Path:
     return fp
 
 
+def source_dataset(f: FoundRelease, skip_tables: set[str] = frozenset()) -> dict:
+    """One release the build used: what `dataset.json`'s `source_datasets` lists."""
+    links, _ = compose.module_columns(f, skip_tables)
+    return {
+        "module": f.module.name,
+        "name": f.release.project,
+        "version": f.version,
+        "release": "demo" if f.release.demo else "full",
+        "license": f.release.license,
+        "url": f"{f.release.url}{f.version}/",
+        "parts": list(compose.active_parts(f, skip_tables)),
+        "link_columns": links,
+    }
+
+
+def auxiliary_sources() -> list[dict]:
+    """The public concept maps the base spec joins (MIT-LCP mimic-code), with the tag they are pinned to.
+
+    Examples:
+        >>> aux = auxiliary_sources()
+        >>> aux[0]["name"], aux[0]["version"].startswith("v"), len(aux[0]["files"]) > 5
+        ('mimic-code', True, True)
+    """
+    out: dict[tuple[str, str], dict] = {}
+    for entry in compose.common_sources():
+        for item in entry.get("urls", []):
+            m = re.search(r"github(?:usercontent)?\.com/[^/]+/([^/]+)/([^/]+)/", item["url"])
+            name, ver = (m.group(1), m.group(2)) if m else (item["url"], None)
+            doc = out.setdefault((name, ver), {"name": name, "version": ver, "files": []})
+            doc["files"].append({"file": item["rel_path"], "sha256": item.get("sha256")})
+    return list(out.values())
+
+
 def write_sources(
     meds_root: Path,
     core: FoundRelease,
@@ -99,17 +134,13 @@ def write_sources(
     staged: dict[str, Staged],
     placed: dict,
     link_mode: str,
+    skip_tables: set[str] = frozenset(),
 ) -> Path:
     def release(f: FoundRelease) -> dict:
         return {
-            "module": f.module.name,
+            **source_dataset(f, skip_tables),
             "title": f.module.title,
-            "project": f.release.project,
-            "version": f.version,
-            "url": f"{f.release.url}{f.version}/",
-            "release": "demo" if f.release.demo else "full",
-            "license": f.release.license,
-            "link_column": f.module.link_column,
+            "parts_requested": list(f.parts),
             "staging": staged[f.module.name].stats if f.module.name in staged else {},
             "objects": placed.get(f.module.name),
         }
@@ -126,10 +157,32 @@ def write_sources(
             "MEDS root; metadata/objects.parquet maps each to its source file and SHA-256."
         ),
         "sources": [release(core), *(release(f) for f in found)],
+        "auxiliary_sources": auxiliary_sources(),
     }
     fp = meds_root / "metadata" / "sources.json"
     fp.write_text(json.dumps(doc, indent=2) + "\n")
     return fp
+
+
+def add_source_datasets(
+    meds_root: Path, core: FoundRelease, found: list[FoundRelease], skip_tables: set[str] = frozenset()
+) -> dict:
+    """Add `source_datasets` to `metadata/dataset.json`: every release used, with its version and parts.
+
+    `dataset_version` already names each release as `<slug>/<version>` (MEDS-Extract writes it from the
+    spec), but as one string. This adds the same in structured form, plus what MEDS has no field for:
+    demo or full, license per release, and which parts of each module were built. MEDS's dataset
+    metadata schema allows extra keys (suMEDS adds `sumeds_enrichment` the same way); a candidate for
+    an `etl.source_datasets` option in MEDS-Extract.
+    """
+    fp = meds_root / "metadata" / "dataset.json"
+    meta = json.loads(fp.read_text())
+    meta["source_datasets"] = [
+        source_dataset(core, skip_tables),
+        *(source_dataset(f, skip_tables) for f in found),
+    ]
+    fp.write_text(json.dumps(meta) + "\n")
+    return meta
 
 
 def check_links(meds_root: Path, link_columns: list[str]) -> dict[str, int]:

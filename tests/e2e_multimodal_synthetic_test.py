@@ -257,6 +257,63 @@ def test_dataset_json(built):
         meta["raw_source_id_columns"]
     )
     assert not {"ecg_link", "echo_link", "cxr_link"} & set(meta.get("other_extension_columns", []))
+    # The same releases, structured: version, demo or full, license and the parts built, per release.
+    src = {d["module"]: d for d in meta["source_datasets"]}
+    assert [d["module"] for d in meta["source_datasets"]] == [
+        "core",
+        "note",
+        "ecg",
+        "echo",
+        "cxr",
+        "waveform",
+    ]
+    assert (src["core"]["name"], src["core"]["version"], src["core"]["release"]) == (
+        "mimic-iv-demo",
+        "2.2",
+        "demo",
+    )
+    assert (src["ecg"]["name"], src["ecg"]["version"], src["ecg"]["license"]) == (
+        "mimic-iv-ecg-demo",
+        "0.1",
+        "ODbL-1.0",
+    )
+    assert src["echo"]["parts"] == ["dicom", "measurements"] and src["echo"]["link_columns"] == ["echo_link"]
+    assert src["note"]["parts"] == ["discharge", "radiology"]
+    assert [f"{d['name']}/{d['version']}" for d in meta["source_datasets"]] == meta["dataset_version"].split(
+        ","
+    )
+
+
+def test_parts_selection(synthetic_root, demo_raw_dir, tmp_path):
+    """Radiology reports only, echo measurements without any DICOM, and ECGs."""
+    root, s = synthetic_root
+    out = tmp_path / "meds"
+    run_script(
+        "mimic-iv-meds-multimodal", "--root", str(root), "--output-dir", str(out),
+        "--modules", "echo:measurements,note:radiology,ecg", "--common-dir", str(demo_raw_dir), "--no-enrich",
+    )  # fmt: skip
+    meta = json.loads((out / "metadata" / "dataset.json").read_text())
+    assert meta["dataset_name"] == "MIMIC-IV+Note(radiology)+ECG+ECHO(measurements)"
+    assert meta["additional_value_modality_columns"] == ["ecg_link"]
+    assert "echo_measurement_id" in meta["raw_source_id_columns"]
+    src = {d["module"]: d for d in meta["source_datasets"]}
+    assert (src["note"]["parts"], src["echo"]["parts"], src["echo"]["link_columns"]) == (
+        ["radiology"],
+        ["measurements"],
+        [],
+    )
+    codes = pl.scan_parquet(out / "data" / "**" / "*.parquet").select("code").collect()["code"]
+    assert (
+        not codes.str.starts_with("NOTE//DISCHARGE").any() and codes.str.starts_with("NOTE//RADIOLOGY").any()
+    )
+    assert (
+        not codes.str.starts_with("ECHO//DICOM").any()
+        and codes.str.starts_with("ECHO//MEASUREMENT//").sum() == 3
+    )
+    assert "echo_link" not in pl.scan_parquet(out / "data" / "**" / "*.parquet").collect_schema().names()
+    assert not (out / "echo").exists()
+    objects = pl.read_parquet(out / "metadata" / "objects.parquet")
+    assert set(objects["modality"]) == {"ecg"}
 
 
 def test_ecg(built):

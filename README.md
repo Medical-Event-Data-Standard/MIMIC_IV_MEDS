@@ -307,6 +307,8 @@ folder holding the releases side by side, in PhysioNet's own layout (`<slug>/<ve
 
 ```bash
 # --modules: any subset of ed,note,ecg,echo,cxr,waveform, or `all`; empty for MIMIC-IV alone.
+# A module can be narrowed to parts: note:radiology, echo:measurements (no DICOMs needed),
+# echo:dicom+measurements. `--list-modules` lists modules, parts and the releases each is found as.
 # Optional: --link-mode copy|hardlink|symlink (how objects get into the MEDS root; default copy),
 # --path cxr=/elsewhere/mimic-cxr-jpg/2.1.0 (a release not under --root), --no-enrich (offline).
 mimic-iv-meds-multimodal --root /data/MIMIC-IV_Multimodal_Demo --output-dir $MEDS_OUTPUT_DIR --modules all
@@ -336,14 +338,26 @@ $MEDS_OUTPUT_DIR/
   waveform/<sha[:2]>/<sha>/<record>.hea, <record>_NNNN.hea/.dat, <record>n.csv.gz   # a whole record
 ```
 
-`metadata/dataset.json` says which combination this is: `dataset_name` is e.g.
-`MIMIC-IV+ED+Note+ECG+ECHO+CXR`, `dataset_version` lists every release as `<slug>/<version>`,
-`license` is the PhysioNet Credentialed Health Data License as soon as one credentialed release is
-in, and the link columns are declared as MEDS `additional_value_modality_columns`. MEDS-Extract
-writes all of that from the composed spec's `etl:` block. `objects.parquet` and `sources.json`
-have no MEDS or MEDS-Extract counterpart yet; they are written by
-`src/MIMIC_IV_MEDS/multimodal/finalize.py`, kept self-contained so they can move upstream as a
-post-stage.
+`metadata/dataset.json` says which combination this is. MEDS-Extract writes, from the composed
+spec's `etl:` block: `dataset_name` (e.g. `MIMIC-IV+ED+Note(radiology)+ECG+ECHO(measurements)`, parts
+shown when only some were built), `dataset_version` (every release as `<slug>/<version>`, e.g.
+`mimic-iv-demo/2.2,mimic-iv-ed/2.2,…`), `license` (the PhysioNet Credentialed Health Data License
+as soon as one credentialed release is in), the link columns as MEDS
+`additional_value_modality_columns`, and the raw-source id columns of the parts built. The build
+adds `source_datasets`: the same releases as a list, each with name, version, demo or full,
+license, PhysioNet URL, parts built and link columns. `source_datasets`, `objects.parquet` and
+`sources.json` (which also records the pinned mimic-code concept maps) have no MEDS-Extract
+counterpart yet; they are written by `src/MIMIC_IV_MEDS/multimodal/finalize.py`, kept
+self-contained so they can move upstream as a post-stage.
+
+Demo and full releases have the same structure, so the same build runs on either, or on a mix
+(e.g. the MIMIC-IV demo with the full MIMIC-IV-ED, which then contributes only the demo subjects'
+stays). Checked: MIMIC-IV-ED demo 2.2 and full 2.2 have the same tables and columns; MIMIC-IV-ECG
+demo 0.1 and full 1.0 the same `record_list.csv` columns, though the demo stores records as
+`files/p<subject>/s<study>/` and the full release as `files/p<4 digits>/p<subject>/s<study>/`
+(the build follows each release's `path` column, so both work). Note, ECHO, CXR-JPG and the
+waveform database have no separate demo. For full data use `--link-mode hardlink` or `symlink`
+and keep each release's `SHA256SUMS.txt` (hashes are taken from it instead of reading every file).
 
 Every module is restricted to the subjects of the core's `hosp/patients` (for the demo: its 100
 patients), whether its files hold only those subjects or the whole release, so a module can never

@@ -48,6 +48,21 @@ class Release:
 
 
 @dataclass(frozen=True)
+class Part:
+    """A selectable piece of a module (`--modules echo:measurements`).
+
+    `tables` are the fragment tables only this part feeds (left out of the spec when it is not built);
+    empty when the part selects rows of a shared table instead (the note types).
+    """
+
+    name: str
+    title: str
+    tables: tuple[str, ...] = ()
+    link_column: str | None = None
+    raw_source_id_columns: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Module:
     name: str  # the CLI name, e.g. "ecg"
     label: str  # how it appears in `dataset_name`, e.g. "ECG"
@@ -59,9 +74,15 @@ class Module:
     link_column: str | None = None
     #: Extension columns this module adds that are join keys into its raw release.
     raw_source_id_columns: tuple[str, ...] = ()
+    #: Selectable parts; empty when the module is all-or-nothing.
+    parts: tuple[Part, ...] = ()
 
     def markers(self) -> tuple[str, ...]:
         return (self.marker,) if isinstance(self.marker, str) else self.marker
+
+    @property
+    def part_names(self) -> tuple[str, ...]:
+        return tuple(p.name for p in self.parts)
 
 
 @dataclass
@@ -70,12 +91,30 @@ class FoundRelease:
     release: Release
     version: str
     root: Path
+    #: The parts asked for (all of the module's when none were named).
+    parts: tuple[str, ...] = ()
+    #: Whether the parts were named explicitly; a named part whose data is missing is an error.
+    explicit: bool = False
     extras: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        if not self.parts:
+            self.parts = self.module.part_names
 
     @property
     def tag(self) -> str:
         """`<slug>/<version>`: how the release is named in `dataset_version`."""
         return f"{self.release.project}/{self.version}"
+
+    @property
+    def label(self) -> str:
+        """The module's label in `dataset_name`, with its parts when only some were asked for."""
+        if self.explicit and set(self.parts) != set(self.module.part_names):
+            return f"{self.module.label}({'+'.join(self.parts)})"
+        return self.module.label
+
+    def wants(self, part: str) -> bool:
+        return part in self.parts
 
 
 CORE = Module(
@@ -110,6 +149,10 @@ MODULES: dict[str, Module] = {
             releases=(Release("mimic-iv-note", False, PHYSIONET_CREDENTIALED),),
             marker=("note/discharge.csv.gz", "note/radiology.csv.gz"),
             raw_source_id_columns=("note_id",),
+            parts=(
+                Part("discharge", "discharge summaries and their addenda (note/discharge.csv.gz)"),
+                Part("radiology", "radiology reports and their addenda (note/radiology.csv.gz)"),
+            ),
         ),
         Module(
             name="ecg",
@@ -126,11 +169,30 @@ MODULES: dict[str, Module] = {
         Module(
             name="echo",
             label="ECHO",
-            title="MIMIC-IV-ECHO (echocardiogram DICOMs)",
+            title="MIMIC-IV-ECHO (echocardiogram DICOMs and report measurements)",
             releases=(Release("mimic-iv-echo", False, PHYSIONET_CREDENTIALED),),
-            marker="echo-record-list.csv",
-            link_column="echo_link",
-            raw_source_id_columns=("echo_study_id", "echo_measurement_id"),
+            marker=(
+                "echo-record-list.csv",
+                "structured-measurement.csv.gz",
+                "structured_measurement.csv.gz",
+                "structured-measurement.csv",
+                "structured_measurement.csv",
+            ),
+            parts=(
+                Part(
+                    "dicom",
+                    "one event per DICOM file, linked (echo-record-list.csv + files/)",
+                    tables=("echo/records",),
+                    link_column="echo_link",
+                    raw_source_id_columns=("echo_study_id",),
+                ),
+                Part(
+                    "measurements",
+                    "report measurements (structured-measurement.csv.gz); needs no DICOMs",
+                    tables=("echo/measurements",),
+                    raw_source_id_columns=("echo_measurement_id", "echo_study_id"),
+                ),
+            ),
         ),
         Module(
             name="cxr",
@@ -152,6 +214,58 @@ MODULES: dict[str, Module] = {
         ),
     )
 }
+
+
+def parse_selection(spec: str) -> dict[str, tuple[tuple[str, ...], bool]]:
+    """`--modules` value -> `{module: (parts, explicit)}`, in canonical module order.
+
+    Examples:
+        >>> parse_selection("echo:measurements, ed ,note:radiology+discharge")
+        {'ed': ((), False), 'note': (('discharge', 'radiology'), True), 'echo': (('measurements',), True)}
+        >>> list(parse_selection("all")) == list(MODULES)
+        True
+        >>> parse_selection("")
+        {}
+        >>> parse_selection("echo:videos")
+        Traceback (most recent call last):
+            ...
+        ValueError: echo has no part 'videos'; parts: dicom, measurements
+    """
+    chosen: dict[str, tuple[tuple[str, ...], bool]] = {}
+    for item in (x.strip() for x in spec.split(",")):
+        if not item:
+            continue
+        if item == "all":
+            chosen |= {m: ((), False) for m in MODULES if m not in chosen}
+            continue
+        name, _, parts_spec = item.partition(":")
+        if name not in MODULES:
+            raise ValueError(f"unknown module {name!r}; choose from {', '.join(MODULES)}")
+        module = MODULES[name]
+        parts = tuple(p.strip() for p in parts_spec.split("+") if p.strip())
+        for p in parts:
+            if p not in module.part_names:
+                have = ", ".join(module.part_names) or "none (the module is all-or-nothing)"
+                raise ValueError(f"{name} has no part {p!r}; parts: {have}")
+        if parts:
+            parts = tuple(p for p in module.part_names if p in parts)  # canonical order
+        chosen[name] = (parts, bool(parts))
+    return {m: chosen[m] for m in MODULES if m in chosen}
+
+
+def describe() -> str:
+    """The `--list-modules` text: every module, its parts and the releases it is found as."""
+    lines = []
+    for m in (CORE, *MODULES.values()):
+        rel = ", ".join(f"{r.project} ({'demo' if r.demo else 'full'}, {r.license})" for r in m.releases)
+        lines.append(f"{m.name:<9} {m.title}\n{'':<9} releases: {rel}")
+        if m.link_column:
+            lines.append(f"{'':<9} link column: {m.link_column}")
+        for p in m.parts:
+            link = f" [{p.link_column}]" if p.link_column else ""
+            lines.append(f"{'':<9} part {m.name}:{p.name}: {p.title}{link}")
+    lines.append("core is always built; it defines the cohort every other module is restricted to.")
+    return "\n".join(lines)
 
 
 def _has_marker(d: Path, module: Module) -> bool:
@@ -197,7 +311,12 @@ def _candidates(root: Path, prefix: str, other_prefixes: tuple[str, ...]) -> lis
 
 
 def find_release(
-    module: Module, root: Path, path: Path | None = None, version: str | None = None
+    module: Module,
+    root: Path,
+    path: Path | None = None,
+    version: str | None = None,
+    parts: tuple[str, ...] = (),
+    explicit: bool = False,
 ) -> FoundRelease:
     """Locate `module` under `root` (or at `path`); prefers the full release over the demo when both exist."""
     if path is not None:
@@ -211,7 +330,7 @@ def find_release(
             raise ValueError(
                 f"cannot tell the {module.title} version from {path}; pass --version {module.name}=X"
             )
-        return FoundRelease(module, release, version, path)
+        return FoundRelease(module, release, version, path, parts, explicit)
 
     all_prefixes = [(r, p) for r in module.releases for p in (r.project, *r.aliases)]
     # Full releases first: when someone has both, the build should use the real data.
@@ -223,7 +342,7 @@ def find_release(
                 hits = [(c, v) for c, v in hits if v == version]
             if hits:
                 c, v = hits[-1]
-                return FoundRelease(module, release, v, c)
+                return FoundRelease(module, release, v, c, parts, explicit)
     raise FileNotFoundError(
         f"{module.title} not found under {root}: expected one of "
         + ", ".join(f"{r.project}/<version>/ or {r.project}-<version>/" for r in module.releases)

@@ -233,6 +233,7 @@ def stage_common(raw_input: Path, common: list[dict], search_dirs: list[Path], c
     `common` is the base spec's `sources.common` list (http entries with `url`, `rel_path`, `sha256`).
     A local copy counts only when its SHA-256 matches, so a stale file is never used.
     """
+    search_dirs = [*search_dirs, cache_dir]  # earlier downloads count as a local copy
     for entry in common:
         for item in entry.get("urls", []):
             rel, want = item["rel_path"], item.get("sha256")
@@ -323,9 +324,11 @@ def stage_note(note: FoundRelease, raw_input: Path, subjects: pl.Series) -> Stag
     before it existed; `charttime` alone is used when `storetime` is missing.
     """
     frames, stats = [], {}
-    for table in ("discharge", "radiology"):
+    for table in note.parts:  # "discharge", "radiology", or the one asked for
         fp = note.root / "note" / f"{table}.csv.gz"
         if not fp.is_file():
+            if note.explicit:
+                raise FileNotFoundError(f"--modules note:{table} asked for {fp}, which does not exist")
             stats[table] = {"present": False}
             continue
         df = pl.read_csv(fp, infer_schema=False).with_columns(
@@ -370,7 +373,9 @@ def stage_note(note: FoundRelease, raw_input: Path, subjects: pl.Series) -> Stag
             )
         )
     if not frames:
-        raise FileNotFoundError(f"{note.root / 'note'} has neither discharge.csv.gz nor radiology.csv.gz")
+        raise FileNotFoundError(
+            f"{note.root / 'note'} has none of {', '.join(f'{t}.csv.gz' for t in note.parts)}"
+        )
     out = pl.concat(frames)
     (raw_input / "note").mkdir(parents=True, exist_ok=True)
     out.write_parquet(raw_input / "note" / "notes.parquet")
@@ -583,7 +588,24 @@ def stage_echo(echo: FoundRelease, raw_input: Path, subjects: pl.Series, workers
     does not say which because telling them apart means reading every DICOM header. The measurements
     (`stage_echo_measurements`) are optional: without the table the spec leaves `echo/measurements` out.
     """
-    measurements = stage_echo_measurements(echo, raw_input, subjects)
+    measurements = {"selected": False}
+    if echo.wants("measurements"):
+        measurements = stage_echo_measurements(echo, raw_input, subjects)
+        if not measurements["present"] and echo.explicit:
+            raise FileNotFoundError(
+                f"--modules echo:measurements: none of {MEASUREMENT_FILES} in {echo.root}"
+            )
+    has_list = any((echo.root / n).is_file() for n in ("echo-record-list.csv", "echo-record-list.csv.gz"))
+    if not echo.wants("dicom") or (not has_list and not echo.explicit):
+        if not measurements.get("present"):
+            raise FileNotFoundError(
+                f"{echo.root}: nothing to build for echo (no record list, no measurements)"
+            )
+        return Staged(
+            "echo",
+            {"dicoms": {"selected": echo.wants("dicom"), "present": has_list}, "measurements": measurements},
+            skip_tables={"echo/records"},
+        )
     df = (
         read_table(echo.root, "echo-record-list.csv", "echo-record-list.csv.gz")
         .select(
@@ -614,7 +636,7 @@ def stage_echo(echo: FoundRelease, raw_input: Path, subjects: pl.Series, workers
         "DICOM",
     )
     staged.stats = {"dicoms": staged.stats, "measurements": measurements}
-    if not measurements["present"]:
+    if not measurements.get("present"):
         staged.skip_tables.add("echo/measurements")
     return staged
 
