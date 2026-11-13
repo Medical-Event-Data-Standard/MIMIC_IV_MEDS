@@ -19,8 +19,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-# This package ships no Python: the whole ETL is `event_configs.yaml`, run by
-# MEDS-Extract's own `meds-extract-run`. The `[download]` extra adds
+# The ETL is `event_configs.yaml`, run by MEDS-Extract's own `meds-extract-run`; the only Python
+# is the `mimic-iv-meds-multimodal` command (MIMIC_IV_MEDS.multimodal), which needs nothing beyond
+# what MEDS-Extract brings (polars, pyyaml). The `[download]` extra adds
 # `meds-extract-download` (httpx + tenacity), which the runner spawns to stage the raw
 # data. MEDS-transforms, polars and hydra all arrive through it at the versions it fences;
 # duplicating those pins here would only create drift.
