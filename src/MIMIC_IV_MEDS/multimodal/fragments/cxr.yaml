@@ -6,14 +6,15 @@
 # row per image of a core subject that is on disk, timed at StudyDate + StudyTime, coded
 # `CXR//IMAGE//{ViewPosition}//{PatientOrientation}` exactly as MIMIC-CXR-DB codes its images.
 #
-# `cxr_link` is an additional value modality column: `cxr/<sha[:2]>/<sha>.jpg`, relative to the
-# MEDS root. The CheXpert labels are not extracted: they are mined from the report, which exists
+# `external_value_link` is `external_values/cxr/<sha[:2]>/<sha>.jpg`, relative to the MEDS root,
+# and `external_value_encoding` is `jpeg`. The CheXpert labels are not extracted: they are mined from the report, which exists
 # only after the images, and the release gives no report time.
 cxr/images:
   image:
     code: $code
     time: '$time::"%Y-%m-%d %H:%M:%S"'
-    cxr_link: $link
+    external_value_link: $link
+    external_value_encoding: $encoding
     cxr_study_id: $cxr_study_id
     cxr_dicom_id: $cxr_dicom_id
     _metadata:
@@ -22,4 +23,4 @@ cxr/images:
           f"Chest radiograph image, view position {$view}, patient orientation {$orientation}
           (MIMIC-CXR-JPG mimic-cxr-2.0.0-metadata ViewPosition and
           PatientOrientationCodeSequence_CodeMeaning; UNK if missing), timed at the study's StudyDate
-          and StudyTime. cxr_link is the JPG relative to the MEDS root"
+          and StudyTime. external_value_link is the JPG relative to the MEDS root"

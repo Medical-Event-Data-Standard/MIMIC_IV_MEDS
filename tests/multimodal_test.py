@@ -4,17 +4,21 @@ The end-to-end build (MEDS-Extract included) is in `e2e_multimodal_synthetic_tes
 """
 
 import doctest
+import gzip
 import itertools
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import polars as pl
 import pytest
 
-from MIMIC_IV_MEDS.multimodal import compose, finalize, modules, staging
+from MIMIC_IV_MEDS.multimodal import compose, external_values, finalize, modules, staging
 from MIMIC_IV_MEDS.multimodal.modules import CORE, MODULES, ODBL, PHYSIONET_CREDENTIALED, find_release
 
 
-@pytest.mark.parametrize("mod", [modules, staging, compose, finalize], ids=lambda m: m.__name__)
+@pytest.mark.parametrize(
+    "mod", [modules, staging, compose, finalize, external_values], ids=lambda m: m.__name__
+)
 def test_doctests(mod):
     result = doctest.testmod(mod)
     assert result.failed == 0
@@ -100,12 +104,9 @@ def test_find_release_synthetic_fallback_and_several_roots(tmp_path):
     assert spec["etl"]["license"] == ODBL  # nothing credentialed went in
     assert "[synthetic]" in spec["etl"]["dataset_name"]
     meta = finalize.source_dataset(mne)
-    assert (meta["extension"], meta["release"], meta["synthetic"], meta["url"]) == (
-        "mimic-iv-mne",
-        "synthetic",
-        True,
-        None,
-    )
+    # Simulated is a kind of release, not a separate flag (a dataset-level flag is meds#111's topic).
+    assert (meta["extension"], meta["release"], meta["url"]) == ("mimic-iv-mne", "synthetic", None)
+    assert "synthetic" not in meta
 
 
 def test_cxr_db_yields_its_images_to_cxr_jpg():
@@ -171,13 +172,8 @@ def test_compose_every_combination(combo):
     etl = spec["etl"]
     assert etl["dataset_name"] == "+".join(["MIMIC-IV", *(MODULES[m].label for m in combo)])
     assert etl["raw_dataset_version"].split(",") == [f.tag for f in [core, *found]]
-    expected_links = {
-        "ecg": ["ecg_link"],
-        "echo": ["echo_link"],
-        "cxr": ["cxr_link"],
-        "waveform": ["waveform_link"],
-    }
-    links = [c for m in combo for c in expected_links.get(m, [])]
+    # One link column for every object module, whichever are built.
+    links = ["external_value_link"] if {"ecg", "echo", "cxr", "waveform"} & set(combo) else []
     assert etl.get("additional_value_modality_columns", []) == links
     credentialed = any(f.release.credentialed for f in found)
     assert etl["license"] == (PHYSIONET_CREDENTIALED if credentialed else ODBL)
@@ -248,7 +244,7 @@ def test_stage_ed_filters_to_the_cohort_and_keeps_empty_cells_null(tmp_path):
 @pytest.mark.parametrize(
     "selection, skip, name, links, raw_extra, absent",
     [
-        # Only the measurements: no DICOM table, no echo_link, but the measurement ids.
+        # Only the measurements: no DICOM table, no link, but the measurement ids.
         (
             "echo:measurements",
             set(),
@@ -262,7 +258,7 @@ def test_stage_ed_filters_to_the_cohort_and_keeps_empty_cells_null(tmp_path):
             "echo:dicom+measurements",
             set(),
             "MIMIC-IV+ECHO",
-            ["echo_link"],
+            ["external_value_link"],
             ["echo_study_id", "echo_measurement_id"],
             [],
         ),
@@ -271,7 +267,7 @@ def test_stage_ed_filters_to_the_cohort_and_keeps_empty_cells_null(tmp_path):
             "echo",
             {"echo/measurements"},
             "MIMIC-IV+ECHO",
-            ["echo_link"],
+            ["external_value_link"],
             ["echo_study_id"],
             ["echo/measurements"],
         ),
@@ -279,9 +275,26 @@ def test_stage_ed_filters_to_the_cohort_and_keeps_empty_cells_null(tmp_path):
             "note:radiology,ecg",
             set(),
             "MIMIC-IV+Note(radiology)+ECG",
-            ["ecg_link"],
+            ["external_value_link"],
             ["note_id", "ecg_study_id"],
             [],
+        ),
+        # The waveform database's vital signs alone link nothing; its windows alone do.
+        (
+            "mimic-iv-wdb:numerics",
+            set(),
+            "MIMIC-IV+WDB(numerics)",
+            [],
+            ["waveform_record_id"],
+            ["waveform/windows"],
+        ),
+        (
+            "mimic-iv-wdb:windows",
+            set(),
+            "MIMIC-IV+WDB(windows)",
+            ["external_value_link"],
+            ["waveform_record_id"],
+            ["waveform/numerics"],
         ),
     ],
 )
@@ -361,3 +374,105 @@ def test_download_demo_asks_mimic_demo_mm_for_the_selected_sources(tmp_path, mon
     monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
     with pytest.raises(SystemExit, match=r"demo-download"):
         cli.download_demo(tmp_path, sel, yes=False)
+
+
+def test_cut_wfdb_windows_is_lossless(tmp_path):
+    """A multi-rate, two-file, FLAC-compressed segment cut into windows keeps every sample and setting."""
+    wfdb = pytest.importorskip("wfdb")
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    frames, spf = 250, [4, 1, 1]  # a 4x signal in one file, two 1x signals in another
+    sig = [rng.integers(-2000, 2000, frames * k).astype(np.int64) for k in spf]
+    rec = wfdb.Record(
+        record_name="seg_0001", n_sig=3, fs=62.5, sig_len=frames, e_d_signal=sig,
+        file_name=["seg_0001e.dat", "seg_0001f.dat", "seg_0001f.dat"], fmt=["516"] * 3,
+        samps_per_frame=spf, adc_gain=[200.0, 100.0, 1.0], baseline=[0, 0, 0], units=["mV", "mV", "NU"],
+        sig_name=["II", "V", "Pleth"], adc_res=[16] * 3, adc_zero=[0] * 3,
+        init_value=[int(s[0]) for s in sig], checksum=[0] * 3, block_size=[0] * 3,
+    )  # fmt: skip
+    src = tmp_path / "src"
+    src.mkdir()
+    rec.wrsamp(write_dir=str(src), expanded=True)
+
+    start = datetime(2150, 1, 1, 0, 0, 0)
+    windows = staging.cut_wfdb_windows(src / "seg_0001", tmp_path / "out", 100, start)
+    assert [(n, s, e) for n, s, e, _ in windows] == [
+        ("seg_0001_w0000", 0, 100),
+        ("seg_0001_w0001", 100, 200),
+        ("seg_0001_w0002", 200, 250),
+    ]
+    # Signal groups keep their suffixes; each window is a header plus its own two signal files.
+    assert [p.name for p in windows[1][3]] == [
+        "seg_0001_w0001.hea",
+        "seg_0001_w0001e.dat",
+        "seg_0001_w0001f.dat",
+    ]
+    for name, s, e, _ in windows:
+        w = wfdb.rdrecord(str(tmp_path / "out" / name), physical=False, smooth_frames=False)
+        assert (w.sig_len, list(w.fmt), list(w.samps_per_frame), list(w.adc_gain)) == (
+            e - s, ["516"] * 3, spf, [200.0, 100.0, 1.0],
+        )  # fmt: skip
+        for got, full, k in zip(w.e_d_signal, sig, spf, strict=True):
+            assert np.array_equal(got, full[s * k : e * k])
+        assert datetime.combine(w.base_date, w.base_time) == start + timedelta(seconds=s / 62.5)
+
+
+def test_read_wfdb_numerics_times_each_summary_at_the_end_of_its_interval(tmp_path):
+    m = staging.parse_wfdb_master(
+        "#wfdb 10.7\n8000/3 2 62.5/1000 6250 00:00:00 01/01/2150\n8000_0001 6250\n# hadm_id 1\n"
+    )
+    fp = tmp_path / "8000n.csv.gz"
+    # Ticks of a 1 kHz counter: readings at 0.5 s, 59.5 s, 60.5 s and 90 s; one is not a number.
+    fp.write_bytes(
+        gzip.compress(
+            b'"time","HR [bpm]","SpO2 [%]","Note"\n500,80,97,\n59500,90,,\n60500,70,98,x\n90000,abc,99,\n'
+        )
+    )
+    per_minute = staging.read_wfdb_numerics(fp, m, 60.0)
+    t0, td = datetime(2150, 1, 1), timedelta
+    assert per_minute.rows() == [
+        (t0 + td(seconds=60), "WAVEFORM//NUMERIC//HR", 85.0, "bpm"),
+        (t0 + td(seconds=60), "WAVEFORM//NUMERIC//SpO2", 97.0, "%"),
+        (t0 + td(seconds=120), "WAVEFORM//NUMERIC//HR", 70.0, "bpm"),
+        (t0 + td(seconds=120), "WAVEFORM//NUMERIC//SpO2", 98.5, "%"),
+    ]
+    every = staging.read_wfdb_numerics(fp, m, 0)
+    assert every.height == 6 and every["time"].min() == t0 + td(milliseconds=500)
+
+
+def test_external_values_check(tmp_path):
+    rec = tmp_path / "external_values/ecg/ab/abcd"
+    rec.mkdir(parents=True)
+    (rec / "r.hea").write_text("r 1 500 10\nr.dat 16 200 16 0 0 0 0 I\n")
+    (rec / "r.dat").write_bytes(b"..")
+    (tmp_path / "external_values/cxr").mkdir(parents=True)
+    (tmp_path / "external_values/cxr/x.jpg").write_bytes(b"jpg")
+    links = {"external_values/ecg/ab/abcd/r": "wfdb", "external_values/cxr/x.jpg": "jpeg"}
+    assert external_values.check(tmp_path, links) == {"links": 2, "files": 3}
+
+    (tmp_path / "external_values/cxr/stray.jpg").write_bytes(b"jpg")
+    with pytest.raises(ValueError, match="belong to no linked object"):
+        external_values.check(tmp_path, links)
+    (tmp_path / "external_values/cxr/stray.jpg").unlink()
+    (rec / "r.dat").unlink()
+    with pytest.raises(ValueError, match="missing"):
+        external_values.check(tmp_path, links)
+    for bad in ("../x.jpg", "cxr/x.jpg", "/abs/x.jpg"):
+        with pytest.raises(ValueError, match="relative paths under external_values"):
+            external_values.check(tmp_path, {bad: "jpeg"})
+    with pytest.raises(ValueError, match="unknown encoding"):
+        external_values.check(tmp_path, {"external_values/cxr/x.jpg": "png?"})
+
+
+def test_place_objects_never_symlinks_files_the_build_wrote(tmp_path):
+    generated = tmp_path / "work" / "w.hea"
+    generated.parent.mkdir()
+    generated.write_text("w 1 1 1\n")
+    objects = pl.DataFrame(
+        {"link": ["external_values/waveform/ab/abcd/w"], "modality": ["waveform"], "size_bytes": [8],
+         "files": [[generated.as_posix()]]}
+    )  # fmt: skip
+    finalize.place_objects(objects, {"waveform": tmp_path / "release"}, tmp_path / "meds", "symlink")
+    placed = tmp_path / "meds/external_values/waveform/ab/abcd/w"
+    assert placed.read_text() == "w 1 1 1\n" and not placed.is_symlink()

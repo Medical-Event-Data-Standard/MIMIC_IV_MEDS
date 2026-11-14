@@ -5,13 +5,15 @@ point at, and MEDS-Extract only writes tables. These steps are the part of a mul
 has no home upstream yet; each is a self-contained function so it can move into MEDS-Extract as a
 post-stage later:
 
-- `place_objects`: each object goes to `<meds_root>/<link>` (an ECG record's `.hea`/`.dat` into
-  its own folder, keeping their names), by copy, hard link or symlink;
-- `write_objects_table`: `metadata/objects.parquet`, one row per source object: link, modality,
-  format, sha256, size, the release and the path it came from, and its source IDs;
-- `write_sources`: `metadata/sources.json`, every release the build used (project, version, demo
-  or full, license) and what staging kept or dropped from each, as counts;
-- `check_links`: every link in `data/` must be in `objects.parquet` and exist on disk.
+- `place_objects`: each object goes to `<meds_root>/<link>` under `external_values/` (a WFDB
+  record's `.hea`/`.dat` files into its own folder, keeping their names), by copy, hard link or
+  symlink;
+- `add_source_datasets`: `source_datasets` in `metadata/dataset.json`, every release used (project,
+  version, demo, full or synthetic, license, parts, and the encoding of its linked objects);
+- `write_sources`: `metadata/sources.json`, the same plus what staging kept or dropped from each
+  release, as counts;
+- `check_external_values`: every link in `data/` resolves to all of its files, and every file
+  under `external_values/` belongs to a linked object (`external_values.check`).
 """
 
 from __future__ import annotations
@@ -26,20 +28,18 @@ from pathlib import Path
 
 import polars as pl
 
-from . import compose
+from . import compose, external_values
 from .modules import FoundRelease
-from .staging import OBJECT_SCHEMA, Staged
+from .staging import Staged
 
 LINK_MODES = ("copy", "hardlink", "symlink")
 
-#: How a model may use the link columns without seeing the future; written to `sources.json`.
+#: How a model may use the linked objects; written to `sources.json`.
 LOADER_RULE = (
-    "A link's data is available from its event's `time` on, never before, and a loader reads only the "
-    "record or file the link names. Every object event is timed when its data is complete (a waveform "
-    "segment or record at its end; `waveform_duration_s` gives the window [time - duration, time]). A "
-    "waveform record folder also holds its later segments and its numerics: do not list or glob a link's "
-    "folder; the whole record and its numerics are reachable only through WAVEFORM//RECORD, at the "
-    "record's end."
+    "Every linked object is short enough to treat as one point in time (an ECG, an image, an echo DICOM, "
+    "a waveform window of at most --waveform-window-s seconds) and its event is timed when its data is "
+    "complete, so a link may be read from its event's `time` on. `waveform_duration_s` gives a waveform "
+    "window's span, [time - duration, time]."
 )
 
 
@@ -78,36 +78,39 @@ def place_objects(objects: pl.DataFrame, roots: dict[str, Path], meds_root: Path
         c["objects"] += 1
         dest = meds_root / row["link"]
         for rel in row["files"]:
-            # A multi-file record's link names the record, not a file: its files go next to it. Objects can
-            # share files (a waveform segment's files are also its record's): each is placed once.
+            # A multi-file record's link names the record, not a file: its files go next to it. A file the
+            # build wrote itself (absolute: a waveform window, `root / rel` is then `rel`) is never symlinked,
+            # since the build's work folder is not part of the MEDS root.
             target = dest.parent / Path(rel).name if len(row["files"]) > 1 else dest
-            if _place(root / rel, target, mode):
+            file_mode = "hardlink" if Path(rel).is_absolute() and mode == "symlink" else mode
+            if _place_any(root / rel, target, file_mode):
                 c["files_written"] += 1
                 c["bytes_written"] += (root / rel).stat().st_size
     return counts
 
 
-def write_objects_table(objects: pl.DataFrame, meds_root: Path) -> Path:
-    fp = meds_root / "metadata" / "objects.parquet"
-    fp.parent.mkdir(parents=True, exist_ok=True)
-    objects.cast(OBJECT_SCHEMA).sort("modality", "subject_id", "link").write_parquet(fp)
-    return fp
+def _place_any(src: Path, dest: Path, mode: str) -> bool:
+    """`_place`, falling back from a hard link to a copy across file systems."""
+    try:
+        return _place(src, dest, mode)
+    except OSError:
+        if mode != "hardlink":
+            raise
+        return _place(src, dest, "copy")
 
 
 def source_dataset(f: FoundRelease, skip_tables: set[str] = frozenset()) -> dict:
     """One release the build used: what `dataset.json`'s `source_datasets` lists."""
-    links, _ = compose.module_columns(f, skip_tables)
     doc = {
         "extension": "mimic-iv" if f.module.name == "core" else f.module.names[0],
         "module": f.module.name,
         "name": f.release.project,
         "version": f.version,
         "release": "synthetic" if f.synthetic else "demo" if f.release.demo else "full",
-        "synthetic": f.synthetic,
         "license": f.license,
         "url": f"{f.release.url}{f.version}/",
         "parts": list(compose.active_parts(f, skip_tables)),
-        "link_columns": links,
+        "external_value_encoding": compose.encoding(f, skip_tables),
     }
     if f.synthetic:
         info = f.extras.get("synthetic", {})
@@ -157,13 +160,13 @@ def write_sources(
         "generated_by": f"MIMIC_IV_MEDS.multimodal {version('MIMIC-IV-MEDS')}",
         "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "extensions": [f.module.names[0] for f in found],
-        "synthetic_extensions": [f.module.names[0] for f in found if f.synthetic],
         "object_link_mode": link_mode,
         "loader_rule": LOADER_RULE,
         "notes": (
             "Releases whose `release` is `full` may be a subset of that release (e.g. only the MIMIC-IV "
-            "demo subjects); `staging` counts what each contributed. Object links are relative to the "
-            "MEDS root; metadata/objects.parquet maps each to its source file and SHA-256."
+            "demo subjects); `staging` counts what each contributed. A `synthetic` release is simulated "
+            "data. external_value_link is relative to the MEDS root; external_value_encoding says how to "
+            "read it."
         ),
         "sources": [release(core), *(release(f) for f in found)],
         "auxiliary_sources": auxiliary_sources(),
@@ -180,7 +183,8 @@ def add_source_datasets(
 
     `dataset_version` already names each release as `<slug>/<version>` (MEDS-Extract writes it from the
     spec), but as one string. This adds the same in structured form, plus what MEDS has no field for:
-    demo or full, license per release, and which parts of each module were built. MEDS's dataset
+    demo, full or synthetic, license per release, which parts of each module were built, and how its
+    linked objects are encoded. MEDS's dataset
     metadata schema allows extra keys (suMEDS adds `sumeds_enrichment` the same way); a candidate for
     an `etl.source_datasets` option in MEDS-Extract.
     """
@@ -194,29 +198,21 @@ def add_source_datasets(
     return meta
 
 
-def check_links(meds_root: Path, link_columns: list[str]) -> dict[str, int]:
-    """Count the links in `data/` per column; raise if any is unknown to objects.parquet or missing on
-    disk."""
-    known = set()
-    objects_fp = meds_root / "metadata" / "objects.parquet"
-    if objects_fp.exists():
-        known = set(pl.read_parquet(objects_fp, columns=["link"])["link"])
+def check_external_values(meds_root: Path) -> dict[str, int]:
+    """Check every link in `data/` and the `external_values/` folder (`external_values.check`); counts."""
     data = pl.scan_parquet(meds_root / "data" / "**" / "*.parquet")
-    present = set(data.collect_schema().names())
-    counts = {}
-    for col in link_columns:
-        if col not in present:
-            raise ValueError(f"{col} is declared but not in data/")
-        links = data.select(pl.col(col).drop_nulls().unique()).collect()[col].to_list()
-        unknown = [x for x in links if x not in known]
-        # An ECG link names a WFDB record (no extension); its header is `<link>.hea`.
-        missing = [x for x in links if not ((meds_root / x).exists() or (meds_root / f"{x}.hea").exists())]
-        if unknown or missing:
-            raise ValueError(
-                f"{col}: {len(unknown)} links not in objects.parquet, {len(missing)} not on disk"
-            )
-        counts[col] = len(links)
-    return counts
+    link, enc = external_values.LINK_COLUMN, external_values.ENCODING_COLUMN
+    names = set(data.collect_schema().names())
+    if link not in names:
+        links = {}
+    elif enc not in names:
+        raise ValueError(f"{link} is in data/ without {enc}")
+    else:
+        pairs = data.filter(pl.col(link).is_not_null()).select(link, enc).unique().collect()
+        if pairs[enc].null_count() or pairs[link].n_unique() != pairs.height:
+            raise ValueError(f"every {link} needs exactly one {enc}")
+        links = dict(pairs.iter_rows())
+    return external_values.check(meds_root, links)
 
 
 def check_dataset_json(meds_root: Path, link_columns: list[str]) -> dict:

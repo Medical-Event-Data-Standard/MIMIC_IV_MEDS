@@ -10,18 +10,22 @@ is required; each extension in `--extensions` must be there too (`--list-extensi
 extensions asked for. The output is a MEDS root with the objects inside it:
 
     <output-dir>/
-      data/{train,tuning,held_out}/*.parquet   # one event per note / ECG / echo DICOM / CXR image
-      metadata/dataset.json                    # name, versions, license, additional_value_modality_columns
+      data/{train,tuning,held_out}/*.parquet   # one event per note / ECG / DICOM / image / waveform window
+      metadata/dataset.json                    # name, versions, license, source_datasets, column categories
       metadata/codes.parquet, subject_splits.parquet
-      metadata/objects.parquet                 # link -> release, source path, sha256, size, format
       metadata/sources.json                    # every release used, and what each contributed (counts)
-      ecg/<sha[:2]>/<sha>/<record>.hea, .dat
-      echo/<sha[:2]>/<sha>.dcm
-      cxr/<sha[:2]>/<sha>.jpg
+      external_values/                         # every object an event links to, and nothing else
+        ecg/<sha[:2]>/<sha>/<record>.hea, .dat
+        echo/<sha[:2]>/<sha>.dcm
+        cxr/<sha[:2]>/<sha>.jpg
+        waveform/<sha[:2]>/<sha>/<window>.hea, .dat
+
+Each object event has `external_value_link` (the path above, relative to the MEDS root) and
+`external_value_encoding` (`wfdb`, `dicom` or `jpeg`; see `external_values.py`).
 
 Steps: stage the raw input and the object manifest (`staging.py`), compose the spec for exactly
 these modules (`compose.py`), run `meds-extract-run` on it without downloading, then place the
-objects and write the object and source metadata (`finalize.py`). Logs show counts, never rows.
+objects and write the source metadata (`finalize.py`). Logs show counts, never rows.
 """
 
 from __future__ import annotations
@@ -146,6 +150,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "MIMIC_IV_MEDS",
     )
+    p.add_argument(
+        "--waveform-window-s",
+        type=float,
+        default=staging.WAVEFORM_WINDOW_S,
+        help="cut waveform segments longer than this many seconds into windows of this length, each a "
+        "linked object of its own (needs the `external-values` extra); 0 keeps whole segments",
+    )
+    p.add_argument(
+        "--waveform-numerics-interval-s",
+        type=float,
+        default=staging.NUMERICS_INTERVAL_S,
+        help="summarize each waveform vital sign as its median over intervals of this many seconds, "
+        "timed at the end of each interval; 0 keeps every reading at its own time",
+    )
     p.add_argument("--workers", type=int, default=min(8, os.cpu_count() or 1), help="threads for hashing")
     p.add_argument(
         "--no-enrich", action="store_true", help="skip the suMEDS code-metadata enrichment (offline)"
@@ -258,6 +276,16 @@ def build(a: argparse.Namespace) -> Path:
         name = f.module.name
         if name in staging.TABLE_STAGERS:
             staged[name] = staging.TABLE_STAGERS[name](f, raw_input, subjects)
+        elif name == "waveform":
+            staged[name] = staging.stage_waveform(
+                f,
+                raw_input,
+                subjects,
+                a.workers,
+                a.waveform_window_s,
+                work / "generated" / "waveform",
+                a.waveform_numerics_interval_s,
+            )
         else:
             staged[name] = staging.OBJECT_STAGERS[name](f, raw_input, subjects, a.workers)
         logger.info(f"{f.module.names[0]:>16}: staged {staged[name].stats}")
@@ -269,15 +297,18 @@ def build(a: argparse.Namespace) -> Path:
     manifests = [s.objects for s in staged.values() if s.objects is not None]
     objects = pl.concat(manifests) if manifests else pl.DataFrame(schema=staging.OBJECT_SCHEMA)
     placed = finalize.place_objects(objects, {f.module.name: f.root for f in found}, out, a.link_mode)
-    finalize.write_objects_table(objects, out)
     finalize.write_sources(out, core, found, staged, placed, a.link_mode, skip)
     finalize.add_source_datasets(out, core, found, skip)
     link_cols = compose.link_columns(found, skip)
     finalize.check_dataset_json(out, link_cols)
-    for col, n in finalize.check_links(out, link_cols).items():
-        logger.info(f"{col}: {n} distinct links, all resolve")
+    counts = finalize.check_external_values(out)
+    logger.info(
+        f"external_values: {counts['links']} distinct links, all resolve; {counts['files']} files, "
+        "each belonging to a linked object"
+    )
     if not a.keep_staging:
         shutil.rmtree(raw_input)
+        shutil.rmtree(work / "generated", ignore_errors=True)
     logger.info(f"done: {out}")
     return out
 

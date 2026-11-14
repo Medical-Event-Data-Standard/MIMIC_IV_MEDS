@@ -53,6 +53,11 @@ dependencies = [
 # Optional: the build reads any folder in PhysioNet's layout, however it was filled. Until
 # mimic-demo-mm is on PyPI, uv takes it from its repository (`[tool.uv.sources]`).
 demo-download = ["mimic-demo-mm"]
+# Readers for the linked objects of a multimodal build (`external_value_encoding`: wfdb, dicom, jpeg;
+# see MIMIC_IV_MEDS.multimodal.external_values). wfdb is also what cuts waveform segments longer than
+# `--waveform-window-s` into windows (MIMIC-IV-WDB stores FLAC-compressed signals, which wfdb >= 4.1
+# reads and writes); a build without the waveform database, or with `--waveform-window-s 0`, needs none.
+external-values = ["wfdb>=4.1,<5", "pydicom>=2.4", "pillow>=10"]
 
 [tool.uv.sources]
 mimic-demo-mm = { git = "https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo" }
@@ -72,6 +77,8 @@ dev = [
     "pytest~=9.0",
     "pytest-rerunfailures==16.1",
     "shfmt-py==3.12.0.2",
+    # Runs the waveform windowing tests (`tests/multimodal_test.py`), which write real WFDB records.
+    "wfdb>=4.1,<5",
 ]
 # The documentation site (`zensical.toml`, `docs/`), built with Zensical, the successor to
 # Material for MkDocs: by Read the Docs from `.readthedocs.yaml`, and in CI with
@@ -84,8 +91,8 @@ docs = [
 ]
 
 [project.scripts]
-# MIMIC-IV plus any combination of MIMIC-IV-ED, -Note, -ECG, -ECHO and MIMIC-CXR-JPG, from local
-# copies of the releases, with the ECG/echo/CXR objects stored inside the MEDS root. See
+# MIMIC-IV plus any combination of its extensions, from local copies of the releases, with the
+# ECG/echo/CXR/waveform objects stored under `external_values/` in the MEDS root. See
 # src/MIMIC_IV_MEDS/multimodal/cli.py.
 mimic-iv-meds-multimodal = "MIMIC_IV_MEDS.multimodal.cli:main"
 

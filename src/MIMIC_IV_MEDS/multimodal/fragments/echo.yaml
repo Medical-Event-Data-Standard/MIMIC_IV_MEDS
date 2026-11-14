@@ -5,19 +5,20 @@
 # `echo/records.parquet`, which `staging.stage_echo` builds from `echo-record-list.csv`: one row
 # per DICOM file of a core subject that is on disk.
 #
-# `echo_link` is an additional value modality column: `echo/<sha[:2]>/<sha>.dcm`, relative to the
-# MEDS root. The file is the release's DICOM, unchanged (cropping, resizing etc. are the model's job).
+# `external_value_link` is `external_values/echo/<sha[:2]>/<sha>.dcm`, relative to the MEDS root,
+# and `external_value_encoding` is `dicom`. The file is the release's DICOM, unchanged (cropping, resizing etc. are the model's job).
 echo/records:
   dicom:
     code: $code
     time: '$time::"%Y-%m-%d %H:%M:%S"'
-    echo_link: $link
+    external_value_link: $link
+    external_value_encoding: $encoding
     echo_study_id: $echo_study_id
     _metadata:
       _self:
         description: >-
           'Echocardiogram DICOM file (mostly cine loops) from MIMIC-IV-ECHO, timed at its acquisition
-          (echo-record-list.acquisition_datetime). echo_link is the file relative to the MEDS root;
+          (echo-record-list.acquisition_datetime). external_value_link is the file relative to the MEDS root;
           echo_study_id is the echo study'
 
 # The measurements of each echo report (MIMIC-IV-ECHO `structured-measurement`), staged by

@@ -41,9 +41,19 @@ mimic-iv-meds-multimodal --root /data/physionet --output-dir $MEDS_OUTPUT_DIR \
 
 It reads local releases in PhysioNet's layouts (the multimodal demo downloader's output included;
 `--download-demo` runs it), restricts every extension to the core's subjects, stores linked objects
-(ECGs, echo DICOMs, chest X-ray JPGs, waveforms) inside the MEDS root, and records every release
-used, with its version, in `metadata/dataset.json`. Details are in the README section
-"Multimodal build". A new extension is added to `MIMIC_IV_MEDS/multimodal/modules.py` (its
+(ECGs, echo DICOMs, chest X-ray JPGs, waveform windows) inside the MEDS root under
+`external_values/`, and records every release used, with its version, in `metadata/dataset.json`.
+Each linked object is one event with two columns, following
+[meds#109](https://github.com/Medical-Event-Data-Standard/meds/issues/109):
+
+- `external_value_link`: the object's path relative to the MEDS root;
+- `external_value_encoding`: how to read it, `wfdb` (`wfdb.rdrecord`), `dicom` (`pydicom.dcmread`) or
+    `jpeg` (`PIL.Image.open`).
+
+Linked objects are short enough to treat as points in time, timed when their data is complete.
+Long waveform recordings are cut into windows (`--waveform-window-s`, 10 min), and the monitors' vital
+signs become ordinary per-minute events, timed at the end of each minute. Details are in the README
+section "Multimodal build". A new extension is added to `MIMIC_IV_MEDS/multimodal/modules.py` (its
 release, marker file and fragment) and, if its raw files need reshaping, a stager in `staging.py`.
 
 ## Why extensions are separate specs

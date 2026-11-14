@@ -248,8 +248,9 @@ downloader leave it).
 ```bash
 # --extensions: any of the names below, or `all`; empty for MIMIC-IV alone. PhysioNet slugs
 # (mimic-cxr-jpg, mimic-iv-ext-note-extract, mimic4wdb, …) work too. An extension can be narrowed to
-# parts: mimic-iv-note:radiology, mimic-iv-echo:measurements (no DICOMs needed).
+# parts: mimic-iv-note:radiology, mimic-iv-echo:measurements (no DICOMs needed), mimic-iv-wdb:numerics.
 # Optional: --link-mode copy|hardlink|symlink (how objects get into the MEDS root; default copy),
+# --waveform-window-s 600 and --waveform-numerics-interval-s 60 (see the loader rule below),
 # --path mimic-iv-cxr=/elsewhere/mimic-cxr-jpg/2.1.0 (a release not under --root), --no-enrich (offline).
 mimic-iv-meds-multimodal --root /data/mimic-demo-multimodal --output-dir $MEDS_OUTPUT_DIR --extensions mimic-iv-ed,mimic-iv-mne,mimic-iv-cxr,mimic-iv-cxr-db
 ```
@@ -260,11 +261,11 @@ mimic-iv-meds-multimodal --root /data/mimic-demo-multimodal --output-dir $MEDS_O
 | `mimic-iv-ed`     | `mimic-iv-ed-demo` / `mimic-iv-ed`   | the `MIMIC-IV-ED` tables (`ED//…`)                                                                                            | as in that spec                                |
 | `mimic-iv-note`   | `mimic-iv-note`                      | `NOTE//DISCHARGE_SUMMARY`, `NOTE//RADIOLOGY_REPORT[//ADDENDUM]`, text in `text_value`                                         | `max(charttime, storetime)`                    |
 | `mimic-iv-mne`    | `mimic-iv-ext-note-extract`          | the `MIMIC-IV-MNE` tables (`NOTE//ALLERGY`, `NOTE//PHYSICAL_EXAM//…`, …)                                                      | as in that spec (discharge)                    |
-| `mimic-iv-ecg`    | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, `ecg_link`                                                                              | `ecg_time` (acquisition)                       |
-| `mimic-iv-echo`   | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, `echo_link`; `ECHO//MEASUREMENT//<measurement>` from `structured-measurement` (if present) | `acquisition_datetime`; `measurement_datetime` |
-| `mimic-iv-cxr`    | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>//<PatientOrientation>`, one per JPG, `cxr_link`                                                   | `StudyDate` + `StudyTime`                      |
+| `mimic-iv-ecg`    | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, linked (`wfdb`)                                                                         | `ecg_time` (acquisition)                       |
+| `mimic-iv-echo`   | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, linked (`dicom`); `ECHO//MEASUREMENT//<measurement>` from `structured-measurement`         | `acquisition_datetime`; `measurement_datetime` |
+| `mimic-iv-cxr`    | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>//<PatientOrientation>`, one per JPG, linked (`jpeg`)                                              | `StudyDate` + `StudyTime`                      |
 | `mimic-iv-cxr-db` | `mimic-cxr-ext-mimic-cxr-db`         | the `MIMIC-IV-CXRDB` tables (`CXR//STUDY//…`, `CXR_NLP//…`; its `CXR//IMAGE//…` only without `mimic-iv-cxr`)                  | as in that spec                                |
-| `mimic-iv-wdb`    | `mimic4wdb`                          | `WAVEFORM//SEGMENT` per continuous segment and `WAVEFORM//RECORD` per multi-segment record, `waveform_link`                   | the **end** of the linked data                 |
+| `mimic-iv-wdb`    | `mimic4wdb`                          | `WAVEFORM//WINDOW`, one per window of ≤ 10 min, linked (`wfdb`); `WAVEFORM//NUMERIC//<signal>` vital signs, per-minute median | the **end** of the window / minute             |
 
 ED, MNE and CXR-DB use the same spec fragments as their registered specs (`spec=MIMIC-IV-ED`,
 `MIMIC-IV-MNE`, `MIMIC-IV-CXRDB`), so a multimodal build with one of them extracts the same events
@@ -290,31 +291,48 @@ there. MIMIC-Note-Extract and MIMIC-CXR-DB have no demo subset. For those, add t
 simulated releases as a second root (`--root data/synthetic_demo`; see
 [Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)): a simulated
 release (`SYNTHETIC_<slug>.json`) is used only when no real one is found, and the build marks it
-everywhere: `[synthetic]` in `dataset_name`, its `+synthetic` version in `dataset_version`,
-`"synthetic": true` in `source_datasets`, and `synthetic_extensions` in `sources.json`.
+everywhere: `[synthetic]` in `dataset_name`, its `+synthetic` version in `dataset_version`, and
+`"release": "synthetic"` (with the ODbL license and what it simulates) in `source_datasets` and
+`sources.json`.
 
-Objects (waveforms, DICOMs, JPGs) are stored inside the MEDS root under their SHA-256, in their
-original formats, and each object event names its file in a link column relative to that root:
+Objects (ECGs, DICOMs, JPGs, waveform windows) are stored inside the MEDS root, under one folder,
+`external_values/`, in their original formats. Every object event has two columns, following the
+convention discussed in [meds#109](https://github.com/Medical-Event-Data-Standard/meds/issues/109):
+`external_value_link`, the object's path relative to the MEDS root, and `external_value_encoding`,
+how to read it. The modality is in the event's `code`.
 
 ```text
 $MEDS_OUTPUT_DIR/
   data/…, metadata/dataset.json, codes.parquet, subject_splits.parquet
-  metadata/objects.parquet   # link -> modality, format, sha256, size, source release + path, source IDs
-  metadata/sources.json      # each release used (slug, version, demo/full, license) and what it contributed
-  ecg/<sha[:2]>/<sha>/<record>.hea, .dat   # wfdb.rdrecord(root / ecg_link)
-  echo/<sha[:2]>/<sha>.dcm
-  cxr/<sha[:2]>/<sha>.jpg
-  waveform/<sha[:2]>/<sha>/<record>.hea, <record>_NNNN.hea/.dat, <record>n.csv.gz   # a whole record
+  metadata/sources.json      # each release used (slug, version, demo/full/synthetic, license) and what it contributed
+  external_values/           # every object an event links to, and nothing else
+    ecg/<sha[:2]>/<sha>/<record>.hea, .dat
+    echo/<sha[:2]>/<sha>.dcm
+    cxr/<sha[:2]>/<sha>.jpg
+    waveform/<sha[:2]>/<sha>/<window>.hea, .dat
 ```
+
+| `external_value_encoding` | The link names                                             | Read it with (`root` is the MEDS root) |
+| ------------------------- | ---------------------------------------------------------- | -------------------------------------- |
+| `wfdb`                    | a WFDB record: `<link>.hea` plus the signal files it names | `wfdb.rdrecord(root / link)`           |
+| `dicom`                   | one DICOM file                                             | `pydicom.dcmread(root / link)`         |
+| `jpeg`                    | one JPEG image                                             | `PIL.Image.open(root / link)`          |
+
+`MIMIC_IV_MEDS.multimodal.external_values.read(root, link, encoding)` does exactly this (install the
+readers with `pip install "MIMIC-IV-MEDS[external-values]"`). Below `external_values/` the folders are
+this build's choice: objects are named by their SHA-256, so identical bytes share one link. The
+build checks that every link resolves to all of its files and that every file under
+`external_values/` belongs to a linked object.
 
 `metadata/dataset.json` says which combination this is. MEDS-Extract writes, from the composed
 spec's `etl:` block: `dataset_name` (e.g. `MIMIC-IV+ED+Note(radiology)+ECG+ECHO(measurements)`, parts
 shown when only some were built), `dataset_version` (every release as `<slug>/<version>`, e.g.
 `mimic-iv-demo/2.2,mimic-iv-ed/2.2,…`), `license` (the PhysioNet Credentialed Health Data License
-as soon as one credentialed release is in), the link columns as MEDS
-`additional_value_modality_columns`, and the raw-source id columns of the parts built. The build
-adds `source_datasets`: the same releases as a list, each with its extension name, PhysioNet name,
-version, demo, full or synthetic, license, PhysioNet URL, parts built and link columns. `source_datasets`, `objects.parquet` and
+as soon as one credentialed release is in), `external_value_link` as MEDS
+`additional_value_modality_columns` (`external_value_encoding` lands in `other_extension_columns`),
+and the raw-source id columns of the parts built. The build adds `source_datasets`: the same
+releases as a list, each with its extension name, PhysioNet name, version, demo, full or synthetic,
+license, PhysioNet URL, parts built and the encoding of its linked objects. `source_datasets` and
 `sources.json` (which also records the pinned mimic-code concept maps) have no MEDS-Extract
 counterpart yet; they are written by `src/MIMIC_IV_MEDS/multimodal/finalize.py`, kept
 self-contained so they can move upstream as a post-stage.
@@ -336,21 +354,34 @@ keeping only the cohort's rows. An object listed in a record list but not (fully
 disk gets no event: no link ever dangles, `sources.json` counts what was skipped, and re-running
 after a download completes picks it up. On the MIMIC-IV demo subjects (100) the build adds 2,042
 notes, 659 ECGs, 411 echo DICOMs, 6,820 echo measurements (58 subjects), 566 chest X-rays and
-5 bedside-monitor waveform records (4 subjects, 60 segments, 190 h).
+5 bedside-monitor waveform records (4 subjects, 60 segments, 190 h): 1,187 waveform windows and
+158,116 per-minute vital signs (21 signals).
 
-**Loader rule: a link's data becomes available at its event's `time`, and a loader reads only the
-record the link names.** Every object event is timed when its data is complete, so a model that,
-at prediction time *t*, loads only the links of events with `time <= t` never sees later data. This
-matters most for waveforms: a record spans an ICU stay (days), and its folder also holds its later
-segments and its numerics (`<record>n.csv.gz`, ~1 Hz HR, SpO2, NBP, …). `WAVEFORM//SEGMENT` is
-timed at the end of its segment and its link is a WFDB record of that segment alone;
-`WAVEFORM//RECORD`, the only event linking to the whole record (and so the only way to its
-numerics), is timed at the end of the record. `waveform_duration_s` gives each window,
-`[time - duration, time]`. Do not list or glob a link's folder. Every link, segments included, is
-a row of `metadata/objects.parquet`. The price of end-timing: a segment is usable only once it
-ends, and on the demo segments last up to ~60 h (records: median ~30 h, up to ~76 h). An encoder
-that wants earlier access must cut the signal at the prediction time itself; the ETL could also
-cut segments into fixed windows, which it does not do yet.
+`scripts/profile_external_values.py <meds_root>` reads a sample of every encoding and reports
+counts, size on disk and read time (counts and timings only). On the demo build: 566 JPEGs
+(968 MB, median 12 ms per image, decoded), 1,846 WFDB records (659 ECGs and 1,187 waveform windows,
+402 MB, 6 ms), 411 DICOMs (1,365 MB, 4 ms; `pydicom` parses the file, pixel data is decoded on
+access).
+
+**Linked objects are points in time.** Every linked object is short enough to treat as happening at
+one time, and its event is timed when its data is complete, so a model that, at prediction time
+*t*, loads only the links of events with `time <= t` never sees later data. ECGs (10 s), images
+and echo DICOMs are short already. A waveform record spans an ICU stay (on the demo up to ~76 h,
+segments up to ~60 h), so it is never linked whole: every segment longer than
+`--waveform-window-s` (600 s) is cut into windows of that length, each written as a WFDB record of
+its own (same signals, FLAC compression, gains and samples per frame; the digital samples are
+unchanged), and shorter segments are linked as they are. `WAVEFORM//WINDOW` is timed at the end of
+its window; `waveform_duration_s` gives its span, `[time - duration, time]`; `waveform_segment` and
+`waveform_window` say where it was cut from. Cutting needs `wfdb` (the `external-values` extra);
+`--waveform-window-s 0` keeps whole segments instead, outside the point-in-time rule.
+
+The monitors' vital signs (each record's numerics, `<record>n.csv.gz`: HR, SpO2, ABP, NBP, RR, ST, QT,
+… about once a second) are not linked: they become ordinary events, `WAVEFORM//NUMERIC//<signal>`
+with `numeric_value` and `unit`. Each is the median of a signal's readings over one minute
+(`--waveform-numerics-interval-s`), timed at the end of that minute, so it enters the timeline only
+after it was measured; an interval of `0` keeps every reading at its own time (on the demo about 9 M
+events instead of 158 k). `--extensions mimic-iv-wdb:windows` or `mimic-iv-wdb:numerics` builds one
+of the two.
 
 Caveats: the ECG time is the ECG machine's clock, which the release says was mostly not
 synchronized with the hospital's. `mimic-iv-cxr` alone extracts no CheXpert labels: they are mined

@@ -68,7 +68,8 @@ class Part:
     name: str
     title: str
     tables: tuple[str, ...] = ()
-    link_column: str | None = None
+    #: How this part's linked objects are stored (`external_values.ENCODINGS`), if it links any.
+    encoding: str | None = None
     raw_source_id_columns: tuple[str, ...] = ()
 
 
@@ -80,8 +81,9 @@ class Module:
     releases: tuple[Release, ...]
     #: A path, relative to the release root, that must exist for a directory to count as this release.
     marker: str | tuple[str, ...]
-    #: The MEDS column holding paths to this module's objects (images, waveforms), if any.
-    link_column: str | None = None
+    #: How this module's linked objects (images, waveforms) are stored (`external_values.ENCODINGS`);
+    #: None for a module without objects. Every object goes in `external_value_link`.
+    encoding: str | None = None
     #: Extension columns this module adds that are join keys into its raw release.
     raw_source_id_columns: tuple[str, ...] = ()
     #: Selectable parts; empty when the module is all-or-nothing.
@@ -222,7 +224,7 @@ MODULES: dict[str, Module] = {
             ),
             marker="record_list.csv",
             requires=("files",),
-            link_column="ecg_link",
+            encoding="wfdb",
             raw_source_id_columns=("ecg_study_id",),
             fragment="multimodal/fragments/ecg.yaml",
         ),
@@ -244,7 +246,7 @@ MODULES: dict[str, Module] = {
                     "dicom",
                     "one event per DICOM file, linked (echo-record-list.csv + files/)",
                     tables=("echo/records",),
-                    link_column="echo_link",
+                    encoding="dicom",
                     raw_source_id_columns=("echo_study_id",),
                 ),
                 Part(
@@ -264,7 +266,7 @@ MODULES: dict[str, Module] = {
             title="MIMIC-CXR-JPG (chest radiograph JPGs)",
             releases=(Release("mimic-cxr-jpg", False, PHYSIONET_CREDENTIALED),),
             marker=("mimic-cxr-2.0.0-metadata.csv.gz", "mimic-cxr-2.0.0-metadata.csv"),
-            link_column="cxr_link",
+            encoding="jpeg",
             raw_source_id_columns=("cxr_study_id", "cxr_dicom_id"),
             fragment="multimodal/fragments/cxr.yaml",
         ),
@@ -287,11 +289,24 @@ MODULES: dict[str, Module] = {
             extension="mimic-iv-wdb",
             aliases=("mimic4wdb",),
             label="WDB",
-            title="MIMIC-IV Waveform Database (bedside monitor waveforms and numerics, WFDB)",
+            title="MIMIC-IV Waveform Database (bedside monitor waveforms and vital signs)",
             releases=(Release("mimic4wdb", False, ODBL),),
             marker=("waves",),
-            link_column="waveform_link",
             raw_source_id_columns=("waveform_record_id",),
+            parts=(
+                Part(
+                    "windows",
+                    "waveform windows of at most --waveform-window-s seconds, linked (WFDB)",
+                    tables=("waveform/windows",),
+                    encoding="wfdb",
+                ),
+                Part(
+                    "numerics",
+                    "the monitors' vital signs (HR, SpO2, ABP, ...) as events, summarized over "
+                    "--waveform-numerics-interval-s",
+                    tables=("waveform/numerics",),
+                ),
+            ),
             fragment="multimodal/fragments/waveform.yaml",
         ),
     )
@@ -355,10 +370,10 @@ def describe() -> str:
         if len(m.names) > 1:
             lines.append(f"{'':<16} also: {', '.join(m.names[1:])}")
         lines.append(f"{'':<16} releases: {rel}")
-        if m.link_column:
-            lines.append(f"{'':<16} link column: {m.link_column}")
+        if m.encoding:
+            lines.append(f"{'':<16} external values: {m.encoding}")
         for p in m.parts:
-            link = f" [{p.link_column}]" if p.link_column else ""
+            link = f" [external values: {p.encoding}]" if p.encoding else ""
             lines.append(f"{'':<16} part {name}:{p.name}: {p.title}{link}")
     lines.append(
         "core (MIMIC-IV) is always built; it defines the cohort every extension is restricted to.\n"

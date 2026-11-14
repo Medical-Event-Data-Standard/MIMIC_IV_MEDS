@@ -19,7 +19,8 @@ combination works without a registered spec per subset. The composed spec:
     appends `:<package version>`);
   - `license`: the PhysioNet Credentialed Health Data License as soon as any release used is
     credentialed, else ODbL (a simulated release is ODbL);
-  - `additional_value_modality_columns`: the link column of each object module;
+  - `additional_value_modality_columns`: `external_value_link`, when a module links objects (its
+    companion `external_value_encoding` lands in `other_extension_columns`);
   - `raw_source_id_columns`: the base's plus each module's raw-release keys.
 """
 
@@ -30,6 +31,7 @@ from pathlib import Path
 
 import yaml
 
+from .external_values import ENCODING_COLUMN, LINK_COLUMN
 from .modules import MODULES, ODBL, PHYSIONET_CREDENTIALED, FoundRelease
 
 PKG = files("MIMIC_IV_MEDS")
@@ -107,18 +109,26 @@ def module_columns(f: FoundRelease, skip_tables: set[str] = frozenset()) -> tupl
     MEDS-Extract rejects a `dataset.json` category naming a column its output lacks, so a part that was
     not built must not contribute its columns.
     """
-    links = [f.module.link_column] if f.module.link_column else []
+    links = [LINK_COLUMN] if encoding(f, skip_tables) else []
     raw = list(f.module.raw_source_id_columns)
     active = set(active_parts(f, skip_tables))
     for p in f.module.parts:
         if p.name in active:
-            links += [p.link_column] if p.link_column and p.link_column not in links else []
             raw += [c for c in p.raw_source_id_columns if c not in raw]
     return links, raw
 
 
+def encoding(f: FoundRelease, skip_tables: set[str] = frozenset()) -> str | None:
+    """How `f`'s linked objects are stored, or None when it links none in this build."""
+    if f.module.encoding:
+        return f.module.encoding
+    active = set(active_parts(f, skip_tables))
+    return next((p.encoding for p in f.module.parts if p.name in active and p.encoding), None)
+
+
 def link_columns(found: list[FoundRelease], skip_tables: set[str] = frozenset()) -> list[str]:
-    return [c for f in found for c in module_columns(f, skip_tables)[0]]
+    """`[external_value_link]` when any module of the build links objects, else `[]`."""
+    return [LINK_COLUMN] if any(encoding(f, skip_tables) for f in found) else []
 
 
 def common_sources() -> list[dict]:
@@ -136,4 +146,4 @@ def write_spec(spec: dict, fp: Path) -> Path:
     return fp
 
 
-__all__ = ["MODULES", "common_sources", "compose", "write_spec"]
+__all__ = ["ENCODING_COLUMN", "LINK_COLUMN", "MODULES", "common_sources", "compose", "write_spec"]

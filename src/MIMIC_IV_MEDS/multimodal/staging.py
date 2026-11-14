@@ -7,9 +7,10 @@ per module that already carries the link column:
 - the core (`hosp/`, `icu/`) and ED (`ed/`) tables are symlinked in unchanged;
 - the public concept-map CSVs the base spec joins (its `sources.common` block) are linked in from a
   local copy, or downloaded once into a cache and checked against the spec's SHA-256;
-- notes, ECGs, echo DICOMs and chest radiographs become one parquet table each under
-  `<module>/`, with the event code, a leakage-safe time in MIMIC-IV's own format, the extension
-  columns and, for objects, the link (`<module>/<sha[:2]>/<sha>...`, relative to the MEDS root).
+- notes, ECGs, echo DICOMs, chest radiographs and waveform windows become one parquet table each
+  under `<module>/`, with the event code, a leakage-safe time in MIMIC-IV's own format, the
+  extension columns and, for objects, the link (`external_values/<module>/<sha[:2]>/<sha>...`,
+  relative to the MEDS root) and its encoding (see `external_values.py`).
 
 Rows are kept only for subjects in the core `hosp/patients` (so a module can never add subjects
 that would reshuffle the core cohort's splits) and, for objects, only when every file of the object
@@ -25,6 +26,7 @@ import gzip
 import hashlib
 import io
 import logging
+import re
 import urllib.request
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -34,6 +36,7 @@ from pathlib import Path
 
 import polars as pl
 
+from .external_values import ROOT as EXTERNAL_ROOT
 from .modules import FoundRelease
 
 logger = logging.getLogger(__name__)
@@ -55,20 +58,15 @@ class Staged:
     skip_tables: set[str] = field(default_factory=set)
 
 
-#: Columns of the object manifest (and of `metadata/objects.parquet`, see `finalize.py`).
+#: Columns of the object manifest, which `finalize.place_objects` uses to fill `external_values/`.
 OBJECT_SCHEMA = {
     "link": pl.String,
     "modality": pl.String,
-    "format": pl.String,
-    "sha256": pl.String,
+    "encoding": pl.String,
     "size_bytes": pl.Int64,
-    "files": pl.List(pl.String),  # the object's files, relative to the release root
-    "source_project": pl.String,
-    "source_version": pl.String,
-    "source_path": pl.String,  # how the release itself names the object, relative to its root
-    "subject_id": pl.Int64,
-    "study_id": pl.Int64,
-    "object_id": pl.String,
+    # The object's files, relative to the release root; absolute for files the build wrote itself (the
+    # windows of a long waveform segment), which are never symlinked into the MEDS root.
+    "files": pl.List(pl.String),
 }
 
 
@@ -121,25 +119,25 @@ def object_digest(file_digests: dict[str, str]) -> str:
 
 
 def link_for(module: str, digest: str, suffix: str = "", record_name: str | None = None) -> str:
-    """The object's path relative to the MEDS root.
+    """The object's path relative to the MEDS root, under `external_values/`.
 
     Examples:
         >>> link_for("cxr", "b70e" + "0" * 60, ".jpg")
-        'cxr/b7/b70e000000000000000000000000000000000000000000000000000000000000.jpg'
-        >>> link_for("ecg", "3fa2" + "0" * 60, record_name="40689238")[:12]
-        'ecg/3f/3fa20'
+        'external_values/cxr/b7/b70e000000000000000000000000000000000000000000000000000000000000.jpg'
+        >>> link_for("ecg", "3fa2" + "0" * 60, record_name="40689238")[:28]
+        'external_values/ecg/3f/3fa20'
         >>> link_for("ecg", "3fa2" + "0" * 60, record_name="40689238").endswith("/40689238")
         True
     """
     if record_name is not None:
-        return f"{module}/{digest[:2]}/{digest}/{record_name}"
-    return f"{module}/{digest[:2]}/{digest}{suffix}"
+        return f"{EXTERNAL_ROOT}/{module}/{digest[:2]}/{digest}/{record_name}"
+    return f"{EXTERNAL_ROOT}/{module}/{digest[:2]}/{digest}{suffix}"
 
 
 def link_expr(module: str, suffix: str = "", record_col: str | None = None) -> pl.Expr:
     """`link_for` as a polars expression over the `sha256` column; null where `sha256` is null."""
     sha = pl.col("sha256")
-    head = pl.lit(f"{module}/") + sha.str.slice(0, 2) + "/" + sha
+    head = pl.lit(f"{EXTERNAL_ROOT}/{module}/") + sha.str.slice(0, 2) + "/" + sha
     return (head + "/" + pl.col(record_col) if record_col else head + suffix).alias("link")
 
 
@@ -488,14 +486,16 @@ def _finish_objects(
     subjects: pl.Series,
     out_table: Path,
     event_cols: list[str],
-    fmt: str,
+    encoding: str,
 ) -> Staged:
     """Shared tail of the object modules: filter, write the event table, build the manifest.
 
-    `df` has one row per listed object with `subject_id`, `study_id`, `object_id`, `source_path`,
-    `files`, `sha256` (null when any file is missing), `size_bytes`, `link`, `time` (parsed) and the
-    module's event columns.
+    `df` has one row per listed object with `subject_id`, `files`, `sha256` (null when any file is
+    missing), `size_bytes`, `link`, `time` (parsed) and the module's event columns. The event table
+    gets `encoding` too (the fragments map it to `external_value_encoding`).
     """
+    df = df.with_columns(pl.lit(encoding).alias("encoding"))
+    event_cols = [*event_cols, "encoding"]
     listed = df.height
     in_cohort = df["subject_id"].is_in(subjects.implode())
     on_disk = df["sha256"].is_not_null()
@@ -516,18 +516,7 @@ def _finish_objects(
     out_table.parent.mkdir(parents=True, exist_ok=True)
     kept.with_columns(pl.col("time").dt.strftime(TIME_FMT)).select(event_cols).write_parquet(out_table)
     objects = kept.select(
-        pl.col("link"),
-        pl.lit(found.module.name).alias("modality"),
-        pl.lit(fmt).alias("format"),
-        "sha256",
-        "size_bytes",
-        "files",
-        pl.lit(found.release.project).alias("source_project"),
-        pl.lit(found.version).alias("source_version"),
-        "source_path",
-        "subject_id",
-        "study_id",
-        "object_id",
+        pl.col("link"), pl.lit(found.module.name).alias("modality"), "encoding", "size_bytes", "files"
     ).cast(OBJECT_SCHEMA)
     return Staged(found.module.name, stats, objects)
 
@@ -586,7 +575,7 @@ def stage_ecg(ecg: FoundRelease, raw_input: Path, subjects: pl.Series, workers: 
         subjects,
         raw_input / "ecg" / "records.parquet",
         ["subject_id", "code", "time", "ecg_study_id", "link"],
-        "WFDB",
+        "wfdb",
     )
 
 
@@ -719,7 +708,7 @@ def stage_echo(echo: FoundRelease, raw_input: Path, subjects: pl.Series, workers
         subjects,
         raw_input / "echo" / "records.parquet",
         ["subject_id", "code", "time", "echo_study_id", "link"],
-        "DICOM",
+        "dicom",
     )
     staged.stats = {"dicoms": staged.stats, "measurements": measurements}
     if not measurements.get("present"):
@@ -778,7 +767,7 @@ def stage_cxr(cxr: FoundRelease, raw_input: Path, subjects: pl.Series, workers: 
         subjects,
         raw_input / "cxr" / "images.parquet",
         ["subject_id", "code", "time", "view", "orientation", "cxr_study_id", "cxr_dicom_id", "link"],
-        "JPEG",
+        "jpeg",
     )
 
 
@@ -793,6 +782,9 @@ class WfdbMaster:
     #: `(segment name or "~" for a gap, samples)`, in order.
     segments: list[tuple[str, int]]
     info: dict[str, str]
+    #: Ticks per second of the counter the numerics' `time` column counts, and its value at the start.
+    counter_freq: float | None = None
+    counter_base: float = 0.0
 
 
 def parse_wfdb_master(text: str) -> WfdbMaster:
@@ -807,6 +799,8 @@ def parse_wfdb_master(text: str) -> WfdbMaster:
         ... )
         >>> m.name, m.fs, m.n_samples, m.start
         ('8000', 62.5, 1250, datetime.datetime(2150, 12, 31, 23, 59, 58, 500000))
+        >>> m.counter_freq, m.counter_base
+        (999.9, 0.0)
         >>> m.segments
         [('8000_0000', 0), ('8000_0001', 625), ('~', 125), ('8000_0002', 500)]
         >>> m.info
@@ -830,7 +824,19 @@ def parse_wfdb_master(text: str) -> WfdbMaster:
             except ValueError:
                 pass
     segments = [(tok[0], int(tok[1])) for tok in (ln.split() for ln in body[1:])]
-    return WfdbMaster(rec[0].split("/")[0], float(rec[2].split("/")[0]), int(rec[3]), start, segments, info)
+    # `<frame freq>/<counter freq>(<base counter value>)`, the last two optional.
+    freq, _, counter = rec[2].partition("/")
+    counter_freq, _, base = counter.partition("(")
+    return WfdbMaster(
+        rec[0].split("/")[0],
+        float(freq),
+        int(rec[3]),
+        start,
+        segments,
+        info,
+        float(counter_freq) if counter_freq else None,
+        float(base.rstrip(")")) if base else 0.0,
+    )
 
 
 def _segment_files(hea: Path) -> list[str]:
@@ -843,23 +849,142 @@ def _segment_files(hea: Path) -> list[str]:
     return files
 
 
-def stage_waveform(wdb: FoundRelease, raw_input: Path, subjects: pl.Series, workers: int) -> Staged:
-    """`waveform/segments.parquet`: bedside-monitor waveforms of the MIMIC-IV Waveform Database.
+#: Default length of a waveform window, in seconds (`--waveform-window-s`).
+WAVEFORM_WINDOW_S = 600.0
 
-    A record is a WFDB multi-segment record of one ICU stay (days long): a master header, one header
-    plus signal files per segment (gaps between them), and a numerics table (`<record>n.csv.gz`,
-    ~1 Hz vitals). The record folder, with its original file names, is one object under its SHA-256;
-    it gets two kinds of event, each **timed at the end** of the data it links to, because data that
-    spans days cannot be put at its start without showing a model the future:
 
-    - `WAVEFORM//SEGMENT` per segment with signal data, linking to that segment (a WFDB record of its
-      own), with `waveform_duration_s` so the window is `[time - duration, time]`;
-    - `WAVEFORM//RECORD` at the end of the record, linking to the whole multi-segment record (and so
-      to its numerics, which sit next to it).
+def cut_wfdb_windows(
+    record: Path, out_dir: Path, window_samples: int, start: datetime | None
+) -> list[tuple[str, int, int, list[Path]]]:
+    """Write the single-segment WFDB record `record` as consecutive windows of `window_samples` frames.
+
+    Each window is a WFDB record of its own in `out_dir`, named `<record>_wNNNN`, with the same
+    signals, signal file grouping, storage format (FLAC-compressed format 516 in MIMIC-IV-WDB), gains,
+    baselines and samples per frame, and the digital samples unchanged; only the samples differ, and
+    the base time is the window's start when `start` (the record's start) is known. Returns
+    `(name, first frame, end frame, files)` per window. Needs `wfdb` (the `external-values` extra).
+    """
+    try:
+        import wfdb
+    except ImportError as e:
+        raise ImportError(
+            "cutting long waveform segments into windows needs wfdb: "
+            'pip install "MIMIC-IV-MEDS[external-values]" (or --waveform-window-s 0 keeps whole segments, '
+            "outside the point-in-time scope of a linked object)"
+        ) from e
+    header = wfdb.rdheader(str(record))
+    seg = header.record_name
+    groups = list(dict.fromkeys(header.file_name))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    windows = []
+    for k, s in enumerate(range(0, header.sig_len, window_samples)):
+        e = min(header.sig_len, s + window_samples)
+        r = wfdb.rdrecord(str(record), sampfrom=s, sampto=e, physical=False, smooth_frames=False)
+        name = f"{seg}_w{k:04d}"
+        r.record_name = name
+        # `<seg>e.dat` -> `<seg>_w0000e.dat`: the signal groups keep their suffixes.
+        r.file_name = [
+            name + (fn[len(seg) :] if fn.startswith(seg) else f"_{groups.index(fn)}.dat")
+            for fn in r.file_name
+        ]
+        if r.init_value is not None:
+            r.init_value = [int(sig[0]) for sig in r.e_d_signal]
+        if start is not None:
+            ws = start + timedelta(seconds=s / header.fs)
+            r.base_time, r.base_date = ws.time(), ws.date()
+        r.wrsamp(write_dir=str(out_dir), expanded=True)
+        files = [out_dir / f"{name}.hea", *(out_dir / f for f in dict.fromkeys(r.file_name))]
+        windows.append((name, s, e, files))
+    return windows
+
+
+#: Default interval the vital signs are summarized over, in seconds (`--waveform-numerics-interval-s`).
+NUMERICS_INTERVAL_S = 60.0
+_NUMERIC_COLUMN = re.compile(r"^(?P<name>.*?)\s*\[(?P<unit>[^\]]*)\]\s*$")
+
+
+def numeric_name_unit(column: str) -> tuple[str, str | None]:
+    """`"HR [bpm]"` -> `("HR", "bpm")`; a column without a `[unit]` keeps its name and gets no unit.
+
+    Examples:
+        >>> numeric_name_unit("Pulse (SpO2) [bpm]"), numeric_name_unit("PVC [/min]"), numeric_name_unit("Foo")
+        (('Pulse (SpO2)', 'bpm'), ('PVC', '/min'), ('Foo', None))
+    """
+    m = _NUMERIC_COLUMN.match(column)
+    return (m["name"], m["unit"] or None) if m else (column.strip(), None)
+
+
+def read_wfdb_numerics(fp: Path, m: WfdbMaster, interval_s: float) -> pl.DataFrame:
+    """A record's numerics (`<record>n.csv.gz`) as `time, code, numeric_value, unit` rows.
+
+    The first column counts ticks of the record's counter (`m.counter_freq` per second, `m.counter_base`
+    at the record's start); every other column is one signal, `"<name> [<unit>]"`. With `interval_s > 0`
+    each signal becomes its median over consecutive `interval_s`-second intervals from the record's
+    start, **timed at the end of the interval**, so no value appears before all the readings it
+    summarizes; with `interval_s <= 0` every reading is its own row, at its own time. Readings that are
+    not numbers are dropped. Codes are `WAVEFORM//NUMERIC//<name>`.
+    """
+    df = pl.read_csv(fp, infer_schema_length=0)
+    tcol = df.columns[0]
+    long = (
+        df.unpivot(index=tcol, variable_name="column", value_name="value")
+        .with_columns(
+            ((pl.col(tcol).cast(pl.Float64, strict=False) - m.counter_base) / m.counter_freq).alias("s"),
+            pl.col("value").cast(pl.Float64, strict=False),
+        )
+        .drop_nulls(["s", "value"])
+    )
+    if interval_s > 0:
+        long = (
+            long.group_by("column", ((pl.col("s") // interval_s) + 1).alias("interval"))
+            .agg(pl.col("value").median())
+            .with_columns((pl.col("interval") * interval_s).alias("s"))
+        )
+    names = {c: numeric_name_unit(c) for c in df.columns[1:]}
+    return long.select(
+        (pl.lit(m.start) + pl.duration(microseconds=(pl.col("s") * 1e6).round().cast(pl.Int64))).alias(
+            "time"
+        ),
+        (
+            pl.lit("WAVEFORM//NUMERIC//")
+            + pl.col("column").replace_strict({c: n for c, (n, _) in names.items()}, return_dtype=pl.String)
+        ).alias("code"),
+        pl.col("value").alias("numeric_value"),
+        pl.col("column")
+        .replace_strict({c: u for c, (_, u) in names.items()}, return_dtype=pl.String)
+        .alias("unit"),
+    ).sort("time", "code")
+
+
+def stage_waveform(
+    wdb: FoundRelease,
+    raw_input: Path,
+    subjects: pl.Series,
+    workers: int,
+    window_s: float = WAVEFORM_WINDOW_S,
+    window_dir: Path | None = None,
+    numerics_interval_s: float = NUMERICS_INTERVAL_S,
+) -> Staged:
+    """The MIMIC-IV Waveform Database: linked waveform windows and the monitors' vital signs.
+
+    A record is a WFDB multi-segment record of one ICU stay (hours to days): a master header, one
+    header plus signal files per segment (gaps between them), and a numerics table (`<record>n.csv.gz`).
+    Neither is linked whole: a linked object should be short enough to treat as one point in time.
+
+    - Part `windows`, `waveform/windows.parquet`: every segment longer than `window_s` is cut into
+      windows of `window_s` seconds (the last one shorter), each written as a WFDB record of its own
+      (`cut_wfdb_windows`, into `window_dir`); shorter segments are linked unchanged. Each window is one
+      `WAVEFORM//WINDOW` event, **timed at its end** (`waveform_duration_s` gives its length), linking
+      to a folder that holds that window and nothing else. `window_s <= 0` keeps whole segments.
+    - Part `numerics`, `waveform/numerics.parquet`: the vital signs (HR, SpO2, ABP, ... about once a
+      second) as ordinary events with a `numeric_value` and a `unit` (`read_wfdb_numerics`), each
+      summarized over `numerics_interval_s` and timed at the end of its interval.
 
     The release's `RECORDS` lists every patient's folder; only the core cohort's are used, and only
     records whose master header is on disk.
     """
+    want_windows, want_numerics = wdb.wants("windows"), wdb.wants("numerics")
+    window_dir = window_dir or raw_input.parent / "generated" / "waveform"
     sums = read_sha256sums(wdb.root)
     subject_dirs = [
         ln.strip().rstrip("/") for ln in (wdb.root / "RECORDS").read_text().splitlines() if ln.strip()
@@ -869,9 +994,17 @@ def stage_waveform(wdb: FoundRelease, raw_input: Path, subjects: pl.Series, work
         "listed_patients": len(subject_dirs),
         "patients_outside_core_subjects": 0,
         "patients_not_on_disk": 0,
+        "records": 0,
+        "records_missing_on_disk": 0,
+        "records_without_start_time": 0,
     }
-    stats |= {"records": 0, "records_missing_on_disk": 0, "records_without_start_time": 0}
-    rows, objects = [], []
+    if want_windows:
+        stats |= {"segments": 0, "segments_missing_on_disk": 0, "segments_cut": 0}
+        stats["window_s"] = window_s if window_s > 0 else None
+    if want_numerics:
+        stats |= {"numerics_files": 0, "numerics_files_missing": 0, "records_without_counter_frequency": 0}
+        stats["numerics_interval_s"] = numerics_interval_s if numerics_interval_s > 0 else None
+    rows, objects, numerics = [], [], []
     for sd in subject_dirs:
         subject = int(Path(sd).name.lstrip("p"))
         if subject not in cohort:
@@ -892,77 +1025,103 @@ def stage_waveform(wdb: FoundRelease, raw_input: Path, subjects: pl.Series, work
                 continue
             stats["records"] += 1
             rdir = master.parent
-            files = sorted(p for p in rdir.iterdir() if p.is_file() and not p.name.startswith("."))
-            rels = [p.relative_to(wdb.root).as_posix() for p in files]
-            digests = hash_files(wdb.root, rels, sums, workers)
-            digest = object_digest(digests)
-            folder = f"waveform/{digest[:2]}/{digest}"
             hadm = int(m.info["hadm_id"]) if m.info.get("hadm_id", "").isdigit() else None
             record_id = int(m.name) if m.name.isdigit() else None
+            if want_numerics:
+                fp = rdir / f"{m.name}n.csv.gz"
+                if not fp.is_file():
+                    stats["numerics_files_missing"] += 1
+                elif m.counter_freq is None:
+                    stats["records_without_counter_frequency"] += 1
+                else:
+                    stats["numerics_files"] += 1
+                    numerics.append(
+                        read_wfdb_numerics(fp, m, numerics_interval_s).with_columns(
+                            pl.lit(subject, pl.Int64).alias("subject_id"),
+                            pl.lit(hadm, pl.Int64).alias("hadm_id"),
+                            pl.lit(record_id, pl.Int64).alias("waveform_record_id"),
+                        )
+                    )
+            if not want_windows:
+                continue
+            # Whole frames, rounded down: a window never exceeds `window_s`.
+            window_samples = max(1, int(window_s * m.fs)) if window_s > 0 else 0
             offset = 0
             for seg, n in m.segments:
-                offset += n  # samples up to the end of this entry; gaps (`~`) count too
-                if (
-                    seg == "~"
-                    or n == 0
-                    or not (rdir / f"{seg}.hea").is_file()
-                    or not _segment_files(rdir / f"{seg}.hea")
-                ):
+                seg_start, offset = offset, offset + n  # in frames from the record's start; gaps count too
+                if seg == "~" or n == 0 or not (rdir / f"{seg}.hea").is_file():
                     continue
-                rows.append({
-                    "subject_id": subject, "code": "WAVEFORM//SEGMENT",
-                    "time": m.start + timedelta(seconds=offset / m.fs), "link": f"{folder}/{seg}",
-                    "hadm_id": hadm, "waveform_record_id": record_id, "waveform_segment": seg,
-                    "waveform_duration_s": n / m.fs,
-                })  # fmt: skip
-                # Every link is a row of objects.parquet: the segment is its header plus its signal files,
-                # inside the record's folder (and so also part of the record's own row).
+                signal_files = _segment_files(rdir / f"{seg}.hea")
+                if not signal_files:
+                    continue
+                stats["segments"] += 1
                 seg_rels = [
-                    (rdir / f).relative_to(wdb.root).as_posix()
-                    for f in [f"{seg}.hea", *_segment_files(rdir / f"{seg}.hea")]
+                    (rdir / f).relative_to(wdb.root).as_posix() for f in [f"{seg}.hea", *signal_files]
                 ]
-                objects.append({
-                    "link": f"{folder}/{seg}", "modality": "waveform", "format": "WFDB segment",
-                    "sha256": object_digest({r: digests[r] for r in seg_rels}),
-                    "size_bytes": sum((wdb.root / r).stat().st_size for r in seg_rels), "files": seg_rels,
-                    "source_project": wdb.release.project, "source_version": wdb.version,
-                    "source_path": (Path(sd) / Path(rec_rel).parent / seg).as_posix(), "subject_id": subject,
-                    "study_id": record_id, "object_id": seg,
-                })  # fmt: skip
-            rows.append({
-                "subject_id": subject, "code": "WAVEFORM//RECORD",
-                "time": m.start + timedelta(seconds=m.n_samples / m.fs), "link": f"{folder}/{m.name}",
-                "hadm_id": hadm, "waveform_record_id": record_id, "waveform_segment": None,
-                "waveform_duration_s": m.n_samples / m.fs,
-            })  # fmt: skip
-            objects.append({
-                "link": f"{folder}/{m.name}", "modality": "waveform", "format": "WFDB multi-segment",
-                "sha256": digest, "size_bytes": sum(p.stat().st_size for p in files), "files": rels,
-                "source_project": wdb.release.project, "source_version": wdb.version,
-                "source_path": (Path(sd) / rec_rel).as_posix(), "subject_id": subject,
-                "study_id": record_id, "object_id": m.name,
-            })  # fmt: skip
-    schema = {
-        "subject_id": pl.Int64, "code": pl.String, "time": pl.Datetime("us"), "link": pl.String,
-        "hadm_id": pl.Int64, "waveform_record_id": pl.Int64, "waveform_segment": pl.String,
-        "waveform_duration_s": pl.Float64,
-    }  # fmt: skip
-    events = pl.DataFrame(rows, schema=schema, orient="row").with_columns(
-        pl.col("time").dt.strftime(TIME_FMT)
-    )
-    out = raw_input / "waveform" / "segments.parquet"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    events.write_parquet(out)
-    stats |= {
-        "segment_events": int((events["code"] == "WAVEFORM//SEGMENT").sum()),
-        "record_events": int((events["code"] == "WAVEFORM//RECORD").sum()),
-    }
-    if stats["records_missing_on_disk"]:
-        logger.warning(
-            f"waveform: {stats['records_missing_on_disk']} listed records of cohort patients are not on disk"
+                if not all((wdb.root / r).is_file() for r in seg_rels):
+                    stats["segments_missing_on_disk"] += 1
+                    continue
+                if window_samples and n > window_samples:
+                    stats["segments_cut"] += 1
+                    seg_t0 = m.start + timedelta(seconds=seg_start / m.fs)
+                    cut = cut_wfdb_windows(rdir / seg, window_dir / m.name / seg, window_samples, seg_t0)
+                    windows = [
+                        (name, s, e, [p.resolve().as_posix() for p in files],
+                         {p.resolve().as_posix(): sha256_file(p) for p in files})
+                        for name, s, e, files in cut
+                    ]  # fmt: skip
+                else:
+                    windows = [(seg, 0, n, seg_rels, hash_files(wdb.root, seg_rels, sums, workers))]
+                for k, (name, s, e, files, digests) in enumerate(windows):
+                    link = link_for("waveform", object_digest(digests), record_name=name)
+                    rows.append({
+                        "subject_id": subject, "code": "WAVEFORM//WINDOW",
+                        "time": m.start + timedelta(seconds=(seg_start + e) / m.fs), "link": link,
+                        "hadm_id": hadm, "waveform_record_id": record_id, "waveform_segment": seg,
+                        "waveform_window": k, "waveform_duration_s": (e - s) / m.fs, "encoding": "wfdb",
+                    })  # fmt: skip
+                    # `wdb.root / f` is `f` itself when `f` is absolute (a window the build wrote).
+                    size = sum((wdb.root / f).stat().st_size for f in files)
+                    objects.append({
+                        "link": link, "modality": "waveform", "encoding": "wfdb", "size_bytes": size,
+                        "files": files,
+                    })  # fmt: skip
+    (raw_input / "waveform").mkdir(parents=True, exist_ok=True)
+    skip = set()
+    if want_windows:
+        schema = {
+            "subject_id": pl.Int64, "code": pl.String, "time": pl.Datetime("us"), "link": pl.String,
+            "hadm_id": pl.Int64, "waveform_record_id": pl.Int64, "waveform_segment": pl.String,
+            "waveform_window": pl.Int64, "waveform_duration_s": pl.Float64, "encoding": pl.String,
+        }  # fmt: skip
+        events = pl.DataFrame(rows, schema=schema, orient="row")
+        events.with_columns(pl.col("time").dt.strftime(TIME_FMT)).write_parquet(
+            raw_input / "waveform" / "windows.parquet"
         )
-    return Staged("waveform", stats, pl.DataFrame(objects, schema=OBJECT_SCHEMA, orient="row") if objects else
-                  pl.DataFrame(schema=OBJECT_SCHEMA))  # fmt: skip
+        stats["window_events"] = events.height
+        if stats["records_missing_on_disk"] or stats["segments_missing_on_disk"]:
+            logger.warning(
+                f"waveform: {stats['records_missing_on_disk']} records and "
+                f"{stats['segments_missing_on_disk']} segments of cohort patients are not (fully) on disk "
+                "and get no event"
+            )
+    if want_numerics:
+        cols = ["subject_id", "code", "time", "numeric_value", "unit", "hadm_id", "waveform_record_id"]
+        table = pl.concat(numerics).select(cols) if numerics else None
+        stats["numeric_events"] = table.height if table is not None else 0
+        if table is None or not table.height:
+            skip.add("waveform/numerics")  # MEDS-Extract fails on a configured table without input
+        else:
+            table.with_columns(pl.col("time").dt.strftime(TIME_FMT)).write_parquet(
+                raw_input / "waveform" / "numerics.parquet"
+            )
+    manifest = pl.DataFrame(objects, schema=OBJECT_SCHEMA, orient="row") if objects else None
+    return Staged(
+        "waveform",
+        stats,
+        manifest if manifest is not None else pl.DataFrame(schema=OBJECT_SCHEMA),
+        skip_tables=skip,
+    )
 
 
 OBJECT_STAGERS = {"ecg": stage_ecg, "echo": stage_echo, "cxr": stage_cxr, "waveform": stage_waveform}

@@ -10,8 +10,10 @@ and notes. Each case it covers is planted on purpose and checked exactly:
 - two CXR images with identical bytes share one link (content addressing);
 - a `StudyTime` written without its leading zeros (`4212.5`) and a missing `ViewPosition`;
 - note times are `max(charttime, storetime)`; note text lands in `text_value`;
-- every link resolves inside the MEDS root, and `objects.parquet` maps it back to its source file;
-- `dataset.json` names the combination, its releases, its license and its link columns.
+- every `external_value_link` resolves inside `external_values/`, which holds nothing else, and
+  `external_value_encoding` says how to read it;
+- the waveform database gives one linked window per (short) segment and its vital signs as events;
+- `dataset.json` names the combination, its releases, its license and its link column.
 
 The build also takes MIMIC-Note-Extract and MIMIC-CXR-DB from this repository's simulated
 `data/synthetic_demo/` (a second `--root`): they are used because no real release of them is there,
@@ -27,6 +29,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 from conftest import run_script
+
+from MIMIC_IV_MEDS.multimodal import finalize
 
 TS = "%Y-%m-%d %H:%M:%S"
 SIMULATED = Path(__file__).resolve().parents[1] / "data" / "synthetic_demo"
@@ -262,15 +266,16 @@ def test_dataset_json(built):
         "mimic4wdb/0.1.0",
     ]
     assert meta["license"] == "PhysioNet Credentialed Health Data License 1.5.0"
-    assert meta["additional_value_modality_columns"] == ["ecg_link", "echo_link", "cxr_link", "waveform_link"]
+    assert meta["additional_value_modality_columns"] == ["external_value_link"]
+    assert "external_value_encoding" in meta["other_extension_columns"]
     assert {"note_id", "ecg_study_id", "echo_study_id", "cxr_study_id", "cxr_dicom_id"} <= set(
         meta["raw_source_id_columns"]
     )
-    assert not {"ecg_link", "echo_link", "cxr_link"} & set(meta.get("other_extension_columns", []))
     # The same releases, structured: version, demo or full, license and the parts built, per release.
     src = {d["module"]: d for d in meta["source_datasets"]}
     assert [d["extension"] for d in meta["source_datasets"]] == ["mimic-iv", *EXTENSIONS.split(",")]
-    assert [d["module"] for d in meta["source_datasets"] if d["synthetic"]] == ["mne", "cxr_db"]
+    assert [d["module"] for d in meta["source_datasets"] if d["release"] == "synthetic"] == ["mne", "cxr_db"]
+    assert not any("synthetic" in d for d in meta["source_datasets"])
     assert src["mne"]["release"] == "synthetic" and src["mne"]["url"] is None
     assert (src["core"]["name"], src["core"]["version"], src["core"]["release"]) == (
         "mimic-iv-demo",
@@ -282,7 +287,17 @@ def test_dataset_json(built):
         "0.1",
         "ODbL-1.0",
     )
-    assert src["echo"]["parts"] == ["dicom", "measurements"] and src["echo"]["link_columns"] == ["echo_link"]
+    assert (
+        src["echo"]["parts"] == ["dicom", "measurements"]
+        and src["echo"]["external_value_encoding"] == "dicom"
+    )
+    assert src["waveform"]["parts"] == ["windows", "numerics"]
+    assert [src[m]["external_value_encoding"] for m in ("ecg", "cxr", "waveform", "note")] == [
+        "wfdb",
+        "jpeg",
+        "wfdb",
+        None,
+    ]
     assert src["note"]["parts"] == ["discharge", "radiology"]
     assert [f"{d['name']}/{d['version']}" for d in meta["source_datasets"]] == meta["dataset_version"].split(
         ","
@@ -299,13 +314,13 @@ def test_parts_selection(synthetic_root, demo_raw_dir, tmp_path):
     )  # fmt: skip
     meta = json.loads((out / "metadata" / "dataset.json").read_text())
     assert meta["dataset_name"] == "MIMIC-IV+Note(radiology)+ECG+ECHO(measurements)"
-    assert meta["additional_value_modality_columns"] == ["ecg_link"]
+    assert meta["additional_value_modality_columns"] == ["external_value_link"]
     assert "echo_measurement_id" in meta["raw_source_id_columns"]
     src = {d["module"]: d for d in meta["source_datasets"]}
-    assert (src["note"]["parts"], src["echo"]["parts"], src["echo"]["link_columns"]) == (
+    assert (src["note"]["parts"], src["echo"]["parts"], src["echo"]["external_value_encoding"]) == (
         ["radiology"],
         ["measurements"],
-        [],
+        None,
     )
     codes = pl.scan_parquet(out / "data" / "**" / "*.parquet").select("code").collect()["code"]
     assert (
@@ -315,10 +330,7 @@ def test_parts_selection(synthetic_root, demo_raw_dir, tmp_path):
         not codes.str.starts_with("ECHO//DICOM").any()
         and codes.str.starts_with("ECHO//MEASUREMENT//").sum() == 3
     )
-    assert "echo_link" not in pl.scan_parquet(out / "data" / "**" / "*.parquet").collect_schema().names()
-    assert not (out / "echo").exists()
-    objects = pl.read_parquet(out / "metadata" / "objects.parquet")
-    assert set(objects["modality"]) == {"ecg"}
+    assert {p.name for p in (out / "external_values").iterdir()} == {"ecg"}
 
 
 def test_ecg(built):
@@ -328,8 +340,9 @@ def test_ecg(built):
         (s[0], 40000001, "2150-01-01 10:00:00"),
         (s[1], 40000002, "2150-01-02 10:00:00"),
     ]
-    assert set(ev["code"]) == {"ECG//WAVEFORM"}
-    for link, study in ev.select("ecg_link", "ecg_study_id").rows():
+    assert set(ev["code"]) == {"ECG//WAVEFORM"} and set(ev["external_value_encoding"]) == {"wfdb"}
+    for link, study in ev.select("external_value_link", "ecg_study_id").rows():
+        assert link.startswith("external_values/ecg/")
         # The record keeps its own name inside its content-addressed folder, so its header finds its signal.
         assert link.endswith(f"/{study}")
         assert (out / f"{link}.hea").read_text().split("\n")[1].startswith(f"{study}.dat")
@@ -343,8 +356,9 @@ def test_echo(built):
         (s[0], 90000001, "2150-02-01 08:30:00"),
         (s[2], 90000002, "2150-02-02 09:00:00"),
     ]
-    for link, study in ev.select("echo_link", "echo_study_id").rows():
-        assert link.startswith("echo/") and link.endswith(".dcm")
+    assert set(ev["external_value_encoding"]) == {"dicom"}
+    for link, study in ev.select("external_value_link", "echo_study_id").rows():
+        assert link.startswith("external_values/echo/") and link.endswith(".dcm")
         assert (out / link).read_bytes().startswith(f"DICM{study}".encode())
 
 
@@ -384,34 +398,27 @@ def test_echo_measurements(built):
 
 def test_waveform(built):
     out, s = built
-    ev = _events(out, "WAVEFORM//")
-    cols = ["subject_id", "code", "hadm_id", "waveform_record_id", "waveform_segment", "waveform_duration_s"]
-    # Each event at the END of the data it links to: 23:59:58.5 + 625/62.5 s, + (750 + 500)/62.5 s.
-    assert ev.select(pl.col("time").dt.strftime(TS), *cols).sort("time", "code").rows() == [
-        ("2151-01-01 00:00:08", s[0], "WAVEFORM//SEGMENT", 21000001, 88000001, "88000001_0001", 10.0),
-        ("2151-01-01 00:00:18", s[0], "WAVEFORM//RECORD", 21000001, 88000001, None, 20.0),
-        ("2151-01-01 00:00:18", s[0], "WAVEFORM//SEGMENT", 21000001, 88000001, "88000001_0002", 8.0),
+    ev = _events(out, "WAVEFORM//WINDOW")
+    cols = ["subject_id", "hadm_id", "waveform_record_id", "waveform_segment", "waveform_window"]
+    # Both segments are shorter than a window, so each is one window, linked unchanged and timed at its
+    # END: 23:59:58.5 + 625/62.5 s, and + (750 + 500)/62.5 s.
+    assert ev.select(pl.col("time").dt.strftime(TS), *cols, "waveform_duration_s").rows() == [
+        ("2151-01-01 00:00:08", s[0], 21000001, 88000001, "88000001_0001", 0, 10.0),
+        ("2151-01-01 00:00:18", s[0], 21000001, 88000001, "88000001_0002", 0, 8.0),
     ]
-    links = ev["waveform_link"].to_list()
-    folder = {str(Path(x).parent) for x in links}
-    assert len(folder) == 1  # one record folder; its records keep their names
-    folder = out / folder.pop()
-    expected = ["88000001.hea", "88000001_0000.hea", "88000001_0001.hea", "88000001_0002.hea"]
-    expected += ["88000001_0001e.dat", "88000001_0002e.dat", "88000001n.csv.gz"]
-    assert sorted(p.name for p in folder.iterdir()) == sorted(expected)
-    for link in links:
-        assert (out / f"{link}.hea").is_file()
-    # Every link is a row of objects.parquet; a segment's row lists only that segment's files.
-    objects = pl.read_parquet(out / "metadata" / "objects.parquet").filter(pl.col("modality") == "waveform")
-    assert set(links) == set(objects["link"])
-    by_id = {r["object_id"]: r for r in objects.iter_rows(named=True)}
-    assert by_id["88000001"]["format"] == "WFDB multi-segment" and len(by_id["88000001"]["files"]) == 7
-    assert [Path(f).name for f in by_id["88000001_0001"]["files"]] == [
-        "88000001_0001.hea",
-        "88000001_0001e.dat",
-    ]
-    assert by_id["88000001_0001"]["format"] == "WFDB segment"
-    assert len({r["sha256"] for r in by_id.values()}) == 3
+    assert set(ev["external_value_encoding"]) == {"wfdb"}
+    # Each window's folder holds that window and nothing else: no other segment, no master header,
+    # no numerics.
+    for link, seg in ev.select("external_value_link", "waveform_segment").rows():
+        assert link.startswith("external_values/waveform/") and link.endswith(f"/{seg}")
+        assert sorted(p.name for p in (out / link).parent.iterdir()) == [f"{seg}.hea", f"{seg}e.dat"]
+
+    # The numerics are events: HR 80 at counter tick 0, in the first minute, timed at its end.
+    vitals = _events(out, "WAVEFORM//NUMERIC//")
+    assert vitals.select(
+        pl.col("time").dt.strftime(TS), "subject_id", "code", "numeric_value", "unit", "waveform_record_id"
+    ).rows() == [("2151-01-01 00:00:58", s[0], "WAVEFORM//NUMERIC//HR", 80.0, "bpm", 88000001)]
+
     sources = json.loads((out / "metadata" / "sources.json").read_text())
     staged = next(x for x in sources["sources"] if x["module"] == "waveform")["staging"]
     assert {
@@ -419,8 +426,11 @@ def test_waveform(built):
         "patients_outside_core_subjects": 1,
         "patients_not_on_disk": 1,
         "records": 1,
-        "segment_events": 2,
-        "record_events": 1,
+        "segments": 2,
+        "segments_cut": 0,
+        "window_events": 2,
+        "numerics_files": 1,
+        "numeric_events": 1,
     }.items() <= staged.items()
 
 
@@ -432,12 +442,11 @@ def test_cxr(built):
         (s[0], "CXR//IMAGE//UNK//UNK", "aaaa-2", "2150-03-01 10:42:12"),
         (s[1], "CXR//IMAGE//AP//UNK", "bbbb-1", "2150-03-02 23:59:59"),
     ]
-    links = dict(ev.select("cxr_dicom_id", "cxr_link").rows())
+    links = dict(ev.select("cxr_dicom_id", "external_value_link").rows())
     assert links["aaaa-1"] == links["bbbb-1"] != links["aaaa-2"]
-    assert (
-        links["aaaa-1"]
-        == f"cxr/{hashlib.sha256(b'JPEG-A').hexdigest()[:2]}/{hashlib.sha256(b'JPEG-A').hexdigest()}.jpg"
-    )
+    sha = hashlib.sha256(b"JPEG-A").hexdigest()
+    assert links["aaaa-1"] == f"external_values/cxr/{sha[:2]}/{sha}.jpg"
+    assert set(ev["external_value_encoding"]) == {"jpeg"}
     assert (out / links["aaaa-2"]).read_bytes() == b"JPEG-B"
 
 
@@ -465,31 +474,33 @@ def test_notes(built):
     ]
 
 
-def test_objects_and_sources(built, synthetic_root):
+def test_external_values_and_sources(built, synthetic_root):
     out, _ = built
     root, _ = synthetic_root
-    objects = pl.read_parquet(out / "metadata" / "objects.parquet")
-    assert objects.group_by("modality").len().sort("modality").rows() == [
-        ("cxr", 3),
-        ("ecg", 2),
-        ("echo", 2),
-        ("waveform", 3),  # the record and its two segments
-    ]
-    for row in objects.iter_rows(named=True):
-        src_root = {
-            "ecg": root / "mimic-iv-ecg-demo-diagnostic-electrocardiogram-matched-subset-demo-0.1",
-            "echo": root / "mimic-iv-echo" / "1.0.1",
-            "cxr": root / "mimic-cxr-jpg" / "2.1.0",
-            "waveform": root / "mimic4wdb" / "0.1.0",
-        }[row["modality"]]
-        if row["modality"] in ("echo", "cxr"):
-            assert hashlib.sha256((src_root / row["files"][0]).read_bytes()).hexdigest() == row["sha256"]
-        assert sum((src_root / f).stat().st_size for f in row["files"]) == row["size_bytes"]
+    links = (
+        pl.scan_parquet(out / "data" / "**" / "*.parquet")
+        .filter(pl.col("external_value_link").is_not_null())
+        .select("external_value_link", "external_value_encoding")
+        .unique()
+        .collect()
+    )
+    by_folder = links.group_by(pl.col("external_value_link").str.split("/").list.get(1).alias("m")).len()
+    assert sorted(by_folder.rows()) == [("cxr", 2), ("ecg", 2), ("echo", 2), ("waveform", 2)]
+    assert {p.name for p in (out / "external_values").iterdir()} == {"cxr", "ecg", "echo", "waveform"}
+    assert not (out / "metadata" / "objects.parquet").exists()
+    # Every file under external_values/ belongs to a link (the build checks this too).
+    assert finalize.check_external_values(out)["links"] == 8
+    # Single-file objects are the release's bytes, unchanged.
+    cxr = root / "mimic-cxr-jpg" / "2.1.0" / "files"
+    jpgs = {p.read_bytes() for p in cxr.rglob("*.jpg")}
+    for link in links.filter(pl.col("external_value_encoding") == "jpeg")["external_value_link"]:
+        assert (out / link).read_bytes() in jpgs
 
     sources = json.loads((out / "metadata" / "sources.json").read_text())
     assert sources["extensions"] == EXTENSIONS.split(",")
-    assert sources["synthetic_extensions"] == ["mimic-iv-mne", "mimic-iv-cxr-db"]
-    assert "only the record or file the link names" in sources["loader_rule"]
+    assert "synthetic_extensions" not in sources
+    assert [x["module"] for x in sources["sources"] if x["release"] == "synthetic"] == ["mne", "cxr_db"]
+    assert "one point in time" in sources["loader_rule"]
     by = {x["module"]: x for x in sources["sources"]}
     assert {"listed": 3, "missing_on_disk": 1, "emitted": 2}.items() <= by["ecg"]["staging"].items()
     assert by["echo"]["staging"]["dicoms"]["outside_core_subjects"] == 1
@@ -540,4 +551,4 @@ def test_mne_and_cxr_db_from_the_simulated_releases(built):
     assert cxr_db.filter(pl.col("code").str.starts_with("CXR//STUDY//"))["cxr_study_id"].null_count() == 0
     # Only MIMIC-CXR-JPG's image events (each with its link): CXR-DB's were left out.
     images = data.filter(pl.col("code").str.starts_with("CXR//IMAGE//")).collect()
-    assert images["cxr_link"].null_count() == 0
+    assert images["external_value_link"].null_count() == 0
