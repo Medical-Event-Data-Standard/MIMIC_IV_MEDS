@@ -19,8 +19,11 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-# This package ships no Python: the whole ETL is `event_configs.yaml`, run by
-# MEDS-Extract's own `meds-extract-run`. The `[download]` extra adds
+# The ETL is `event_configs.yaml` (plus the opt-in extension specs), run by MEDS-Extract's own
+# `meds-extract-run`. The only Python is the `mimic-iv-meds-multimodal` command
+# (MIMIC_IV_MEDS.multimodal), which combines MIMIC-IV with any set of extensions, and
+# `MIMIC_IV_MEDS.prepare_cxr_db`, which converts the semicolon-delimited MIMIC-CXR-DB release to
+# parquet; both need nothing beyond what MEDS-Extract brings (polars, pyyaml). The `[download]` extra adds
 # `meds-extract-download` (httpx + tenacity), which the runner spawns to stage the raw
 # data. MEDS-transforms, polars and hydra all arrive through it at the versions it fences;
 # duplicating those pins here would only create drift.
@@ -43,6 +46,22 @@ dependencies = [
     "sumeds>=0.6.3,<0.7",
 ]
 
+[project.optional-dependencies]
+# `mimic-iv-meds-multimodal --download-demo` runs `mimic-demo-mm download`, which assembles the
+# multimodal MIMIC-IV demo (the 100 demo subjects across ED, Note, ECG, ECHO, CXR-JPG and the
+# waveform database; credentialed sources need a PhysioNet sign-in) in the layout the build reads.
+# Optional: the build reads any folder in PhysioNet's layout, however it was filled. Until
+# mimic-demo-mm is on PyPI, uv takes it from its repository (`[tool.uv.sources]`).
+demo-download = ["mimic-demo-mm"]
+# Readers for the linked objects of a multimodal build (`external_value_encoding`: wfdb, dicom, jpeg;
+# see MIMIC_IV_MEDS.multimodal.external_values). wfdb is also what cuts waveform segments longer than
+# `--waveform-window-s` into windows (MIMIC-IV-WDB stores FLAC-compressed signals, which wfdb >= 4.1
+# reads and writes); a build without the waveform database, or with `--waveform-window-s 0`, needs none.
+external-values = ["wfdb>=4.1,<5", "pydicom>=2.4", "pillow>=10"]
+
+[tool.uv.sources]
+mimic-demo-mm = { git = "https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo" }
+
 [dependency-groups]
 # `shfmt-py` bundles the `shfmt` binary that the `mdformat-shfmt` pre-commit
 # hook shells out to; declaring it here (in addition to pinning it under the
@@ -58,12 +77,39 @@ dev = [
     "pytest~=9.0",
     "pytest-rerunfailures==16.1",
     "shfmt-py==3.12.0.2",
+    # Runs the waveform windowing tests (`tests/multimodal_test.py`), which write real WFDB records.
+    "wfdb>=4.1,<5",
 ]
+# The documentation site (`zensical.toml`, `docs/`), built with Zensical, the successor to
+# Material for MkDocs: by Read the Docs from `.readthedocs.yaml`, and in CI with
+# `zensical build --strict`. Preview locally with `uv run --group docs zensical serve`.
+# Zensical's built-in awesome-nav support builds the navigation from the `.nav.yml` files in
+# `docs/`, so a new page under `docs/extensions/` appears without a config edit. Zensical is 0.x,
+# so the ceiling is raised deliberately.
+docs = [
+    "zensical>=0.1.1,<0.2",
+]
+
+[project.scripts]
+# MIMIC-IV plus any combination of its extensions, from local copies of the releases, with the
+# ECG/echo/CXR/waveform objects stored under `external_values/` in the MEDS root. See
+# src/MIMIC_IV_MEDS/multimodal/cli.py.
+mimic-iv-meds-multimodal = "MIMIC_IV_MEDS.multimodal.cli:main"
 
 [tool.setuptools_scm]
 
 [project.entry-points."MEDS_extract.pipelines"]
 MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
+# MIMIC-IV plus the separately-credentialed MIMIC-Note-Extract tables. Generated from the base
+# and `extensions/mne.yaml` by `scripts/build_extension_specs.py`; see the README.
+MIMIC-IV-MNE = "MIMIC_IV_MEDS:event_configs_mne.yaml"
+# MIMIC-IV plus the separately-credentialed MIMIC-IV-ED tables (the demo works too: it adds the
+# public MIMIC-IV-ED demo). Generated from the base and `extensions/ed.yaml`; see docs/extensions/ed.md.
+MIMIC-IV-ED = "MIMIC_IV_MEDS:event_configs_ed.yaml"
+# MIMIC-IV plus MIMIC-CXR-DB's radiographs, CheXpert labels and note concepts, from
+# `extensions/cxr_db.yaml`. Its download needs `python -m MIMIC_IV_MEDS.prepare_cxr_db` before the run;
+# see docs/extensions/cxr-db.md.
+MIMIC-IV-CXRDB = "MIMIC_IV_MEDS:event_configs_cxr_db.yaml"
 
 # Registers the suMEDS rules under the same name, so the config's `sumeds_enrich: {rules: MIMIC-IV}`
 # and `--rules MIMIC-IV` find them.

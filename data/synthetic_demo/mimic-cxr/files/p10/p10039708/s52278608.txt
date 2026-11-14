@@ -1,0 +1,20 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for ward imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+Possible consolidation, cannot be excluded.
+No enlarged cardiomediastinum.
+No lung lesion.
+Synthetic finding: lung opacity is present.
+No pneumothorax.
+No pleural other.
+
+IMPRESSION:
+Synthetic impression: lung opacity.

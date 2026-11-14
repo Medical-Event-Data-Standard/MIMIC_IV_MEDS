@@ -1,0 +1,1125 @@
+hadm_id;relation_type;object_uri;id;label;class
+22595853;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+22595853;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+22595853;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+22595853;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+22595853;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+22595853;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22595853;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22841357;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22841357;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+29079034;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+29079034;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+29079034;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+29079034;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+29079034;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+29079034;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+29079034;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+25742920;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+25742920;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+25742920;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+25742920;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+25742920;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+25742920;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24597018;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+24597018;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+24597018;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24597018;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24597018;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27703517;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+27703517;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27703517;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27703517;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27703517;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27703517;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+27703517;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+25563031;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+25563031;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+25563031;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+25563031;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25563031;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25797028;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+25797028;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+25797028;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+25797028;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+25797028;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25797028;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+28662225;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+28662225;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+28662225;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+28662225;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+28662225;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+28662225;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+28662225;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28662225;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20321825;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20321825;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20321825;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+20321825;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+20321825;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20321825;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+20321825;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+23473524;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+23473524;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+23473524;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+23473524;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+23473524;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+23473524;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+28676446;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+28676446;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+28295257;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+28295257;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+28295257;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28295257;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+26549334;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+26549334;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+26549334;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+26549334;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24982426;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+24982426;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24982426;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22380825;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+22380825;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+22380825;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+22380825;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+22380825;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+23688993;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+23688993;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+23688993;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+23688993;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25696644;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+25696644;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25696644;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+28301173;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+25282382;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+25282382;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+25282382;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+25282382;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+25282382;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25282382;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25922998;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25922998;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25922998;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+25922998;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+25922998;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22733922;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+22733922;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+23720373;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+23720373;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+23720373;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+23720373;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+23720373;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+28697806;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+28697806;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+28697806;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20846853;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20846853;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+20846853;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+20846853;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+20846853;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20846853;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20282368;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20282368;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+20282368;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20282368;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+26048429;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+26090619;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+26090619;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+26090619;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+29483621;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+29483621;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+29483621;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+29483621;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+29483621;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+26467376;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+26467376;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+26467376;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+26467376;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+26467376;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27296885;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+27296885;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+27296885;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+27296885;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+27296885;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+22390287;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22390287;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22390287;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+22390287;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+20214994;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20214994;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+23559586;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+23559586;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+24181354;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+24181354;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+24181354;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+24181354;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+24181354;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+24181354;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+25970245;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+25970245;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25970245;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25970245;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+25970245;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25970245;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22187210;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22187210;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22187210;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22187210;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+22187210;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+21255400;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+21255400;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+21255400;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+21039249;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+21039249;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+21039249;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+21039249;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+28723315;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+28723315;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+23251352;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+23251352;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+23251352;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+23251352;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+23251352;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+21216581;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+21216581;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+21216581;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+21216581;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+21216581;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+21216581;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+21216581;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+21216581;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+28108313;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+28108313;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+28108313;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+28108313;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+25559382;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+22081550;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+22081550;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+22081550;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+22081550;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+22081550;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22081550;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22081550;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27411876;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+27411876;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+29176490;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+29176490;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+29176490;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+25239799;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+25239799;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25239799;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25239799;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+25239799;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+20626031;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20626031;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20626031;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28661809;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+28661809;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+28661809;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+28661809;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+28661809;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+28661809;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+26158160;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+27167814;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+27167814;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+27167814;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+27167814;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+27167814;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+27167814;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+27167814;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+27167814;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27167814;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22589518;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+22589518;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+22589518;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+23514107;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+23514107;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+23514107;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+26134779;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+26134779;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+21636229;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+21636229;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20364112;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+20364112;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20364112;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20364112;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20199380;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+20199380;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+22942076;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+22942076;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+22942076;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22942076;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22954658;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+28477357;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+28477357;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25135483;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+25135483;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+25135483;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25135483;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+25135483;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+27962747;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+27962747;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+27962747;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+27962747;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+27962747;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+27962747;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+20285402;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+20285402;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+20285402;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+20285402;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+20285402;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+20285402;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20285402;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22051341;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+22987108;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+22987108;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+22987108;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20338077;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20338077;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20338077;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+20338077;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+20338077;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+20338077;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20338077;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22168393;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+22168393;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+22168393;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22168393;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+20291550;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20291550;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20291550;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20291550;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20291550;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28324362;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+28324362;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+28324362;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28324362;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22995465;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+22995465;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+22995465;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+22995465;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22995465;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+22995465;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+22995465;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+25926192;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25926192;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25926192;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25926192;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25926192;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+21322534;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+29842315;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+29842315;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+29842315;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+29842315;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+29842315;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+29842315;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22429197;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+22429197;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+22429197;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22950920;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22950920;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+22950920;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+22950920;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+22196214;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22196214;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22196214;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27505812;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27089790;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+26369609;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+26369609;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+26369609;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+26369609;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+22539296;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+22539296;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+22539296;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22539296;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22539296;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22896692;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+22896692;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22896692;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22896692;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27882036;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+27882036;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+27882036;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27882036;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+27882036;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+27882036;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+27882036;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27882036;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27882036;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+26739864;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+26739864;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20457729;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20457729;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20457729;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20457729;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22675517;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22675517;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22675517;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22675517;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22675517;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22675517;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25809882;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+25809882;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+25809882;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+25809882;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+25809882;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+25809882;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25809882;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22741225;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+26722126;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+26722126;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+28335091;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+28335091;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+28335091;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+28335091;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+27494880;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+27494880;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27494880;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27494880;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+22502504;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+22502504;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+22502504;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+26013492;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+26013492;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+26013492;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+26013492;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+26013492;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+26013492;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+26013492;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+29780751;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+29780751;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+29780751;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+29780751;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22508257;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+22508257;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+22508257;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22508257;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+23132022;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+23132022;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+23132022;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+23132022;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+23132022;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+27487226;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27487226;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+27487226;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27487226;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27562275;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+29600294;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+29600294;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+29600294;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+26486158;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+26486158;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+26486158;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20900955;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20900955;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+20900955;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20900955;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20900955;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20900955;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+24096336;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+26173805;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+26173805;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+26173805;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+26173805;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+26173805;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+26173805;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+26173805;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+24980601;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+24980601;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+29757856;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+29757856;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+29757856;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+26228185;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+26228185;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24357615;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+24357615;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+24357615;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+24357615;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+24357615;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28889419;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+28889419;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+28889419;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27993466;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+27993466;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27993466;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+27993466;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+27993466;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+25085565;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+25085565;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+28236161;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+28236161;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+28236161;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27670224;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27670224;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27670224;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+27670224;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+27670224;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27670224;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28613200;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+28613200;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+28613200;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28613200;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28613200;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20854119;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20854119;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+20854119;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+20854119;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+20854119;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20790339;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20790339;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20790339;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20790339;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20790339;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20790339;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20790339;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20790339;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+22607171;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22413744;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22413744;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+24698912;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+24698912;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+24698912;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+24698912;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+24698912;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25103777;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+25103777;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+25103777;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+25103777;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+25103777;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+25103777;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+25103777;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+25103777;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+26352758;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+26352758;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+26352758;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+26352758;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+26352758;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+26352758;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+26352758;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22416954;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+22416954;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+22416954;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+22416954;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22416954;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+28196804;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+28196804;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+28196804;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+28157142;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+28157142;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+28157142;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28157142;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+28157142;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24420677;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+24420677;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+24420677;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+24420677;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+24420677;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+24420677;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22130791;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+22130791;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22130791;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22130791;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+29374560;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+29281842;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+29281842;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+29281842;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+28506150;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+28506150;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+28506150;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+28506150;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28506150;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28506150;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27568122;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+27568122;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+27568122;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+27568122;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27568122;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27568122;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20973395;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+20973395;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+20973395;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+27672872;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+27672872;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+27672872;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+27417763;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+27417763;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27417763;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+27417763;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+27417763;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27417763;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27417763;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+27417763;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+21027282;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+21027282;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+21027282;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+28861356;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+28861356;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+28861356;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+28861356;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+28861356;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+28861356;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28861356;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+23983182;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+23983182;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+23983182;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25973915;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+25973915;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+25973915;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+25973915;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25973915;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+26706939;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+26706939;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+26706939;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+26706939;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+26706939;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+26706939;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+26706939;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+23786647;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+23786647;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+23786647;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+23786647;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+29366372;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+29366372;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+29366372;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+29366372;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+29366372;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+29366372;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+29366372;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+29366372;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28479513;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+28479513;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+28479513;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+28479513;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+21101111;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+21101111;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+21101111;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+21101111;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+21101111;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+21101111;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+21101111;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+21101111;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+21101111;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28003918;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+29279905;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+29279905;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+29279905;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+29279905;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+29279905;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+29279905;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+29279905;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+29279905;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+29279905;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27525946;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+27525946;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+27525946;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+26529390;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+26529390;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+26529390;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+26529390;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+25508812;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25508812;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25508812;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+25508812;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+25508812;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25508812;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+26703331;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+21457723;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+21457723;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+21457723;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+21457723;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+26226543;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+26226543;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+26226543;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+26226543;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+26226543;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+21540783;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+21540783;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+21540783;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+21540783;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+21540783;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+21540783;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+24997044;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+24997044;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+24997044;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+24997044;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+20297618;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20297618;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20297618;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20297618;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+20297618;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+20297618;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20611796;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+20611796;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+20611796;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+20611796;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28710730;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+28710730;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28710730;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27738145;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27738145;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+27738145;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+27738145;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+27738145;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22585261;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+22585261;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+22585261;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24104168;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+24104168;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+24104168;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+24104168;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+26842957;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+26842957;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+26842957;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+26842957;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+26842957;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28778757;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+28778757;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+28778757;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+28778757;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+28778757;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+28778757;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+28778757;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+28778757;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+28778757;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+28778757;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+28778757;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+26332470;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+26332470;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+26332470;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+26332470;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+26332470;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+26332470;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+23052851;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+23052851;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+23052851;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+23052851;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+23052851;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+27984218;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+27984218;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+27984218;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+23831430;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+23831430;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+23831430;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+23831430;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+25826145;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+25826145;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+25826145;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25826145;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25826145;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+25826145;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+25826145;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+25826145;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+29820177;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+29820177;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+29820177;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+29820177;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+29820177;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+23199774;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+23143086;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+23488445;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+23488445;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+23488445;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+23488445;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+23488445;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+29974575;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+29974575;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+29974575;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24490144;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+24490144;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+24490144;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+24490144;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+24490144;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+24490144;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24490144;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+25020332;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+25020332;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+25020332;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+25020332;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+25020332;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28829452;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+28998349;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+28998349;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+26321862;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+26321862;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+26321862;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+26321862;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+26321862;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+26321862;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+26321862;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+27660781;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+27660781;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27660781;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+27660781;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+27660781;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+27660781;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20429160;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+20429160;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20429160;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+27112038;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+27112038;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+27112038;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+27112038;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+27112038;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+21928381;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+21928381;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+21928381;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+21928381;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+22756440;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+22756440;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+22756440;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+22756440;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+22756440;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+23112364;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+23112364;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27154822;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27154822;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+27154822;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+27154822;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22342963;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+28909879;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+29642388;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+29642388;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+29642388;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+29642388;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27708593;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+27708593;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27708593;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+27708593;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+29839885;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+29839885;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+29839885;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+28872262;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28872262;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+28872262;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+29858644;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+29858644;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+29858644;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24244087;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+24244087;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+24244087;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24244087;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28887654;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+28887654;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+21133938;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+21133938;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+21607814;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+21607814;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+21607814;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+21607814;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+21607814;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+21607814;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+21607814;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+29295881;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+21759936;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+21759936;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+21759936;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+21759936;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+21759936;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28984460;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+20044587;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20044587;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20044587;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20044587;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20044587;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+20044587;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20044587;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+20044587;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+25561728;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+25561728;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+25561728;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+25561728;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25561728;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24717014;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+24717014;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+24717014;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+27327816;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+27327816;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+27327816;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+27327816;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24470193;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+24470193;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+24470193;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+24470193;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+24470193;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+23403708;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+23403708;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+23403708;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+23403708;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+23403708;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20437651;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+20437651;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20437651;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+20437651;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+20437651;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+20437651;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+20437651;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22059910;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22059910;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22059910;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22059910;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+22059910;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22059910;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+24547356;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+24547356;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25260176;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+25260176;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25260176;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25260176;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+25260176;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25166559;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+26275841;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+26275841;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+26275841;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+26275841;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+26275841;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+29163082;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+29163082;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+29163082;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+29163082;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27488741;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+27488741;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+27488741;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+27488741;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+27488741;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+28166872;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+28166872;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+28166872;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+21477991;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+21477991;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+21477991;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+21477991;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+21477991;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+21477991;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22205327;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22205327;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20764029;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20764029;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+20764029;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+20764029;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+21606243;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+21606243;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+21606243;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+21606243;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+21606243;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+28477280;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+28477280;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+28477280;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+28477280;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+28477280;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+25177949;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+25177949;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+25177949;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+25177949;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+25177949;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+25177949;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+25177949;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25177949;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20611640;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20611640;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+22580999;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+22580999;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22580999;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+22580999;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22580999;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22580999;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+29462354;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+29462354;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+29462354;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+24912093;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+24912093;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+24912093;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24912093;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22732862;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+22732862;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20385771;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+20385771;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20385771;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+20385771;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+20385771;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+29654498;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+29654498;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+29654498;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+27496788;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+27496788;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+27496788;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+27496788;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+21476294;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+21476294;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+21476294;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+21476294;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+21476294;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+21476294;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+21599196;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+21599196;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+21599196;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+21599196;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+29276678;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+28019404;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+28019404;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+28019404;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+28019404;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+28019404;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+28019404;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+24256866;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+24256866;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+24256866;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24256866;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+24540843;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+24540843;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+28543425;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+28543425;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+28543425;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+28543425;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22490490;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22490490;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22490490;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22490490;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+20192635;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+20192635;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+20192635;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20192635;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20192635;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20192635;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+20192635;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22326517;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+22326517;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+22326517;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+22326517;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22326517;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24225421;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+24225421;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+24225421;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24656677;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+24656677;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+24656677;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+23721604;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+23721604;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+23721604;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+29802992;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+29802992;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+29802992;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24885579;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22228639;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+22228639;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+22228639;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22228639;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+27617929;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+27617929;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+27617929;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27617929;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27617929;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27617929;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20755971;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20755971;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+20755971;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20755971;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+20755971;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+20755971;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+20755971;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+20755971;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+20755971;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+25129047;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+25129047;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+25129047;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25129047;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+25129047;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22797747;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+22797747;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+22797747;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24745425;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+24745425;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24745425;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27189241;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27189241;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27189241;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+27189241;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+29026789;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+29026789;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+29026789;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+20572787;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+20572787;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+20572787;Past Medical History;snomed:709044004;snomed:709044004;Chronic kidney disease;Clinical_Findings_and_Diseases
+20572787;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+20572787;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+28258130;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+28258130;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+28258130;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+28258130;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+23819016;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+23819016;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+26793610;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+26793610;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+26793610;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+26793610;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+26793610;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+26793610;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+26793610;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+26793610;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+25864431;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+25864431;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22999601;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+22999601;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+22999601;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+27504040;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27504040;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24928679;Past Medical History;snomed:44054006;snomed:44054006;Type 2 diabetes mellitus;Clinical_Findings_and_Diseases
+24928679;Past Medical History;mesh:D003920;mesh:D003920;Diabetes Mellitus;Domain_Specific
+24928679;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+24928679;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+24928679;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+20093566;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+20093566;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+29488258;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+29488258;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+29488258;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+26924951;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+26924951;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+26924951;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+26924951;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+24294180;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+24294180;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+24294180;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+24294180;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+24294180;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+24294180;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+24294180;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22484749;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+22484749;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+22484749;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+27125816;Past Medical History;snomed:40930008;snomed:40930008;Hypothyroidism;Clinical_Findings_and_Diseases
+27125816;Past Medical History;snomed:13645005;snomed:13645005;Chronic obstructive pulmonary disease;Clinical_Findings_and_Diseases
+27125816;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25172300;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+25172300;Past Medical History;snomed:55822004;snomed:55822004;Hyperlipidemia;Clinical_Findings_and_Diseases
+25172300;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+25172300;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+27553957;Past Medical History;snomed:195967001;snomed:195967001;Asthma;Clinical_Findings_and_Diseases
+27553957;Past Medical History;snomed:84114007;snomed:84114007;Heart failure;Clinical_Findings_and_Diseases
+27553957;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27553957;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+25384176;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+25384176;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+25384176;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+25384176;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+21791856;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+21791856;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+21791856;Laboratory and Results.Discharge Labs;loinc:2951-2;loinc:2951-2;Sodium;Measurements_and_Concepts
+22251969;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+22251969;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22251969;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22251969;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+22251969;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+22251969;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27876215;Past Medical History;snomed:49436004;snomed:49436004;Atrial fibrillation;Clinical_Findings_and_Diseases
+27876215;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+27876215;Laboratory and Results.Discharge Labs;loinc:2345-7;loinc:2345-7;Glucose;Measurements_and_Concepts
+27259207;Past Medical History;snomed:35489007;snomed:35489007;Depressive disorder;Clinical_Findings_and_Diseases
+27259207;Laboratory and Results.Discharge Labs;loinc:2823-3;loinc:2823-3;Potassium;Measurements_and_Concepts
+25933959;Past Medical History;snomed:53741008;snomed:53741008;Coronary arteriosclerosis;Clinical_Findings_and_Diseases
+27996267;Past Medical History;snomed:38341003;snomed:38341003;Hypertensive disorder;Clinical_Findings_and_Diseases
+27996267;Past Medical History;mesh:D006973;mesh:D006973;Hypertension;Domain_Specific
+27996267;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases
+27996267;Laboratory and Results.Discharge Labs;loinc:2160-0;loinc:2160-0;Creatinine;Measurements_and_Concepts
+27996267;Laboratory and Results.Discharge Labs;loinc:718-7;loinc:718-7;Hemoglobin;Measurements_and_Concepts
+29999999;Past Medical History;snomed:235595009;snomed:235595009;Gastroesophageal reflux disease;Clinical_Findings_and_Diseases

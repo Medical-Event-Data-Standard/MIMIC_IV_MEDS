@@ -1,0 +1,41 @@
+# Multimodal module `echo`: MIMIC-IV-ECHO transthoracic echocardiogram DICOMs.
+#   https://physionet.org/content/mimic-iv-echo/
+#
+# Composed into the multimodal spec by `MIMIC_IV_MEDS.multimodal`; not a spec on its own. It reads
+# `echo/records.parquet`, which `staging.stage_echo` builds from `echo-record-list.csv`: one row
+# per DICOM file of a core subject that is on disk.
+#
+# `external_value_link` is `external_values/echo/<sha[:2]>/<sha>.dcm`, relative to the MEDS root,
+# and `external_value_encoding` is `dicom`. The file is the release's DICOM, unchanged (cropping, resizing etc. are the model's job).
+echo/records:
+  dicom:
+    code: $code
+    time: '$time::"%Y-%m-%d %H:%M:%S"'
+    external_value_link: $link
+    external_value_encoding: $encoding
+    echo_study_id: $echo_study_id
+    _metadata:
+      _self:
+        description: >-
+          'Echocardiogram DICOM file (mostly cine loops) from MIMIC-IV-ECHO, timed at its acquisition
+          (echo-record-list.acquisition_datetime). external_value_link is the file relative to the MEDS root;
+          echo_study_id is the echo study'
+
+# The measurements of each echo report (MIMIC-IV-ECHO `structured-measurement`), staged by
+# `staging.stage_echo_measurements`: streamed from the csv.gz and filtered to the core cohort, rows
+# without a result dropped, numeric results in numeric_value and the rest in text_value. Left out of
+# the spec when the release folder has no measurement table.
+echo/measurements:
+  measurement:
+    code: $code
+    time: '$time::"%Y-%m-%d %H:%M:%S"'
+    numeric_value: $numeric_value
+    text_value: $text_value
+    unit: $unit
+    echo_test_type: $echo_test_type
+    echo_measurement_id: $echo_measurement_id
+    echo_study_id: $echo_study_id
+    _metadata:
+      _self:
+        description: >-
+          f"Echocardiogram report measurement (MIMIC-IV-ECHO structured-measurement): {$description}"

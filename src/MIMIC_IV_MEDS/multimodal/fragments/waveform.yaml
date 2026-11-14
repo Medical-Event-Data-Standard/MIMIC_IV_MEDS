@@ -1,0 +1,53 @@
+# Multimodal module `waveform` (`mimic-iv-wdb`): the MIMIC-IV Waveform Database (bedside monitors).
+#   https://physionet.org/content/mimic4wdb/0.1.0/
+#
+# Composed into the multimodal spec by `MIMIC_IV_MEDS.multimodal`; not a spec on its own. It reads
+# `waveform/windows.parquet`, which `staging.stage_waveform` builds from the release's RECORDS and
+# the records' WFDB headers. A record spans an ICU stay (hours to days), and a linked object should
+# be short enough to treat as one point in time, so every segment longer than the window
+# (`--waveform-window-s`, 600 s by default) is cut into windows, each a WFDB record of its own. Each
+# window is timed at its END; `waveform_duration_s` gives its length, so it covers
+# [time - duration, time].
+#
+# `external_value_link` is the window's WFDB record name relative to the MEDS root
+# (`external_values/waveform/<sha[:2]>/<sha>/<window>`), `external_value_encoding` is `wfdb`, so
+# `wfdb.rdrecord(meds_root / external_value_link)` reads it. The whole multi-segment record is not
+# linked: it spans the stay. Its numerics (`<record>n.csv.gz`, the monitors' vital signs about once a
+# second) become ordinary events instead (part `numerics`, `waveform/numerics` below).
+waveform/windows:
+  window:
+    code: $code
+    time: '$time::"%Y-%m-%d %H:%M:%S"'
+    external_value_link: $link
+    external_value_encoding: $encoding
+    hadm_id: $hadm_id
+    waveform_record_id: $waveform_record_id
+    waveform_segment: $waveform_segment
+    waveform_window: $waveform_window
+    waveform_duration_s: $waveform_duration_s
+    _metadata:
+      _self:
+        description: >-
+          'Bedside monitor waveforms (MIMIC-IV Waveform Database, WFDB), one window of at most
+          --waveform-window-s seconds of one continuous segment, timed at the end of the window.
+          external_value_link is the window, a WFDB record of its own, relative to the MEDS root;
+          waveform_segment is the segment it was cut from, waveform_window its index in the segment,
+          waveform_duration_s its length'
+
+# Part `numerics`: the vital signs of each record's numerics table, staged by
+# `staging.read_wfdb_numerics`: one event per signal and interval (`--waveform-numerics-interval-s`,
+# 60 s by default: the median of the interval's readings, timed at the END of the interval), or per
+# reading with an interval of 0. `unit` comes from the column name (`HR [bpm]`).
+waveform/numerics:
+  numeric:
+    code: $code
+    time: '$time::"%Y-%m-%d %H:%M:%S"'
+    numeric_value: $numeric_value
+    unit: $unit
+    hadm_id: $hadm_id
+    waveform_record_id: $waveform_record_id
+    _metadata:
+      _self:
+        description: >-
+          'Bedside monitor vital sign (MIMIC-IV Waveform Database numerics), the median of its readings
+          over an interval of --waveform-numerics-interval-s seconds, timed at the end of the interval'

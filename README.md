@@ -9,7 +9,10 @@
 [![contributors](https://img.shields.io/github/contributors/Medical-Event-Data-Standard/MIMIC_IV_MEDS.svg)](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/graphs/contributors)
 [![DOI](https://zenodo.org/badge/901560093.svg)](https://doi.org/10.5281/zenodo.17535579)
 
-This pipeline extracts the MIMIC-IV dataset (from PhysioNet) into the MEDS format.
+This pipeline extracts the MIMIC-IV dataset (from PhysioNet) into the MEDS format, optionally
+together with companion datasets such as MIMIC-Note-Extract.
+
+**Documentation: <https://mimic-iv-meds.readthedocs.io>**
 
 ## Usage:
 
@@ -59,6 +62,45 @@ from PhysioNet, which rate-limits each connection to roughly 50 KB/s, while the 
 itself is ~32 minutes and ~20 GB of RAM. Raise `download_concurrency` and keep the raw data
 with `download_dest_dir`; see [Expected runtime and compute needs](#expected-runtime-and-compute-needs).
 
+## Documentation
+
+The full documentation is at **<https://mimic-iv-meds.readthedocs.io>**. It is the canonical
+place for the ETL's design and for the extensions:
+
+- [Getting started](https://mimic-iv-meds.readthedocs.io/en/latest/getting-started/): PhysioNet
+    access per spec, commands, suMEDS enrichment, output layout, runtime.
+- [Base ETL](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/): every table, code and
+    timing rule, the reasoning behind the modelling decisions summarized below, the code metadata
+    and what suMEDS adds to it, and the extension-column roles in `dataset.json`.
+- [Extensions](https://mimic-iv-meds.readthedocs.io/en/latest/extensions/): the opt-in specs
+    (`MIMIC-IV-MNE`; MIMIC-IV-ED and MIMIC-CXR-DB in progress), how they are built, and how to add
+    one.
+- [Sources and citations](https://mimic-iv-meds.readthedocs.io/en/latest/sources/): every dataset
+    and work used, with licences and BibTeX.
+- [Contributing](https://mimic-iv-meds.readthedocs.io/en/latest/contributing/): tests, the
+    summary-statistics baselines, the synthetic-data CI and the generated specs.
+
+The site's source is in [`docs/`](docs/); preview it with `uv run --group docs zensical serve`.
+
+## Simulated demo data for modules without a public demo
+
+> [!WARNING]
+> The files under [`data/synthetic_demo/`](data/synthetic_demo/README.md) are **synthetic**. They are
+> for testing pipelines and for tutorials only, are not real patient data, and must not be used for
+> research.
+
+MIMIC-IV-Note 2.2, MIMIC-CXR 2.1.0, MIMIC-CXR-JPG 2.1.0 and MIMIC-IV-ECHO 0.1 are credentialed and
+have no public demo. ED, ECG and the waveform database do have a public release. So that
+`dataset_key=demo` can cover those four modules too, `scripts/synthetic_demo.py` simulates them for
+the public demo's 100 subjects. It reuses their real ids and admission, ED and ICU times, and writes
+each module in its release's exact layout. The modules agree with each other: each chest X-ray study
+has the report text and the timing of a radiology note, and each admission has a discharge summary
+at its discharge time. No value comes from a credentialed dataset; the free text is templated
+("Synthetic ..."). [`data/synthetic_demo/sources.yaml`](data/synthetic_demo/sources.yaml) pins
+every file at a commit of this repository, with its SHA-256, as a ready-made `demo` source.
+Provenance, the public schema behind each table, and what the public docs leave open are in
+[`data/synthetic_demo/README.md`](data/synthetic_demo/README.md).
+
 ## How this ETL is defined
 
 There is no Python in this package. The entire ETL is one file —
@@ -81,146 +123,343 @@ Everything the pipeline does is therefore inspectable — and modifiable — in 
 see [MEDS-Extract's documentation](https://github.com/mmcdermott/MEDS_extract) for the
 syntax.
 
+Add-on datasets that need their own PhysioNet credentials are kept out of that file, because
+MEDS-Extract fails on any configured table whose raw file is missing. Each lives in a fragment
+under [`src/MIMIC_IV_MEDS/extensions/`](src/MIMIC_IV_MEDS/extensions/), and
+`scripts/build_extension_specs.py` composes the base with it into a generated, separately
+registered spec (`event_configs_<name>.yaml`). Never edit the generated file: change the base or
+the fragment and re-run the script; `tests/extension_specs_test.py` fails if you forget. The
+extensions so far are [MIMIC-Note-Extract](#optional-extension-mimic-note-extract) and
+[MIMIC-IV-ED](#optional-extension-mimic-iv-ed). See
+[Extensions](https://mimic-iv-meds.readthedocs.io/en/latest/extensions/) for the mechanism and
+how to add one.
+
 ## What goes in the code, and what doesn't
 
-MIMIC carries a lot of columns that are neither the measurement nor metadata about it. Where
-each one lands is a modelling decision, so the reasoning is recorded here rather than in the
-config. All figures are from the full 3.1 release.
+MIMIC carries many columns that are neither the measurement nor metadata about it, and where each
+one lands is a modelling decision. The decisions are summarized here; the reasoning and the
+supporting figures are in
+[Base ETL → Modelling decisions](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#modelling-decisions).
 
 ### Demographics
 
-`insurance`, `language`, `marital_status` and `race` are properties of the subject, not
-annotations on the admission, so they are emitted as their own events (`INSURANCE//…`,
-`LANGUAGE//…`, `MARITAL_STATUS//…`, `RACE//…`) rather than carried as extension columns. MIMIC
-records no separate timestamp for them, so they are co-timed with the admission.
-
-Their nulls are **not** coalesced to `UNK`. A null code component drops the row under 0.7, so a
-missing demographic produces no event — which is the honest encoding, and avoids minting a
-`RACE//UNK` code that would read as an observed category. Null rates: insurance 1.71%, language
-0.14%, marital_status 2.49%, race 0%.
+`insurance`, `language`, `marital_status` and `race` are their own events (`INSURANCE//…`, etc.),
+co-timed with the admission. Nulls are **not** coalesced to `UNK`: a missing demographic produces
+no event. [Details.](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#demographics)
 
 ### DRG
 
-**`drg_type: HCFA` means MS-DRG**, not the legacy CMS-DRG the name suggests. 302 distinct HCFA
-codes fall above 579, inside the MS-DRG-only numbering space (MS-DRG replaced CMS-DRG in FY2008;
-MIMIC-IV spans 2008–2022). `APR` is Solventum's proprietary APR-DRG. Both are genuine external
-classifications, so each code carries the bare identifier as a parent — `MS-DRG/003`,
-`APR-DRG/047` — via a `_self` metadata block.
-
-**`description` is not part of the code.** It is not a function of the code: 87.8% of HCFA
-`(drg_type, drg_code)` pairs carry more than one description, up to five, and the variants are
-spelling differences for the same DRG — `W MCC` vs `WITH MCC`, `&` vs `AND`, some truncated
-near 72 characters. Rendering it into the code split single DRGs across several MEDS codes and
-inflated the HCFA vocabulary **1.98×** (1,557 codes for 787 real DRGs). It rides in `text_value`
-instead, which keeps the string without letting MIMIC's spelling changes fragment the
-vocabulary.
-
-**`drg_severity` and `drg_mortality` stay extension columns.** They are the APR-DRG severity-of-
-illness and risk-of-mortality subclasses, computed by the grouper from the coded diagnoses —
-external model output, not something observed on the patient — so they are not MEDS
-measurements. They remain available for cohort selection. They are not redundant either: 278 of
-300 APR codes span all four severity levels, and knowing severity still leaves 66% of
-mortality's own entropy. Both are APR-only, hence null on every HCFA row.
-
-Note that the DRG code is itself grouper-assigned. What distinguishes it is that the DRG is an
-administrative fact with consequences — it is what was billed — whereas the subclasses are
-gradations attached to that assignment.
+`drg_type: HCFA` means MS-DRG; each DRG code gets an `MS-DRG/…` or `APR-DRG/…` parent. The DRG
+title rides in `text_value`, not the code, because its spelling varies within one DRG.
+`drg_severity` and `drg_mortality` stay extension columns.
+[Details.](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#drg)
 
 ### OMR
 
-**`omr` results are numbers, so they go in `numeric_value`.** `hosp/omr.result_value` is a varchar
-that holds two kinds of result: a single number (weight, height, BMI, ...) and a blood pressure
-written as `systolic/diastolic`. Earlier versions copied the string into `text_value` and left
-`numeric_value` null for every `omr` row, which hid these measurements from everything downstream
-that reads numbers: value binning, feature aggregation, threshold predicates. On the full v3.1
-release the raw table has 7.75 M rows: 4.91 M plain numbers, 2.84 M blood pressures, and 1,133
-other strings (a censored `eGFR` such as `>60`, a handful of odd weight and height entries);
-same-day repeats of one value collapse at the merge stage, which leaves 7.63 M distinct events.
-
-**Three blocks partition the rows.** The row classes are computed once, in `_table.cols`
-(`is_number`, `bp_systolic`, `bp_diastolic`), and the blocks only read them, so the patterns
-cannot drift apart. A plain decimal is cast into `numeric_value` under the bare code, with
-`text_value` left null for it (`labevents` and `chartevents` keep the raw string next to the
-number; here the string carries nothing the number does not). A blood pressure becomes two
-events, `<result_name>//SYSTOLIC` and `<result_name>//DIASTOLIC`, each with its number, the way
-`icu/chartevents` already keeps systolic and diastolic as two items. Anything else stays in
-`text_value` under the bare code as before, so a code such as `eGFR` can carry both numeric and
-text rows. A block routes a row away by giving it a null code, which MEDS-Extract drops and
-reports per shard as `dropped N/M rows with null code`: three such warnings per shard for this
-table are expected and are not a data loss.
-
-**`seq_num` rides on the two blood-pressure blocks.** `omr` is dated to the day, so several
-readings on one day share one timestamp. `seq_num` is unique per (subject, day, result name) in
-the raw table; carried as an extension column on the `SYSTOLIC` and `DIASTOLIC` events (null on
-every other row), it keeps each systolic/diastolic pair recoverable and stops the merge stage's
-`unique_by: "*"` de-duplication from collapsing same-day components that happen to share a value.
-On the full release 4.6% of blood-pressure subject-days carry more than one reading (123,740 of
-2,710,497 days; 257,684 readings), and 12,648 readings that repeat a same-day value would otherwise
-collapse. The bare `omr` block does not carry it, so its existing de-duplication of same-day repeat
-weights is unchanged.
-
-**This changes the `omr` vocabulary.** `Blood Pressure` becomes `//SYSTOLIC` and `//DIASTOLIC`
-codes, and weight, BMI and height move from `text_value` to `numeric_value`, so cohorts built
-before and after are not comparable on them.
+`omr` numbers go in `numeric_value`; a blood pressure becomes `<result_name>//SYSTOLIC` and
+`//DIASTOLIC` events, carrying `seq_num`; anything else stays in `text_value`. Three blocks split the
+rows via null codes, so three `dropped N/M rows with null code` warnings per shard are expected.
+This changed the `omr` vocabulary relative to earlier versions.
+[Details.](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#omr)
 
 ### Order modifiers
 
-`priority` (`ROUTINE` / `STAT`) joins the `LAB//SPECIMEN_COLLECTED` code only, not
-`LAB//RESULT`. Priority modifies how the specimen was collected; the result is simply what was
-observed, and is the same measurement however urgently it was drawn. Nothing is lost by leaving
-it off the result: `charttime` is never null across all 158M rows, so the collection event is
-always emitted. It is coalesced, being 4.8% null.
+Lab `priority` is in `LAB//SPECIMEN_COLLECTED` only. Pharmacy `route` and `frequency`, and the
+`icu/inputevents` order and status descriptions, stay extension columns (see
+[#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15)).
+[Details.](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#order-modifiers)
 
-`route` and `frequency` on `hosp/pharmacy` were considered for the same treatment and
-**deliberately left as extension columns**. Adding them takes `MEDICATION//START` from 22,539 to
-125,381 codes — **5.56×**, with 56,248 singleton codes — and `frequency` alone accounts for
-4.53× of that across 177 values. That fragments the medication vocabulary far more than it
-sharpens it.
+## Optional extension: MIMIC-Note-Extract
 
-`icu/inputevents` is untouched for related reasons: `ordercategorydescription` (5 values) and
-`statusdescription` (6 values) are closed enums rather than text, they cannot both occupy the
-single `text_value` slot on `input_end` (100% of rows carry both), and `rateuom` is 44.7% null
-so promoting it would stamp `UNK` into half of all `INFUSION_START` codes. See
-[#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15).
+[MIMIC-IV-Ext MIMIC-Note-Extract](https://physionet.org/content/mimic-iv-ext-note-extract/1.0/)
+(MNE, v1.0; [paper](https://arxiv.org/abs/2611.04685)) structures 13 sections of the MIMIC-IV-Note
+v2.2 discharge summaries into tables keyed by `hadm_id`, using rules plus an LLM. The spec
+`MIMIC-IV-MNE` is the full `MIMIC-IV` ETL plus those tables:
+
+```bash
+# Needs a PhysioNet account approved for BOTH MIMIC-IV and MIMIC-Note-Extract.
+meds-extract-run spec=MIMIC-IV-MNE output_dir=$MEDS_OUTPUT_DIR
+```
+
+With `do_download=false`, put MNE's `*.csv.gz` files at the root of `input_dir`, next to `hosp/`
+and `icu/` (that is where the download puts them).
+
+MNE has no public demo, so `dataset_key=demo` adds **simulated** MNE tables to the public MIMIC-IV
+demo. It needs no credentials and is still one command:
+
+```bash
+meds-extract-run spec=MIMIC-IV-MNE output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+> [!WARNING]
+> The MNE part of that build is **synthetic**: it is for pipeline testing and tutorials only, not
+> for research. Its `dataset_version` says so (`2.2+mne-1.0-synthetic-0.1:<package version>`).
+
+The simulated tables are what MNE would extract from the simulated MIMIC-IV-Note discharge
+summaries (see [Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)): one
+summary for each of the demo's 275 admissions, plus one for an admission that is not in MIMIC,
+whose rows are dropped. Together they exercise every routing rule below.
+`tests/e2e_mne_demo_test.py` builds that demo and compares every MNE event with what the rules
+give for the simulated rows.
+
+In short: every MNE event is timed at `hosp/admissions.dischtime` (MNE has no timestamps, and it
+was all written at discharge), every code starts with `NOTE//`, and MNE's free text rides in
+`text_value`. It adds 17.6 M events to 137,362 subjects, covering 55.1% of admissions — mostly
+before 2020. The
+[MIMIC-IV-MNE page](https://mimic-iv-meds.readthedocs.io/en/latest/extensions/mne/) has the full
+code table, the decisions behind it, the caveats, what is not extracted and why, and the
+validation results.
+
+## Optional extension: MIMIC-IV-ED
+
+[MIMIC-IV-ED v2.2](https://physionet.org/content/mimic-iv-ed/2.2/) holds about 425k emergency
+department stays from 2011 to 2019: arrival and disposition, triage, vital signs charted during
+the stay, ED diagnoses, the medication reconciliation, and Pyxis dispensations. The spec
+`MIMIC-IV-ED` is the full `MIMIC-IV` ETL plus those tables. Unlike MNE it has a public demo, so
+`dataset_key=demo` works:
+
+```bash
+# Needs a PhysioNet account approved for BOTH MIMIC-IV and MIMIC-IV-ED.
+meds-extract-run spec=MIMIC-IV-ED output_dir=$MEDS_OUTPUT_DIR
+# The open MIMIC-IV demo plus the open MIMIC-IV-ED demo; no credentials needed.
+meds-extract-run spec=MIMIC-IV-ED output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+Every code starts with `ED//`. Triage events are timed at ED arrival; diagnoses and disposition at
+ED departure, so they cannot leak into the stay. Against the full release the extension adds
+**18.8 M events** to 205,504 subjects. 79,370 of the 141,175 subjects without any hospital
+admission gain ED events. The ED tables take ~5 min and under 1 GB to extract on their own.
+
+ED detail exists only for 2011–2019, so its presence is a proxy for calendar period. Count ED
+visits with the base's `TRANSFER_TO//ED//…`, not with `ED//ARRIVAL`. The modelling decisions,
+caveats and validation are in [`docs/extensions/ed.md`](docs/extensions/ed.md).
+
+## Multimodal build: MIMIC-IV plus any combination of extensions
+
+`mimic-iv-meds-multimodal` builds one MEDS dataset from MIMIC-IV and any combination of the
+optional extensions: ED, notes, MIMIC-Note-Extract, ECG, echo, chest X-rays (images and/or
+MIMIC-CXR-DB) and bedside-monitor waveforms. Every extension is listed by
+`mimic-iv-meds-multimodal --list-extensions` and selected the same way, with `--extensions`.
+Unlike the `spec=` runs above it reads local copies: point `--root` at a folder holding the
+releases side by side, in PhysioNet's own layout (`<slug>/<version>/` as `wget -r` leaves it,
+`<slug>-<version>/` as the ZIP download, the `physionet` package and the multimodal demo
+downloader leave it).
+
+```bash
+# --extensions: any of the names below, or `all`; empty for MIMIC-IV alone. PhysioNet slugs
+# (mimic-cxr-jpg, mimic-iv-ext-note-extract, mimic4wdb, …) work too. An extension can be narrowed to
+# parts: mimic-iv-note:radiology, mimic-iv-echo:measurements (no DICOMs needed), mimic-iv-wdb:numerics.
+# Optional: --link-mode copy|hardlink|symlink (how objects get into the MEDS root; default copy),
+# --waveform-window-s 600 and --waveform-numerics-interval-s 60 (see the loader rule below),
+# --path mimic-iv-cxr=/elsewhere/mimic-cxr-jpg/2.1.0 (a release not under --root), --no-enrich (offline).
+mimic-iv-meds-multimodal --root /data/mimic-demo-multimodal --output-dir $MEDS_OUTPUT_DIR --extensions mimic-iv-ed,mimic-iv-mne,mimic-iv-cxr,mimic-iv-cxr-db
+```
+
+| `--extensions`    | Release (demo / full)                | Events                                                                                                                        | Time                                           |
+| ----------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| (always)          | `mimic-iv-demo` / `mimiciv`          | the `MIMIC-IV` spec, unchanged                                                                                                | as in that spec                                |
+| `mimic-iv-ed`     | `mimic-iv-ed-demo` / `mimic-iv-ed`   | the `MIMIC-IV-ED` tables (`ED//…`)                                                                                            | as in that spec                                |
+| `mimic-iv-note`   | `mimic-iv-note`                      | `NOTE//DISCHARGE_SUMMARY`, `NOTE//RADIOLOGY_REPORT[//ADDENDUM]`, text in `text_value`                                         | `max(charttime, storetime)`                    |
+| `mimic-iv-mne`    | `mimic-iv-ext-note-extract`          | the `MIMIC-IV-MNE` tables (`NOTE//ALLERGY`, `NOTE//PHYSICAL_EXAM//…`, …)                                                      | as in that spec (discharge)                    |
+| `mimic-iv-ecg`    | `mimic-iv-ecg-demo` / `mimic-iv-ecg` | `ECG//WAVEFORM`, one per WFDB record, linked (`wfdb`)                                                                         | `ecg_time` (acquisition)                       |
+| `mimic-iv-echo`   | `mimic-iv-echo`                      | `ECHO//DICOM`, one per DICOM file, linked (`dicom`); `ECHO//MEASUREMENT//<measurement>` from `structured-measurement`         | `acquisition_datetime`; `measurement_datetime` |
+| `mimic-iv-cxr`    | `mimic-cxr-jpg`                      | `CXR//IMAGE//<ViewPosition>//<PatientOrientation>`, one per JPG, linked (`jpeg`)                                              | `StudyDate` + `StudyTime`                      |
+| `mimic-iv-cxr-db` | `mimic-cxr-ext-mimic-cxr-db`         | the `MIMIC-IV-CXRDB` tables (`CXR//STUDY//…`, `CXR_NLP//…`; its `CXR//IMAGE//…` only without `mimic-iv-cxr`)                  | as in that spec                                |
+| `mimic-iv-wdb`    | `mimic4wdb`                          | `WAVEFORM//WINDOW`, one per window of ≤ 10 min, linked (`wfdb`); `WAVEFORM//NUMERIC//<signal>` vital signs, per-minute median | the **end** of the window / minute             |
+
+ED, MNE and CXR-DB use the same spec fragments as their registered specs (`spec=MIMIC-IV-ED`,
+`MIMIC-IV-MNE`, `MIMIC-IV-CXRDB`), so a multimodal build with one of them extracts the same events
+as that spec, and any combination works without a spec per combination. MIMIC-CXR-JPG and
+MIMIC-CXR-DB code an image the same way (`CXR//IMAGE//{view}//{orientation}`, `UNK` if missing) and
+share `cxr_study_id` and `cxr_dicom_id`; with both in a build, the image events are MIMIC-CXR-JPG's
+(with the link) and CXR-DB adds the studies, CheXpert labels and concepts. CXR-DB's semicolon-
+delimited CSVs are converted to parquet during the build (`prepare_cxr_db` need not be run first).
+
+**The multimodal demo.** [`mimic-demo-mm`](https://github.com/rvandewater/MIMIC-IV-Multimodal-Demo)
+downloads the 100 MIMIC-IV demo subjects across every module (open demos whole, credentialed
+releases filtered to those subjects; a PhysioNet sign-in is needed for those) into exactly the
+layout this build reads. Install it with the optional extra and let the build run it first:
+
+```bash
+pip install "MIMIC-IV-MEDS[demo-download]"
+mimic-iv-meds-multimodal --download-demo --root ./mimic-demo-multimodal --output-dir $MEDS_OUTPUT_DIR --extensions mimic-iv-ed,mimic-iv-note,mimic-iv-ecg,mimic-iv-echo,mimic-iv-cxr,mimic-iv-wdb
+```
+
+`--download-demo` fetches only the sources the selected extensions need (`--yes` skips its
+confirmation); without it the build uses whatever is already under `--root`, however it got
+there. MIMIC-Note-Extract and MIMIC-CXR-DB have no demo subset. For those, add this repository's
+simulated releases as a second root (`--root data/synthetic_demo`; see
+[Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)): a simulated
+release (`SYNTHETIC_<slug>.json`) is used only when no real one is found, and the build marks it
+everywhere: `[synthetic]` in `dataset_name`, its `+synthetic` version in `dataset_version`, and
+`"release": "synthetic"` (with the ODbL license and what it simulates) in `source_datasets` and
+`sources.json`.
+
+Objects (ECGs, DICOMs, JPGs, waveform windows) are stored inside the MEDS root, under one folder,
+`external_values/`, in their original formats. Every object event has two columns, following the
+convention discussed in [meds#109](https://github.com/Medical-Event-Data-Standard/meds/issues/109):
+`external_value_link`, the object's path relative to the MEDS root, and `external_value_encoding`,
+how to read it. The modality is in the event's `code`.
+
+```text
+$MEDS_OUTPUT_DIR/
+  data/…, metadata/dataset.json, codes.parquet, subject_splits.parquet
+  metadata/sources.json      # each release used (slug, version, demo/full/synthetic, license) and what it contributed
+  external_values/           # every object an event links to, and nothing else
+    ecg/<sha[:2]>/<sha>/<record>.hea, .dat
+    echo/<sha[:2]>/<sha>.dcm
+    cxr/<sha[:2]>/<sha>.jpg
+    waveform/<sha[:2]>/<sha>/<window>.hea, .dat
+```
+
+| `external_value_encoding` | The link names                                             | Read it with (`root` is the MEDS root) |
+| ------------------------- | ---------------------------------------------------------- | -------------------------------------- |
+| `wfdb`                    | a WFDB record: `<link>.hea` plus the signal files it names | `wfdb.rdrecord(root / link)`           |
+| `dicom`                   | one DICOM file                                             | `pydicom.dcmread(root / link)`         |
+| `jpeg`                    | one JPEG image                                             | `PIL.Image.open(root / link)`          |
+
+`MIMIC_IV_MEDS.multimodal.external_values.read(root, link, encoding)` does exactly this (install the
+readers with `pip install "MIMIC-IV-MEDS[external-values]"`). Below `external_values/` the folders are
+this build's choice: objects are named by their SHA-256, so identical bytes share one link. The
+build checks that every link resolves to all of its files and that every file under
+`external_values/` belongs to a linked object.
+
+`metadata/dataset.json` says which combination this is. MEDS-Extract writes, from the composed
+spec's `etl:` block: `dataset_name` (e.g. `MIMIC-IV+ED+Note(radiology)+ECG+ECHO(measurements)`, parts
+shown when only some were built), `dataset_version` (every release as `<slug>/<version>`, e.g.
+`mimic-iv-demo/2.2,mimic-iv-ed/2.2,…`), `license` (the PhysioNet Credentialed Health Data License
+as soon as one credentialed release is in), `external_value_link` as MEDS
+`additional_value_modality_columns` (`external_value_encoding` lands in `other_extension_columns`),
+and the raw-source id columns of the parts built. The build adds `source_datasets`: the same
+releases as a list, each with its extension name, PhysioNet name, version, demo, full or synthetic,
+license, PhysioNet URL, parts built and the encoding of its linked objects. `source_datasets` and
+`sources.json` (which also records the pinned mimic-code concept maps) have no MEDS-Extract
+counterpart yet; they are written by `src/MIMIC_IV_MEDS/multimodal/finalize.py`, kept
+self-contained so they can move upstream as a post-stage.
+
+Demo and full releases have the same structure, so the same build runs on either, or on a mix
+(e.g. the MIMIC-IV demo with the full MIMIC-IV-ED, which then contributes only the demo subjects'
+stays). Checked: MIMIC-IV-ED demo 2.2 and full 2.2 have the same tables and columns; MIMIC-IV-ECG
+demo 0.1 and full 1.0 the same `record_list.csv` columns, though the demo stores records as
+`files/p<subject>/s<study>/` and the full release as `files/p<4 digits>/p<subject>/s<study>/`
+(the build follows each release's `path` column, so both work). Note, ECHO, CXR-JPG and the
+waveform database have no separate demo. For full data use `--link-mode hardlink` or `symlink`
+and keep each release's `SHA256SUMS.txt` (hashes are taken from it instead of reading every file).
+
+Every module is restricted to the subjects of the core's `hosp/patients` (for the demo: its 100
+patients), whether its files hold only those subjects or the whole release, so a module can never
+add subjects or reshuffle the core's splits. Tables too big to load whole, like MIMIC-IV-ECHO's
+`structured-measurement.csv.gz` (28 M rows for all patients), stay compressed and are streamed,
+keeping only the cohort's rows. An object listed in a record list but not (fully) on
+disk gets no event: no link ever dangles, `sources.json` counts what was skipped, and re-running
+after a download completes picks it up. On the MIMIC-IV demo subjects (100) the build adds 2,042
+notes, 659 ECGs, 411 echo DICOMs, 6,820 echo measurements (58 subjects), 566 chest X-rays and
+5 bedside-monitor waveform records (4 subjects, 60 segments, 190 h): 1,187 waveform windows and
+158,116 per-minute vital signs (21 signals).
+
+`scripts/profile_external_values.py <meds_root>` reads a sample of every encoding and reports
+counts, size on disk and read time (counts and timings only). On the demo build: 566 JPEGs
+(968 MB, median 12 ms per image, decoded), 1,846 WFDB records (659 ECGs and 1,187 waveform windows,
+402 MB, 6 ms), 411 DICOMs (1,365 MB, 4 ms; `pydicom` parses the file, pixel data is decoded on
+access).
+
+**Linked objects are points in time.** Every linked object is short enough to treat as happening at
+one time, and its event is timed when its data is complete, so a model that, at prediction time
+*t*, loads only the links of events with `time <= t` never sees later data. ECGs (10 s), images
+and echo DICOMs are short already. A waveform record spans an ICU stay (on the demo up to ~76 h,
+segments up to ~60 h), so it is never linked whole: every segment longer than
+`--waveform-window-s` (600 s) is cut into windows of that length, each written as a WFDB record of
+its own (same signals, FLAC compression, gains and samples per frame; the digital samples are
+unchanged), and shorter segments are linked as they are. `WAVEFORM//WINDOW` is timed at the end of
+its window; `waveform_duration_s` gives its span, `[time - duration, time]`; `waveform_segment` and
+`waveform_window` say where it was cut from. Cutting needs `wfdb` (the `external-values` extra);
+`--waveform-window-s 0` keeps whole segments instead, outside the point-in-time rule.
+
+The monitors' vital signs (each record's numerics, `<record>n.csv.gz`: HR, SpO2, ABP, NBP, RR, ST, QT,
+… about once a second) are not linked: they become ordinary events, `WAVEFORM//NUMERIC//<signal>`
+with `numeric_value` and `unit`. Each is the median of a signal's readings over one minute
+(`--waveform-numerics-interval-s`), timed at the end of that minute, so it enters the timeline only
+after it was measured; an interval of `0` keeps every reading at its own time (on the demo about 9 M
+events instead of 158 k). `--extensions mimic-iv-wdb:windows` or `mimic-iv-wdb:numerics` builds one
+of the two.
+
+Caveats: the ECG time is the ECG machine's clock, which the release says was mostly not
+synchronized with the hospital's. `mimic-iv-cxr` alone extracts no CheXpert labels: they are mined
+from the report, which MIMIC-CXR-JPG does not time (`mimic-iv-cxr-db` adds them at the study's last
+image, with the caveat in its section below). Echo measurements with an empty `result` (two thirds of
+the rows: blank fields of the report form) get no event; most measurements belong to echos whose
+DICOMs are not released, so only some carry an `echo_study_id`. Notes are timed at
+when they were saved, not when the care happened: the median gap is about 20 h for discharge
+summaries and 2.4 h for radiology reports on the demo subjects.
+
+## Optional extension: MIMIC-CXR-DB
+
+[MIMIC-CXR-DB](https://physionet.org/content/mimic-cxr-ext-mimic-cxr-db/1.0/) (v1.0;
+[paper](https://papers.miccai.org/miccai-2026-sat/MultiTab_015.html)) links the MIMIC-CXR-JPG chest
+radiographs to MIMIC-IV admissions. It ships their DICOM metadata, the CheXpert labels, and
+ontology concepts extracted from the radiology reports and discharge summaries. The spec
+`MIMIC-IV-CXRDB` is the full `MIMIC-IV` ETL plus those three tables. The release is
+semicolon-delimited, which MEDS-Extract 0.8.1 cannot read, so a one-second conversion runs between
+the download and the extraction:
+
+```bash
+# Needs a PhysioNet account approved for BOTH MIMIC-IV and MIMIC-CXR-DB.
+meds-extract-download spec=MIMIC-IV-CXRDB output_dir=$RAW
+python -m MIMIC_IV_MEDS.prepare_cxr_db $RAW
+meds-extract-run spec=MIMIC-IV-CXRDB do_download=false input_dir=$RAW output_dir=$MEDS_OUTPUT_DIR
+```
+
+It adds 1.96 M events to 61,868 subjects:
+
+- an image event per radiograph (`CXR//IMAGE//{view}//{orientation}`, with `study_id` and
+    `dicom_id`);
+- a study event (`CXR//STUDY//{procedure}`);
+- the 14 CheXpert labels (`CXR_NLP//CHEXPERT//{finding}//{POSITIVE,NEGATIVE,UNCERTAIN}`);
+- the Jev-screened report and discharge concepts (`CXR_NLP//RADIOLOGY|DISCHARGE//{section}//{ontology id}`).
+
+> [!WARNING]
+> **Open issue: leakage.** The CheXpert labels and radiology-report concepts are timed at the
+> study's last image, which is earlier than the report could be read. How to time them (a fixed
+> reporting delay, MIMIC-IV-Note's radiology `storetime` if a study-level link exists, or keeping
+> this with a warning) is not decided yet. Drop `CXR_NLP//CHEXPERT` and `CXR_NLP//RADIOLOGY` for
+> leakage-sensitive tasks.
+
+The rest of the release re-derives MIMIC-IV (its admissions, diagnoses and labs) and is not
+extracted. The design decisions, coverage, caveats (including overlap with MNE) and validation are
+in [`docs/extensions/cxr-db.md`](docs/extensions/cxr-db.md).
+
+MIMIC-CXR-DB has no public demo, so `dataset_key=demo` adds **simulated** CXR-DB tables to the public
+MIMIC-IV demo. The simulated tables ship already converted to parquet, so this is one command with
+no `prepare_cxr_db` step and no credentials:
+
+```bash
+meds-extract-run spec=MIMIC-IV-CXRDB output_dir=$MEDS_OUTPUT_DIR dataset_key=demo
+```
+
+> [!WARNING]
+> The CXR-DB part of that build is **synthetic**: it is for pipeline testing and tutorials only, not
+> for research. Its `dataset_version` says so (`2.2+cxr_db-1.0-synthetic-0.1:<package version>`).
+
+The simulated tables are derived from the simulated MIMIC-CXR(-JPG) studies and MIMIC-IV-Note
+reports and discharge summaries (see
+[Simulated demo data](#simulated-demo-data-for-modules-without-a-public-demo)). The images, their
+CheXpert labels and the report concepts therefore agree with the report texts, and the discharge
+concepts agree with the summaries.
 
 ## Code metadata
 
 `metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary
-applies, `parent_codes` in OMOP form (`LOINC/2160-0`, `ICD10CM/I10`, `NDC/…`), so tooling
-that maps codes across datasets or resolves them through OHDSI Athena has something to work
-with. All of it is declared in `event_configs.yaml`, through three routes:
-
-| Codes                                                                                                                                                                                | Route                                                                     | Source                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DIAGNOSIS`, `PROCEDURE//ICD`, `HCPCS`, ICU itemid codes (`LAB//<itemid>`, `PROCEDURE//START`/`END`, `INFUSION_*`, `SUBJECT_FLUID_OUTPUT`), `LAB//RESULT`, `LAB//SPECIMEN_COLLECTED` | `_metadata` joins against dictionary tables at run time                   | MIMIC-IV's own `d_icd_diagnoses`, `d_icd_procedures`, `d_hcpcs` and `d_items`; the [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps (MIT, tag v2.4.0, checksum-pinned under `sources:`) for lab descriptions and the LOINC, SNOMED and RxNorm parents |
-| every other component-coded event (admissions, demographics, transfers, ICU stays, DRGs, medications, OMR)                                                                           | `_self` templates over the code's own components                          | the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) of the column each component comes from (MIT-LCP/mimic-website, MIT), paraphrased, with the column named in parentheses                                                                                  |
-| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION//KG`                                                                                            | `_self` templates, the code rendered from a constant `_table.cols` column | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                   |
-
-Literal codes take the detour through a constant column because MEDS-Extract attaches
-metadata only through a code's components and rejects a `_metadata` block on a code with
-none. The pre-existing `codes.parquet` it suggests for that case is not read by the
-standard pipeline (`extract_code_metadata` reads it from the output of
-`split_and_shard_subjects`, which writes none). The constant changes nothing in the data;
-only the codes' `code_template` names the column.
-
-Every parent the ETL writes is read from MIMIC-IV's own tables or the mimic-code maps;
-links that need an external ontology (the OMOP Gender tags, the ICD pack hierarchy) come from
-suMEDS instead (next section).
-
-On the demo (2.2), 10,250 of 10,254 codes are described and 7,899 have a parent code. What
-is left uncovered, and why:
-
-- **Labs missing from mimic-code's lab map.** Lab descriptions come from
-    `d_labitems_to_loinc.csv`, which lacks 28 of the demo's 1,622 `d_labitems` (all
-    `53xxx`; one occurs in the demo's lab events, giving the four undescribed codes). A second
-    description block over `hosp/d_labitems` would fill them, but MEDS-Extract has no
-    precedence between blocks: it joins both strings, with a newline, into the description
-    of every lab code.
-- **No vocabulary parent:** medications whose order carries no NDC; ICU items absent from
-    the mimic-code maps; admission, discharge, transfer, ICU-stay, demographic and OMR codes;
-    CPT codes (`HCPCS//…` is keyed on MIMIC's short description, which for CPT is only the
-    section name). The `DRG` parents use `MS-DRG/` and `APR-DRG/` (see [DRG](#drg)), which
-    vocabulary tooling does not resolve; OMOP's own id for MS-DRGs is `DRG`.
+applies, `parent_codes` in OMOP form (`LOINC/2160-0`, `ICD10CM/I10`, `NDC/…`). All of it is
+declared in `event_configs.yaml`: dictionary-table joins at run time (MIMIC-IV's `d_*` tables and
+the mimic-code concept maps), and `_self` templates paraphrasing the
+[MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) for every other code. Literal codes
+(`ED_REGISTRATION`, `MEDS_BIRTH`, …) are rendered from a constant column because MEDS-Extract
+attaches metadata only through a code's components. Every parent the ETL writes is read from
+MIMIC-IV's own tables or the mimic-code maps; links that need an external ontology (the OMOP Gender
+tags, the ICD pack hierarchy) come from suMEDS instead (next section). On the demo (2.2), 10,250 of
+10,254 codes are described and 7,899 have a parent code. The routes and what is left uncovered are
+documented under
+[Base ETL → Code metadata](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#code-metadata).
 
 ## Enriching code metadata with suMEDS
 
@@ -272,27 +511,11 @@ suMEDS-enrich --prefetch --rules MIMIC-IV
 meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR "overrides=['++stage_cfg.offline=true']"
 ```
 
-For MIMIC-IV, the rules add:
-
-- `GENDER//F` and `GENDER//M` get the OMOP Gender codes `Gender//F` and `Gender//M` (a tag:
-    Gender has no public pack; with `--athena-csv` suMEDS validates them against Athena).
-- `DIAGNOSIS//ICD//{9,10}//…` and `PROCEDURE//ICD//{9,10}//…` are matched to the dotted ICD-9-CM,
-    ICD-10-CM, ICD-9 procedure or ICD-10-PCS code, which fills `vocabulary_id` and `concept_code`.
-    The ETL's own reference (`ICD10CM/I50.23`) stays first in `parent_codes`, and every ancestor
-    in the pack follows it (`ICD10CM//I50.2`, `ICD10CM//I50`).
-- Same-dataset parents: an ICD code of the table becomes the parent of another when its
-    vocabulary code is the nearest ancestor present (`DIAGNOSIS//ICD//10//I5023` gets
-    `DIAGNOSIS//ICD//10//I502` when both occur).
-- `parent_names` maps each vocabulary code in `parent_codes` that a pack knows to its official
-    name, including the ETL's own references. Lab and fluid-output codes whose parent is a
-    LOINC code (`LOINC/2160-0`) also get `vocabulary_id` `LOINC` and the `concept_code`.
-
-On the demo (2.2), the published packs add parents to 1,779 codes (1,777 of its 1,826 ICD codes, 4
-of them with a same-dataset parent, and both Gender codes) and names to 3,222 codes. The ETL alone
-does not emit any of this: a plain `meds-extract-run` build has no Gender parents, no ICD ancestors,
-no same-dataset parents and no names. suMEDS enrichment never removes or rewrites existing parents
-or descriptions, so the ETL's own parents (`ICD10CM/…`, `LOINC/…`, `NDC/…`, RxNorm, SNOMED, DRG) and
-its descriptions from MIMIC-IV's dictionary tables stay as they are.
+For MIMIC-IV, the rules add the OMOP Gender tags (`Gender//F`, `Gender//M`), the dotted ICD
+vocabulary code and its pack ancestors after the ETL's own reference, same-dataset ICD parents, and
+official names in `parent_names`. Enrichment never removes or rewrites the ETL's own parents or
+descriptions. The full list, with the demo coverage, is under
+[Base ETL → Enrichment with suMEDS](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#enrichment-with-sumeds).
 
 ## Parallel and multi-node runs
 
@@ -403,23 +626,19 @@ stages that see every row regardless. Wall time, by contrast, is close to linear
 
 Intermediate stage outputs are retained under the output directory, which is why the tree is
 15 GB against 4.5 GB of actual MEDS data. See
-[this github issue](https://github.com/Medical-Event-Data-Standard/MEDS_transforms/issues/235) for tracking on ensuring these
+[this github issue](https://github.com/mmcdermott/MEDS_extract/issues/15) for tracking on ensuring these
 directories are automatically cleaned up in the future.
 
 ## Summary statistics
 
-[`tests/regression/demo_summary_stats.json`](tests/regression/demo_summary_stats.json) is a
-[meds_summary_stats](https://github.com/Medical-Event-Data-Standard/meds_summary_stats) fingerprint of
-the MEDS dataset this ETL builds from the open MIMIC-IV demo: subject, event and measurement counts,
-digests of the code vocabulary, per-subject, value and time distributions, code-metadata coverage, the
-splits and the schema. It names no code and reports no cell of fewer than 20 subjects and no minimum or
-maximum, which is what makes it safe to publish. The Tests workflow rebuilds the demo on every pull
-request and fails when the result no longer matches the baseline, as decided by
-[`tests/regression/policy.yaml`](tests/regression/policy.yaml).
-
-`scripts/summary_stats.sh` regenerates a baseline from a build of this checkout. It prints how the
-statistics changed against the committed baseline before overwriting it, and `--compare` checks a build
-without writing anything:
+[`tests/regression/demo_summary_stats.json`](tests/regression/demo_summary_stats.json) and
+[`tests/regression/full_summary_stats.json`](tests/regression/full_summary_stats.json) are
+[meds_summary_stats](https://github.com/Medical-Event-Data-Standard/meds_summary_stats) fingerprints
+of what this ETL builds from the open MIMIC-IV demo and from the full MIMIC-IV 3.1 release. They name
+no code and report no cell of fewer than 20 subjects and no minimum or maximum, which is what makes
+them safe to publish. The Tests workflow fails when the demo no longer matches its baseline, as
+decided by [`tests/regression/policy.yaml`](tests/regression/policy.yaml). CI cannot rebuild the
+credentialed release, so regenerate both in every pull request that changes the output:
 
 ```bash
 # The demo: downloaded and built with this checkout
@@ -429,14 +648,9 @@ scripts/summary_stats.sh full --input-dir $RAW_INPUT_DIR
 scripts/summary_stats.sh full --meds-dir $MEDS_OUTPUT_DIR
 ```
 
-[`tests/regression/full_summary_stats.json`](tests/regression/full_summary_stats.json) is the same
-fingerprint of the full MIMIC-IV 3.1 release. Because it is committed next to the ETL, its diff shows
-what an ETL change did to the whole credentialed release, and two ETL versions can be compared without
-access to the data. CI cannot rebuild the credentialed release, so regenerate it with
-`scripts/summary_stats.sh full` in every pull request that changes the output.
-
-Both baselines are built with `skip_stages=[sumeds_enrich]`: they fingerprint what the ETL writes, which
-does not depend on network access or on the suMEDS pack release. Summarize a build made the same way.
+Both baselines are built with `skip_stages=[sumeds_enrich]`; summarize a build made the same way.
+`--compare` checks a build without writing anything. See
+[Contributing → Summary-statistics baselines](https://mimic-iv-meds.readthedocs.io/en/latest/contributing/#summary-statistics-baselines).
 
 ## 📚 Citing this work
 

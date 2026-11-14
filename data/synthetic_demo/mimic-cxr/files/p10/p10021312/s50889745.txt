@@ -1,0 +1,20 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for outside imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+No atelectasis.
+No cardiomegaly.
+Possible fracture, cannot be excluded.
+Possible lung opacity, cannot be excluded.
+No pneumothorax.
+No pleural other.
+
+IMPRESSION:
+Synthetic impression: see findings.

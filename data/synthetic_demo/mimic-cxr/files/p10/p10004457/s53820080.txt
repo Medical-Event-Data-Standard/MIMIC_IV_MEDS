@@ -1,0 +1,20 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for outside imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+Possible edema, cannot be excluded.
+No enlarged cardiomediastinum.
+Possible pleural effusion, cannot be excluded.
+Synthetic finding: pneumonia is present.
+No pneumothorax.
+No pleural other.
+
+IMPRESSION:
+Synthetic impression: pneumonia.

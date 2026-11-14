@@ -57,6 +57,8 @@ jobs:
       # changes, so keep it for a week. The key rotates every ISO week, which bounds how long one
       # copy is reused; within a week a cache hit leaves only the SHA256SUMS.txt fetch, because the
       # downloader skips every file whose hash matches and re-fetches any that do not.
+      # tests/e2e_ed_demo_test.py downloads the MIMIC-IV-ED demo into the same directory (under ed/),
+      # so this one cache holds both demos.
       - name: Week for demo download cache key
         id: cache-week
         run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"

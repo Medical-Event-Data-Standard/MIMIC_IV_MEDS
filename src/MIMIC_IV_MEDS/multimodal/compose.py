@@ -1,0 +1,149 @@
+"""Compose the base spec with any combination of module fragments into one MESSY spec.
+
+Unlike `scripts/build_extension_specs.py`, which writes one registered spec per extension and keeps
+the YAML comments, this composes at build time, for whichever modules were asked for, so every
+combination works without a registered spec per subset. The composed spec:
+
+- has every event table of the base, plus every table of each extension's fragment: ED, MNE and
+  CXR-DB reuse the fragments of their registered specs (`extensions/<name>.yaml`, so
+  `spec=MIMIC-IV-ED` and a multimodal build with only ED extract the same events); the
+  object-linked extensions use `multimodal/fragments/<name>.yaml`;
+- leaves out the events an extension yields to another one in the build (CXR-DB's image events
+  when MIMIC-CXR-JPG's linked image events are there);
+- has no `sources:` block: the build stages the raw input itself and runs MEDS-Extract with
+  `do_download=false`;
+- describes the combination in its `etl:` block, which MEDS-Extract writes to
+  `metadata/dataset.json`:
+  - `dataset_name`: `MIMIC-IV` plus each module's label, e.g. `MIMIC-IV+ED+ECG`;
+  - `raw_dataset_version`: every release used, as `<slug>/<version>`, comma-separated (MEDS-Extract
+    appends `:<package version>`);
+  - `license`: the PhysioNet Credentialed Health Data License as soon as any release used is
+    credentialed, else ODbL (a simulated release is ODbL);
+  - `additional_value_modality_columns`: `external_value_link`, when a module links objects (its
+    companion `external_value_encoding` lands in `other_extension_columns`);
+  - `raw_source_id_columns`: the base's plus each module's raw-release keys.
+"""
+
+from __future__ import annotations
+
+from importlib.resources import files
+from pathlib import Path
+
+import yaml
+
+from .external_values import ENCODING_COLUMN, LINK_COLUMN
+from .modules import MODULES, ODBL, PHYSIONET_CREDENTIALED, FoundRelease
+
+PKG = files("MIMIC_IV_MEDS")
+RESERVED = ("etl", "sources")
+
+
+def base_spec() -> dict:
+    return yaml.safe_load(PKG.joinpath("event_configs.yaml").read_text())
+
+
+def fragment(module: str) -> dict:
+    """A module's event tables (its `etl:` and `sources:` blocks, if any, are dropped)."""
+    text = PKG.joinpath(*MODULES[module].fragment.split("/")).read_text()
+    return {k: v for k, v in yaml.safe_load(text).items() if k not in RESERVED}
+
+
+def _drop_yielded(frag: dict, f: FoundRelease, built: set[str]) -> dict:
+    """`frag` without the events `f`'s module yields to another module in the build."""
+    for other, events in f.module.yields_to.items():
+        if other not in built:
+            continue
+        for table, event in events:
+            if table in frag:
+                frag[table] = {k: v for k, v in frag[table].items() if k != event}
+    return frag
+
+
+def compose(core: FoundRelease, found: list[FoundRelease], skip_tables: set[str] = frozenset()) -> dict:
+    """The spec for `core` plus the modules in `found` (in that order), without `skip_tables`.
+
+    `skip_tables` are optional fragment tables whose raw input the build did not find (e.g. the echo
+    measurements); MEDS-Extract fails on a configured table without input, so they are left out.
+    """
+    base = base_spec()
+    tables = {k: v for k, v in base.items() if k not in RESERVED}
+    # Parts not asked for contribute nothing, whether or not staging reported their tables.
+    skip_tables = set(skip_tables) | {
+        t for f in found for p in f.module.parts if not f.wants(p.name) for t in p.tables
+    }
+    built = {f.module.name for f in found}
+    for f in found:
+        frag = {k: v for k, v in fragment(f.module.name).items() if k not in skip_tables}
+        frag = _drop_yielded(frag, f, built)
+        if clash := sorted(set(frag) & set(tables)):
+            raise ValueError(f"module {f.module.name} redefines tables {clash}")
+        tables.update(frag)
+
+    releases = [core, *found]
+    etl = dict(base["etl"])
+    etl["dataset_name"] = "+".join([core.module.label, *(f.label for f in found)])
+    etl["raw_dataset_version"] = ",".join(r.tag for r in releases)
+    etl["license"] = PHYSIONET_CREDENTIALED if any(r.credentialed for r in releases) else ODBL
+    links = link_columns(found, skip_tables)
+    if links:
+        etl["additional_value_modality_columns"] = links
+    raw_ids = list(etl.get("raw_source_id_columns", []))
+    for f in found:
+        raw_ids += [c for c in module_columns(f, skip_tables)[1] if c not in raw_ids]
+    etl["raw_source_id_columns"] = raw_ids
+    return {"etl": etl, **tables}
+
+
+def active_parts(f: FoundRelease, skip_tables: set[str] = frozenset()) -> tuple[str, ...]:
+    """The parts of `f` that were asked for and built (a part whose tables were all skipped was not)."""
+    return tuple(
+        p.name
+        for p in f.module.parts
+        if f.wants(p.name) and not (p.tables and set(p.tables) <= set(skip_tables))
+    )
+
+
+def module_columns(f: FoundRelease, skip_tables: set[str] = frozenset()) -> tuple[list[str], list[str]]:
+    """`(link columns, raw source id columns)` that `f` puts in the data, given what was built.
+
+    MEDS-Extract rejects a `dataset.json` category naming a column its output lacks, so a part that was
+    not built must not contribute its columns.
+    """
+    links = [LINK_COLUMN] if encoding(f, skip_tables) else []
+    raw = list(f.module.raw_source_id_columns)
+    active = set(active_parts(f, skip_tables))
+    for p in f.module.parts:
+        if p.name in active:
+            raw += [c for c in p.raw_source_id_columns if c not in raw]
+    return links, raw
+
+
+def encoding(f: FoundRelease, skip_tables: set[str] = frozenset()) -> str | None:
+    """How `f`'s linked objects are stored, or None when it links none in this build."""
+    if f.module.encoding:
+        return f.module.encoding
+    active = set(active_parts(f, skip_tables))
+    return next((p.encoding for p in f.module.parts if p.name in active and p.encoding), None)
+
+
+def link_columns(found: list[FoundRelease], skip_tables: set[str] = frozenset()) -> list[str]:
+    """`[external_value_link]` when any module of the build links objects, else `[]`."""
+    return [LINK_COLUMN] if any(encoding(f, skip_tables) for f in found) else []
+
+
+def common_sources() -> list[dict]:
+    """The base spec's `sources.common` entries (the public concept maps its tables join)."""
+    return base_spec().get("sources", {}).get("common", [])
+
+
+def write_spec(spec: dict, fp: Path) -> Path:
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    header = (
+        "# GENERATED by MIMIC_IV_MEDS.multimodal for this build: the base event_configs.yaml plus the\n"
+        "# fragments of the modules asked for. Regenerated on every build; do not edit.\n"
+    )
+    fp.write_text(header + yaml.safe_dump(spec, sort_keys=False, allow_unicode=True, width=10**9))
+    return fp
+
+
+__all__ = ["ENCODING_COLUMN", "LINK_COLUMN", "MODULES", "common_sources", "compose", "write_spec"]

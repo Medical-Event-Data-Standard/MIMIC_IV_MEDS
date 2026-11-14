@@ -1,0 +1,22 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for ed imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+Synthetic finding: cardiomegaly is present.
+Synthetic finding: consolidation is present.
+No edema.
+No lung lesion.
+Synthetic finding: lung opacity is present.
+No pleural effusion.
+Synthetic finding: pneumonia is present.
+Synthetic finding: support devices is present.
+
+IMPRESSION:
+Synthetic impression: cardiomegaly, consolidation, lung opacity, pneumonia, support devices.

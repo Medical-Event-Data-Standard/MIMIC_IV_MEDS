@@ -1,0 +1,18 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for ward imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+No edema.
+Possible fracture, cannot be excluded.
+No pneumonia.
+No support devices.
+
+IMPRESSION:
+Synthetic impression: see findings.
