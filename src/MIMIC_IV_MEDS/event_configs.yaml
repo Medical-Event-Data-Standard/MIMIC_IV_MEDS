@@ -288,6 +288,10 @@ hosp/labevents:
         # candidate row that the unit would have disambiguated.
         description: coalesce($omop_concept_name, $label)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # The unit is a component of the code, so each code has exactly one; null (`UNK` in the
+      # code) gives none. See "Units" in the README.
+      _self:
+        unit: $valueuom
 
 hosp/omr:
   # Three blocks partition the rows through null codes: a blood-pressure string goes only to
@@ -314,6 +318,10 @@ hosp/omr:
         description: >-
           f"Online Medical Record (OMR) observation, mostly outpatient: {$result_name} (hosp/omr.result_name);
           a numeric result is in numeric_value, any other in text_value"
+        # The unit MIMIC writes in parentheses after the measurement's name (`BMI (kg/m2)`,
+        # `Weight (Lbs)`, `Height (Inches)`), so constant per code. Other names have none (the
+        # parentheses of `Blood Pressure Standing (1 min)` are not a unit).
+        unit: 'extract group 1 of /^(?:BMI|Weight|Height) \(([^)]+)\)$/ from $result_name'
   omr_systolic:
     code: 'f"{$result_name}//SYSTOLIC" if ($bp_systolic ?? "") != ""'
     numeric_value: "$bp_systolic::?float"
@@ -560,6 +568,10 @@ icu/chartevents:
         itemid:
           column: itemid (omop_source_code)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # The charted unit, a component of the code (not `d_items.unitname`, which disagrees with
+      # it for 10% of pairs; see above).
+      _self:
+        unit: $valueuom
 
 icu/procedureevents:
   start:
@@ -645,6 +657,10 @@ icu/inputevents:
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # The unit is not in the code here (see #15), so an itemid charted in several units gets
+      # all of them, and MEDS-Extract warns. The per-event unit stays in the `unit` column.
+      _self:
+        unit: $rateuom
   input_end:
     code: 'f"INFUSION_END//{$itemid}"'
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
@@ -669,6 +685,9 @@ icu/inputevents:
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # As for `input_start`.
+      _self:
+        unit: $amountuom
   subject_weight:
     code: $subject_weight_code
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
@@ -676,6 +695,10 @@ icu/inputevents:
     _metadata:
       _self:
         description: "'Patient weight in kilograms, recorded with an ICU infusion (icu/inputevents.patientweight)'"
+        # Not in the data: the MIMIC-IV documentation of inputevents.patientweight states "The
+        # patient weight in kilograms" (https://mimic.mit.edu/docs/iv/modules/icu/inputevents/;
+        # MIT-LCP/mimic-website at 8182227, MIT), written `kg` as in icu/d_items.unitname.
+        unit: "'kg'"
 
 icu/outputevents:
   output:
@@ -695,6 +718,9 @@ icu/outputevents:
         # labevents. Only one itemid in this file has duplicate rows and they agree on both
         # label and concept code, so the unit never disambiguated anything.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # The unit is a component of the code, as in labevents.
+      _self:
+        unit: $valueuom
 
 # Where the raw data lives. This block is consumed by `meds-extract-download` (which
 # `meds-extract-run` spawns) and is a reserved key stripped before event conversion, so

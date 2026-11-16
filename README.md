@@ -222,6 +222,22 @@ is left uncovered, and why:
     section name). The `DRG` parents use `MS-DRG/` and `APR-DRG/` (see [DRG](#drg)), which
     vocabulary tooling does not resolve; OMOP's own id for MS-DRGs is `DRG`.
 
+### Units
+
+Codes of events with a numeric value carry their unit in a `unit` column, so tools can read it
+from one place. The codes themselves are unchanged. Like every `_metadata` column it is a list.
+
+| Codes                                                  | `unit` from                                                                                                                                                                                                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LAB//RESULT`, `LAB//<itemid>`, `SUBJECT_FLUID_OUTPUT` | `valueuom`, the code's last component, so one unit per code (none for `…//UNK`)                                                                                                                                                                         |
+| OMR `BMI (kg/m2)`, `Weight (Lbs)`, `Height (Inches)`   | the unit in parentheses in `result_name`                                                                                                                                                                                                                |
+| `INFUSION_START`, `INFUSION_END`                       | `rateuom` and `amountuom`. The unit is not in these codes ([#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15)), so an itemid recorded in several units lists all of them; each event's own unit is in the `unit` data column |
+| `SUBJECT_WEIGHT_AT_INFUSION//KG`                       | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT)                                                                                                                  |
+
+Codes without a recorded unit (scores such as the GCS, the OMR blood pressures, `eGFR`) get
+none. On the full 3.1 release, 77% of numeric events have a code with a unit, and 173 of the
+524 `INFUSION_*` codes list more than one.
+
 ## Enriching code metadata with suMEDS
 
 External-ontology links are not written by the ETL. The package ships

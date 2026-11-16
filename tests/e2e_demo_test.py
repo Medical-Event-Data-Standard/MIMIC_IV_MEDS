@@ -49,3 +49,15 @@ def test_e2e_demo(demo_cohort: Path):
     assert not undescribed, f"codes without a description: {undescribed}"
     multi = sorted(c for c, d in described.items() if d is not None and "\n" in d)
     assert not multi, f"codes with several joined descriptions: {multi}"
+
+    # Codes whose last component is the unit carry exactly that unit (see "Units" in the README);
+    # `UNK` there stands for a null unit, which gives none.
+    units = dict(zip(codes["code"].to_pylist(), codes["unit"].to_pylist(), strict=True))
+    unit_coded = [c for c in units if c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
+    unit_coded = [c for c in unit_coded if not c.startswith("LAB//SPECIMEN_COLLECTED//")]
+    assert unit_coded, "no unit-coded codes in the demo"
+    # Split from the left: a unit may itself contain a slash (`#/hpf`).
+    unit_part = {c: c.split("//", 3 if c.startswith("LAB//RESULT//") else 2)[-1] for c in unit_coded}
+    expected = {c: None if u == "UNK" else [u] for c, u in unit_part.items()}
+    wrong = sorted(c for c in unit_coded if (units[c] or None) != expected[c])
+    assert not wrong, f"codes whose unit metadata is not their unit component: {wrong[:10]}"

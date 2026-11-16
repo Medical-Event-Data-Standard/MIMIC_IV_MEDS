@@ -289,9 +289,9 @@
     "code_modifier_columns": [
       "unit"
     ],
-    "created_at": "2026-11-12T21:14:10.428471+00:00",
+    "created_at": "2026-11-16T18:26:20.467695+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.2.1.dev13+gca0b06662.d20261112",
+    "dataset_version": "2.2:0.3.1.dev17+gabf1e1112",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.0",
     "meds_version": "0.4.1",
@@ -322,29 +322,30 @@
       "data/held_out/0.parquet": "sha256:5d193b7a92d9a0bd50515ddd55170d8cd535cfb852a69fb2c2f265024ab0cf0d",
       "data/train/0.parquet": "sha256:cca5f2fde08ec7fc1da98bbb9d205d3aea65c00a50494efb535ba8cfe05d9778",
       "data/tuning/0.parquet": "sha256:94b5676a828dd369d52230db7fcb86ac7478bc4efe527cd0a1a48d0235cd7ae5",
-      "metadata/codes.parquet": "sha256:e1a3483dbed2cbd03afeb4dace75f74e9c21a4a4c41cc7f77a1ad37887a57698",
-      "metadata/dataset.json": "sha256:46eae5305ba86a2dedb4bfa88895d3fd3ced1ec3c3e6e8935978558a7262f964",
+      "metadata/codes.parquet": "sha256:308d468b7bb3047d721293f9f51e4d4f1a227d81ffdae25dd68fb56346c874ca",
+      "metadata/dataset.json": "sha256:1d6a0ab28e8cd154acd40337ddd0c0df279d0766c885790ae5072ea4b440d7df",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
-    "code_metadata": "sha256:54ea160099469a8fa26a704c564bc61969e504a0a819041f21537215fc69c736",
-    "combined": "sha256:36c73d8a11d5e9f22d2609256410fc50107ab3503cec0abb50fbc297d2c7ef84",
+    "code_metadata": "sha256:b1035b0003f340f19d541ba5183b1507cd3e74cc7fd08e7b49abf566b989d398",
+    "combined": "sha256:f13a9d8ef51cf6d65e8d35587b62dca5d432a3b76066a28dd343a1f4056e4e34",
     "data": {
       "digest": "sha256:5fc3989c5f2c2d6b5c4c564cd90c3989810a13a2198235bd87252cad772949ef",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:a50d3ee44e8bb5f62d4afa40576f9ddc400e56c5bfa9dfa520bdd299a617e598",
+    "dataset_metadata": "sha256:0f280686faa738dec3ee1716ecb20bd8bbbc0b66e6adb42b2f0451047b862ecc",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-12T21:14:12.363026",
+  "extracted_at": "2026-11-16T18:27:39.682713",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
       "code_template": "String",
       "description": "String",
       "parent_codes": "List(String)",
-      "possibly_cpt_code": "List(String)"
+      "possibly_cpt_code": "List(String)",
+      "unit": "List(String)"
     },
     "column_dtype_conflicts": {},
     "column_presence": {
