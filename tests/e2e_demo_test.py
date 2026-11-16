@@ -56,7 +56,7 @@ def test_e2e_demo(demo_cohort: Path):
     unit_coded = [c for c in units if c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
     unit_coded = [c for c in unit_coded if not c.startswith("LAB//SPECIMEN_COLLECTED//")]
     assert unit_coded, "no unit-coded codes in the demo"
-    # Split from the left: a unit may itself contain a slash (`#/hpf`).
+    # Split from the left: a unit may itself contain a slash (`/hpf`).
     unit_part = {c: c.split("//", 3 if c.startswith("LAB//RESULT//") else 2)[-1] for c in unit_coded}
     expected = {c: None if u == "UNK" else [u] for c, u in unit_part.items()}
     wrong = sorted(c for c in unit_coded if (units[c] or None) != expected[c])
