@@ -41,6 +41,10 @@ def test_e2e_demo(demo_cohort: Path):
     dataset_json = json.loads((metadata / "dataset.json").read_text())
     assert dataset_json["dataset_name"] == SPEC
     assert dataset_json["dataset_version"].startswith(f"{DEMO_RELEASE}:")
+    # Every code has one unit, so no column modifies a code: code metadata is keyed on the code alone,
+    # and the events' `unit` is an ordinary extension column.
+    assert not dataset_json.get("code_modifier_columns")
+    assert "unit" in dataset_json["other_extension_columns"]
 
     # Code metadata, as read from disk, is valid MEDS code metadata, and every code is
     # described except lab items absent from mimic-code's lab map, which have no other
@@ -59,10 +63,16 @@ def test_e2e_demo(demo_cohort: Path):
     assert codes.schema.field("unit").type == "string"
     units = dict(zip(codes["code"].to_pylist(), codes["unit"].to_pylist(), strict=True))
     data_codes = set(pl.scan_parquet(data_files).select("code").unique().collect()["code"])
-    families = ("LAB//", "SUBJECT_FLUID_OUTPUT//", "INFUSION_START//", "INFUSION_END//")
-    unit_coded = [c for c in units if c in data_codes and c.startswith(families)]
+    infusions = ("INFUSION_START//", "INFUSION_END//")
+    unit_coded = [c for c in units if c in data_codes and c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
     unit_coded = [c for c in unit_coded if not c.startswith("LAB//SPECIMEN_COLLECTED//")]
     assert unit_coded, "no unit-coded codes in the demo"
+    # Infusion codes end in their unit only where the itemid mixes units (`…//<itemid>//<unit>`).
+    infusion_codes = [c for c in units if c in data_codes and c.startswith(infusions)]
+    split = [c for c in infusion_codes if c.count("//") == 2]
+    assert split, "no infusion itemid recorded in several units in the demo"
+    assert len(split) < len(infusion_codes), "every infusion code has its unit in the code"
+    unit_coded += split
     # Split from the left: a unit may itself contain a slash (`/hpf`).
     unit_part = {c: c.split("//", 3 if c.startswith("LAB//RESULT//") else 2)[-1] for c in unit_coded}
     expected = {c: None if u == "UNK" or not u.strip() else u for c, u in unit_part.items()}
@@ -89,8 +99,8 @@ def test_e2e_demo(demo_cohort: Path):
     missing = sorted(stem for stem in siblings if stem not in units or units[stem] is not None)
     assert not missing, f"unit-sibling stems without a row of their own (and no unit): {missing[:10]}"
 
-    # `unit` is also the declared code modifier, so the code metadata must agree with the events'
-    # own `unit`: every code whose events record a (non-blank) unit has that one unit in `codes.parquet`.
+    # Every code's events, where they record a (non-blank) unit, have one unit, the code's `unit` in
+    # `codes.parquet`: no code mixes units, whether or not the unit is in it.
     events = pl.scan_parquet(data_files).with_columns(pl.col("unit").str.strip_chars())
     events = events.filter(pl.col("unit").is_not_null() & (pl.col("unit") != ""))
     data_units = events.group_by("code").agg(pl.col("unit").unique()).collect()

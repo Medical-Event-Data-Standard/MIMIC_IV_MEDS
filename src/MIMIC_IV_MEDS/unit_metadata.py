@@ -1,14 +1,11 @@
 """The ``mimic_iv_collapse_unit_metadata`` post-stage: one unit per code in ``metadata/codes.parquet``.
 
 MEDS-Extract writes every ``_metadata`` column as ``List(String)``, the distinct values seen for a
-code. ``unit`` is also this dataset's declared code modifier (``etl.code_modifier_columns``), which is
-a String in the data, so tools that key code metadata on ``code`` plus the modifiers need a String
-there too. Every code of this ETL has at most one unit (where the unit varies by row it is the code's
-last component), so this stage turns the list into that one String. Codes that differ only in that
-last unit component then get the code without it as a parent, with a row of its own, so they can be
-found together. The spec
-runs the stage after the canonical pipeline (``etl.post_stages``); it is registered in the
-``MEDS_transforms.stages`` entry-point group.
+code. Every code of this ETL has at most one unit (where an item's unit varies by row it is the
+code's last component), so this stage turns the list into that one String. Codes that differ only in
+that last unit component then get the code without it as a parent, with a row of its own, so they
+can be found together. The spec runs the stage after the canonical pipeline (``etl.post_stages``); it
+is registered in the ``MEDS_transforms.stages`` entry-point group.
 """
 
 import logging
