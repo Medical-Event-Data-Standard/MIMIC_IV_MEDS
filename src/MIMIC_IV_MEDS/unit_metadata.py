@@ -1,4 +1,4 @@
-"""The ``collapse_unit_metadata`` post-stage: one unit per code in ``metadata/codes.parquet``.
+"""The ``mimic_iv_collapse_unit_metadata`` post-stage: one unit per code in ``metadata/codes.parquet``.
 
 MEDS-Extract writes every ``_metadata`` column as ``List(String)``, the distinct values seen for a
 code. ``unit`` is also this dataset's declared code modifier (``etl.code_modifier_columns``), which is
@@ -23,7 +23,7 @@ from MEDS_transforms.stages import Stage
 
 logger = logging.getLogger(__name__)
 
-STAGE_NAME = "collapse_unit_metadata"
+STAGE_NAME = "mimic_iv_collapse_unit_metadata"
 UNIT = "unit"
 PARENTS = "parent_codes"
 

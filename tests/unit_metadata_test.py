@@ -4,7 +4,7 @@ The ETL runs the shipped config's numeric tables over a few made-up rows (no dow
 unit comes from the code's own unit component (labs, charted items, outputs, infusions), from the
 name of an OMR measurement, from an ICU item's label where it was charted without one, and, for the
 infusion weight, from MIMIC-IV's documentation. The
-`collapse_unit_metadata` post-stage makes it a String. On the demo cohort the same column is
+`mimic_iv_collapse_unit_metadata` post-stage makes it a String. On the demo cohort the same column is
 checked by `e2e_demo_test.py`.
 """
 

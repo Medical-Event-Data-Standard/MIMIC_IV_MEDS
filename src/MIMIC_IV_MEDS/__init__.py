@@ -11,7 +11,7 @@ as::
 It also ships ``MIMIC_IV_MEDS/sumeds_rules.yaml``, registered with suMEDS's ``sumeds.rules``
 entry-point group under the same name, which the config's ``sumeds_enrich`` post-stage uses to
 enrich the code metadata at the end of that run. The only code is ``unit_metadata.py``, the
-``collapse_unit_metadata`` post-stage the config declares before it (registered in
+``mimic_iv_collapse_unit_metadata`` post-stage the config declares before it (registered in
 MEDS-Transforms's ``MEDS_transforms.stages`` entry-point group), which makes the ``unit`` code
 metadata one String per code.
 

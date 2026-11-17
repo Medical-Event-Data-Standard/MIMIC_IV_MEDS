@@ -70,7 +70,7 @@ The entire ETL is one file —
     [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps);
 - an `etl:` block with the run's few knobs, the roles of the extension columns for
     `metadata/dataset.json`, and the two stages that run after the pipeline:
-    `collapse_unit_metadata` (see [Units](#units)), the package's only Python, and the suMEDS
+    `mimic_iv_collapse_unit_metadata` (see [Units](#units)), the package's only Python, and the suMEDS
     enrichment;
 - one block per raw table describing the events extracted from it, including joins,
     derived columns, and the code-metadata programs that attach descriptions and parent
@@ -230,7 +230,7 @@ Codes of events with a numeric value carry their unit in a `unit` column, so too
 from one place. It is a String: the unit of the code's numeric values, as recorded, one per code
 (null for a code without one). MEDS does not standardise this column. MEDS-Extract writes every
 `_metadata` column as a list of the values seen for a code, so the spec's first post-stage,
-`collapse_unit_metadata` (`src/MIMIC_IV_MEDS/unit_metadata.py`), turns that list into its one unit
+`mimic_iv_collapse_unit_metadata` (`src/MIMIC_IV_MEDS/unit_metadata.py`), turns that list into its one unit
 (stripped of surrounding whitespace; a blank unit gives none), and fails the run, naming the codes,
 if a code has more than one. It runs before the suMEDS enrichment, so a retried enrichment reads the
 same file. `unit` is also the declared code modifier, and for every code, the events' `unit`, where

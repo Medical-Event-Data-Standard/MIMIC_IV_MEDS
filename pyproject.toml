@@ -20,7 +20,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 # The whole ETL is `event_configs.yaml`, run by MEDS-Extract's own `meds-extract-run`; the only
-# Python is the small `collapse_unit_metadata` post-stage it declares (`unit_metadata.py`). The
+# Python is the small `mimic_iv_collapse_unit_metadata` post-stage it declares (`unit_metadata.py`). The
 # `[download]` extra adds `meds-extract-download` (httpx + tenacity), which the runner spawns to stage the raw
 # data. MEDS-transforms, polars and hydra all arrive through it at the versions it fences;
 # duplicating those pins here would only create drift.
@@ -73,7 +73,7 @@ MIMIC-IV = "MIMIC_IV_MEDS:sumeds_rules.yaml"
 # The post-stage that makes the `unit` code metadata one String per code (and links codes that
 # differ only by unit); the config declares it in `etl.post_stages`.
 [project.entry-points."MEDS_transforms.stages"]
-collapse_unit_metadata = "MIMIC_IV_MEDS.unit_metadata:main"
+mimic_iv_collapse_unit_metadata = "MIMIC_IV_MEDS.unit_metadata:main"
 
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"

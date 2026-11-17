@@ -46,7 +46,7 @@ etl:
   # without it as a parent, with a row of its own. It runs first so that the enrichment, now or
   # retried later with `suMEDS-enrich`, always reads the same `codes.parquet`.
   post_stages:
-    - collapse_unit_metadata
+    - mimic_iv_collapse_unit_metadata
     - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:

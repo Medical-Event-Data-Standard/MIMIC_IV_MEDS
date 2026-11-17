@@ -1,5 +1,5 @@
-"""The `collapse_unit_metadata` post-stage on small synthetic `codes.parquet` files: one unit per code,
-and the code without its unit as a parent of codes that differ only by unit."""
+"""The `mimic_iv_collapse_unit_metadata` post-stage on small synthetic `codes.parquet` files: one unit per
+code, and the code without its unit as a parent of codes that differ only by unit."""
 
 from pathlib import Path
 
