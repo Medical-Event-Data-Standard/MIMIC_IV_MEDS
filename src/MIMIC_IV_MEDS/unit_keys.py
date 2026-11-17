@@ -52,13 +52,19 @@ def itemids_with_unit_in_code(inputevents: pl.LazyFrame) -> pl.DataFrame:
         ... })
         >>> itemids_with_unit_in_code(inputevents).rows()
         [(1, True, None), (3, None, True)]
+
+    Integer itemids (the release) come out as integers, as MEDS-Extract infers them when it reads the
+    table for the join; any other itemids (e.g. synthetic ``SYNTH_ITEMID_001``) stay Strings:
+
+        >>> itemids_with_unit_in_code(inputevents.with_columns(itemid="X" + pl.col("itemid"))).rows()
+        [('X1', True, None), ('X3', None, True)]
     """
     flags = []
     for flag, (time, unit) in FAMILIES.items():
         stripped = pl.col(unit).cast(pl.String).str.strip_chars()
         flags.append(
             inputevents.filter(pl.col(time).is_not_null() & pl.col("itemid").is_not_null())
-            .select(pl.col("itemid").cast(pl.Int64), stripped.alias("unit"))
+            .select(pl.col("itemid").cast(pl.String), stripped.alias("unit"))
             .filter(pl.col("unit").is_not_null() & (pl.col("unit") != ""))
             .group_by("itemid")
             .agg(pl.col("unit").n_unique().alias("n"))
@@ -66,7 +72,11 @@ def itemids_with_unit_in_code(inputevents: pl.LazyFrame) -> pl.DataFrame:
             .select("itemid", pl.lit(True).alias(flag))
         )
     start, end = flags
-    return start.join(end, on="itemid", how="full", coalesce=True).sort("itemid").collect(engine="streaming")
+    table = start.join(end, on="itemid", how="full", coalesce=True).collect(engine="streaming")
+    as_int = table["itemid"].cast(pl.Int64, strict=False)
+    if as_int.null_count() == 0:
+        table = table.with_columns(itemid=as_int)
+    return table.sort("itemid")
 
 
 def write_unit_keys(raw_input_dir: Path, output_dir: Path) -> Path:
