@@ -1,7 +1,8 @@
 """End-to-end run of the shipped ETL over the public MIMIC-IV demo release.
 
-This distribution ships no Python — it is `event_configs.yaml` plus the entry-point
-registration that names it `MIMIC-IV`. So the main thing worth testing is that
+This distribution is `event_configs.yaml` plus the entry-point registration that names it
+`MIMIC-IV` (and one small post-stage, tested in `collapse_unit_metadata_test.py`). So the main
+thing worth testing is that
 `meds-extract-run spec=MIMIC-IV` resolves that registration, downloads the demo bucket from
 PhysioNet (no credentials needed), runs the pipeline, and leaves a well-formed MEDS cohort
 behind. That build is the `demo_cohort` fixture of `conftest.py`, shared with
@@ -16,9 +17,12 @@ CI does it exactly once, on one Python version, and both checks read the result.
 import json
 from pathlib import Path
 
+import polars as pl
 import pyarrow.parquet as pq
 from conftest import SPEC
 from meds import CodeMetadataSchema
+
+from MIMIC_IV_MEDS.unit_metadata import description_unit
 
 #: The demo release the spec pins, as it appears in `dataset_version`'s `<release>:<pkg>` stamp.
 DEMO_RELEASE = "2.2"
@@ -50,14 +54,45 @@ def test_e2e_demo(demo_cohort: Path):
     multi = sorted(c for c, d in described.items() if d is not None and "\n" in d)
     assert not multi, f"codes with several joined descriptions: {multi}"
 
-    # Codes whose last component is the unit carry exactly that unit (see "Units" in the README);
-    # `UNK` there stands for a null unit, which gives none.
+    # Codes whose last component is the unit carry exactly that unit, as one String (see "Units"
+    # in the README); `UNK` there stands for a null unit, which gives none, as does a blank one.
+    assert codes.schema.field("unit").type == "string"
     units = dict(zip(codes["code"].to_pylist(), codes["unit"].to_pylist(), strict=True))
-    unit_coded = [c for c in units if c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
+    data_codes = set(pl.scan_parquet(data_files).select("code").unique().collect()["code"])
+    families = ("LAB//", "SUBJECT_FLUID_OUTPUT//", "INFUSION_START//", "INFUSION_END//")
+    unit_coded = [c for c in units if c in data_codes and c.startswith(families)]
     unit_coded = [c for c in unit_coded if not c.startswith("LAB//SPECIMEN_COLLECTED//")]
     assert unit_coded, "no unit-coded codes in the demo"
     # Split from the left: a unit may itself contain a slash (`/hpf`).
     unit_part = {c: c.split("//", 3 if c.startswith("LAB//RESULT//") else 2)[-1] for c in unit_coded}
-    expected = {c: None if u == "UNK" else [u] for c, u in unit_part.items()}
-    wrong = sorted(c for c in unit_coded if (units[c] or None) != expected[c])
+    expected = {c: None if u == "UNK" or not u.strip() else u for c, u in unit_part.items()}
+    # Except where the item's label states the unit, which then fills it.
+    from_label = {
+        c: m.group(1) for c in unit_coded if unit_part[c] == "UNK" and (m := description_unit(described[c]))
+    }
+    assert from_label, "no unit from an item label in the demo"
+    expected |= from_label
+    wrong = sorted(c for c in unit_coded if units[c] != expected[c])
     assert not wrong, f"codes whose unit metadata is not their unit component: {wrong[:10]}"
+
+    # Codes that differ only in their unit component have the code without it as a parent, which
+    # has a row of its own without a unit.
+    stems: dict[str, list[str]] = {}
+    for c in unit_coded:
+        if expected[c] is not None and c not in from_label:
+            stems.setdefault(c.removesuffix(f"//{expected[c]}"), []).append(c)
+    siblings = {stem: group for stem, group in stems.items() if len(group) > 1}
+    assert siblings, "no unit siblings in the demo"
+    parents = dict(zip(codes["code"].to_pylist(), codes["parent_codes"].to_pylist(), strict=True))
+    unlinked = sorted(c for stem, group in siblings.items() for c in group if stem not in (parents[c] or []))
+    assert not unlinked, f"unit siblings without their stem as a parent: {unlinked[:10]}"
+    missing = sorted(stem for stem in siblings if stem not in units or units[stem] is not None)
+    assert not missing, f"unit-sibling stems without a row of their own (and no unit): {missing[:10]}"
+
+    # `unit` is also the declared code modifier, so the code metadata must agree with the events'
+    # own `unit`: every code whose events record a (non-blank) unit has that one unit in `codes.parquet`.
+    events = pl.scan_parquet(data_files).with_columns(pl.col("unit").str.strip_chars())
+    events = events.filter(pl.col("unit").is_not_null() & (pl.col("unit") != ""))
+    data_units = events.group_by("code").agg(pl.col("unit").unique()).collect()
+    disagree = sorted(c for c, u in data_units.iter_rows() if u != [units.get(c)])
+    assert not disagree, f"codes whose events' unit is not their unit metadata: {disagree[:10]}"

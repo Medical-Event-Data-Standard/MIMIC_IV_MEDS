@@ -38,7 +38,15 @@ etl:
   # records it in metadata/dataset.json. A failed enrichment (e.g. without internet access)
   # keeps codes.parquet as the ETL wrote it and does not fail the run; `suMEDS-enrich
   # OUTPUT_DIR` finishes it later. `skip_stages=[sumeds_enrich]` leaves it out of a run.
+  #
+  # Before that, this package's own stage (unit_metadata.py) makes the `unit` code metadata, which
+  # MEDS-Extract writes as a list per code, one String per code, as the `unit` modifier is in the
+  # data; it fails if a code has more than one unit. A charted item without a unit gets the one
+  # its label states, and codes that differ only in their last, unit component get the code
+  # without it as a parent, with a row of its own. It runs first so that the enrichment, now or
+  # retried later with `suMEDS-enrich`, always reads the same `codes.parquet`.
   post_stages:
+    - collapse_unit_metadata
     - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:
@@ -635,7 +643,9 @@ icu/inputevents:
       # Constant rendering a literal code; see `ed_registration_code` in hosp/admissions.
       subject_weight_code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'"
   input_start:
-    code: 'f"INFUSION_START//{$itemid}"'
+    # The rate unit is the last component, so each code has one unit; `UNK` marks exactly the
+    # starts without a rate (`rateuom` is null if and only if `rate` is).
+    code: f"INFUSION_START//{$itemid}//{$rateuom ?? 'UNK'}"
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
@@ -657,12 +667,12 @@ icu/inputevents:
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
-      # The unit is not in the code here (see #15), so an itemid charted in several units gets
-      # all of them, and MEDS-Extract warns. The per-event unit stays in the `unit` column.
+      # The code's last component (none for `…//UNK`).
       _self:
         unit: $rateuom
   input_end:
-    code: 'f"INFUSION_END//{$itemid}"'
+    # The amount unit is the last component, as for `input_start`.
+    code: f"INFUSION_END//{$itemid}//{$amountuom ?? 'UNK'}"
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id

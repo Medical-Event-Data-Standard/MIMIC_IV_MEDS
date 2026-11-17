@@ -1,9 +1,11 @@
-"""Every code with a numeric value carries its unit in `metadata/codes.parquet`.
+"""Every code with a numeric value carries its one unit in `metadata/codes.parquet`.
 
 The ETL runs the shipped config's numeric tables over a few made-up rows (no download): the
-unit comes from the code's own unit component (labs, charted items, outputs), from the name of
-an OMR measurement, from the per-event unit column of infusions, and, for the infusion weight,
-from MIMIC-IV's documentation. On the demo cohort the same column is checked by `e2e_demo_test.py`.
+unit comes from the code's own unit component (labs, charted items, outputs, infusions), from the
+name of an OMR measurement, from an ICU item's label where it was charted without one, and, for the
+infusion weight, from MIMIC-IV's documentation. The
+`collapse_unit_metadata` post-stage makes it a String. On the demo cohort the same column is
+checked by `e2e_demo_test.py`.
 """
 
 from importlib.resources import files
@@ -36,10 +38,12 @@ RAW = {
         "subject_id,hadm_id,stay_id,charttime,itemid,value,valuenum,valueuom",
         "1,10,100,2180-01-01 10:00:00,220045,80,80,bpm",
         "2,20,200,2180-01-02 10:00:00,220045,90,90,bpm",
+        "3,30,300,2180-01-03 10:00:00,226531,150,150,",
     ],
     "icu/d_items.csv": [
         "itemid,label,unitname",
         "220045,Heart Rate,bpm",
+        "226531,Admission Weight (lbs.),None",
         "221906,Norepinephrine,mg",
         "226559,Foley,mL",
     ],
@@ -51,6 +55,8 @@ RAW = {
         "Continuous Med,70.0,FinishedRunning",
         "2,20,200,2180-01-02 10:00:00,2180-01-02 11:00:00,221906,500,mcg,0.2,mcg/kg/min,2,2,"
         "Continuous Med,80.0,FinishedRunning",
+        # A push has an amount but no rate.
+        "3,30,300,2180-01-03 10:00:00,2180-01-03 10:01:00,221906,5,mg,,,3,3,Drug Push,90.0,FinishedRunning",
     ],
     "inputevents_to_rxnorm.csv": [LAB_MAP, "221906,Norepinephrine,norepinephrine,RxNorm,7512"],
     "icu/outputevents.csv": [
@@ -60,21 +66,24 @@ RAW = {
     "outputevents_to_loinc.csv": [LAB_MAP, "226559,Foley,Urine output,LOINC,9187-6"],
 }
 
-#: code -> the units its `unit` metadata must hold.
+#: code -> its `unit` metadata.
 EXPECTED = {
-    "LAB//RESULT//50912//mg/dL": ["mg/dL"],
-    "LAB//220045//bpm": ["bpm"],
-    "SUBJECT_FLUID_OUTPUT//226559//mL": ["mL"],
-    "Weight (Lbs)": ["Lbs"],
-    "BMI (kg/m2)": ["kg/m2"],
-    "INFUSION_START//221906": ["mcg/kg/min"],
-    # The unit is not part of this code, so both charted units are kept.
-    "INFUSION_END//221906": ["mcg", "mg"],
+    "LAB//RESULT//50912//mg/dL": "mg/dL",
+    "LAB//220045//bpm": "bpm",
+    # Charted without a unit; the item's label states it.
+    "LAB//226531//UNK": "lbs.",
+    "SUBJECT_FLUID_OUTPUT//226559//mL": "mL",
+    "Weight (Lbs)": "Lbs",
+    "BMI (kg/m2)": "kg/m2",
+    "INFUSION_START//221906//mcg/kg/min": "mcg/kg/min",
+    # One itemid recorded in two units gives two codes, one per unit.
+    "INFUSION_END//221906//mg": "mg",
+    "INFUSION_END//221906//mcg": "mcg",
     # From the MIMIC-IV documentation of inputevents.patientweight.
-    "SUBJECT_WEIGHT_AT_INFUSION//KG": ["kg"],
+    "SUBJECT_WEIGHT_AT_INFUSION//KG": "kg",
 }
 #: Codes without a recorded unit, which get none.
-NO_UNIT = ["LAB//RESULT//50912//UNK", "Blood Pressure//SYSTOLIC", "eGFR"]
+NO_UNIT = ["LAB//RESULT//50912//UNK", "Blood Pressure//SYSTOLIC", "eGFR", "INFUSION_START//221906//UNK"]
 
 
 @pytest.fixture(scope="module")
@@ -104,16 +113,33 @@ def codes(tmp_path_factory) -> pl.DataFrame:
     return pl.read_parquet(out / "metadata" / "codes.parquet")
 
 
-def _units(codes: pl.DataFrame) -> dict[str, list[str] | None]:
-    # MEDS-Extract writes `_metadata` columns as lists, aggregated per code.
+def _units(codes: pl.DataFrame) -> dict[str, str | None]:
     return dict(zip(codes["code"].to_list(), codes["unit"].to_list(), strict=True))
+
+
+def test_unit_is_a_string(codes: pl.DataFrame):
+    """The post-stage turned MEDS-Extract's list into one String per code, like the `unit` modifier."""
+    assert codes.schema["unit"] == pl.String
 
 
 @pytest.mark.parametrize("code", EXPECTED)
 def test_numeric_codes_carry_their_unit(codes: pl.DataFrame, code: str):
-    assert sorted(_units(codes)[code] or []) == EXPECTED[code]
+    assert _units(codes)[code] == EXPECTED[code]
+
+
+def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFrame):
+    parents = dict(zip(codes["code"].to_list(), codes["parent_codes"].to_list(), strict=True))
+    for code in ["INFUSION_END//221906//mg", "INFUSION_END//221906//mcg"]:
+        assert parents[code] == ["RxNorm/7512", "INFUSION_END//221906"]
+    # No sibling with a unit (the `UNK` start has none), so no extra parent.
+    assert parents["INFUSION_START//221906//mcg/kg/min"] == ["RxNorm/7512"]
+    # The stem has a row of its own, with what both siblings share and no unit.
+    stem = codes.filter(pl.col("code") == "INFUSION_END//221906").to_dicts()
+    assert [{k: row[k] for k in ("description", "parent_codes", "unit")} for row in stem] == [
+        {"description": "Norepinephrine", "parent_codes": ["RxNorm/7512"], "unit": None}
+    ]
 
 
 @pytest.mark.parametrize("code", NO_UNIT)
 def test_codes_without_a_recorded_unit_get_none(codes: pl.DataFrame, code: str):
-    assert not _units(codes)[code]
+    assert _units(codes)[code] is None
