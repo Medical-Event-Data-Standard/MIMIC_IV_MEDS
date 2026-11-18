@@ -48,13 +48,15 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --locked
-          # MESSY_synth 0.1.0 is the first release that reads MEDS-Extract 0.8 configs.
+          # MESSY_synth 0.1.0 is the first release that reads MEDS-Extract 0.8 configs. It pins
+          # MEDS-Extract 0.8.1, so installing it downgrades the project's; the extraction below
+          # syncs back to the locked version (`--locked`), which it needs (0.9 writes `unit`).
           uv pip install "MESSY_synth==0.1.0"
 
       - name: Generate and extract synthetic data
         run: |
           uv run --no-sync MESSY-synth ./src/MIMIC_IV_MEDS/event_configs.yaml -o raw_synthetic/ --explain
-          uv run --no-sync meds-extract-run spec=MIMIC-IV output_dir=./MIMIC_IV_meds_synth \
+          uv run --locked meds-extract-run spec=MIMIC-IV output_dir=./MIMIC_IV_meds_synth \
             input_dir=raw_synthetic do_download=false
           for f in dataset.json codes.parquet subject_splits.parquet; do
             test -f "MIMIC_IV_meds_synth/metadata/$f"
