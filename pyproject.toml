@@ -42,7 +42,7 @@ classifiers = [
 # minor for the same reason (its rules format and CLI are still 0.x).
 dependencies = [
     "meds-extract[download]>=0.9.0,<0.10",
-    "sumeds>=0.6.3,<0.7",
+    "sumeds>=0.6.4,<0.7",
 ]
 
 [dependency-groups]

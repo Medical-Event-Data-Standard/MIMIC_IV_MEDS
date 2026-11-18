@@ -726,8 +726,9 @@ icu/inputevents:
         description: "'Patient weight in kilograms, recorded with an ICU infusion (icu/inputevents.patientweight)'"
         # Not in the data: the MIMIC-IV documentation of inputevents.patientweight states "The
         # patient weight in kilograms" (https://mimic.mit.edu/docs/iv/modules/icu/inputevents/;
-        # MIT-LCP/mimic-website at 8182227, MIT), written `kg` as in icu/d_items.unitname.
-        unit: "'kg'"
+        # MIT-LCP/mimic-website at 8182227, MIT), spelled `kilogram` as in the other MEDS ETLs
+        # (icu/d_items.unitname writes `kg`).
+        unit: "'kilogram'"
 
 icu/outputevents:
   output:

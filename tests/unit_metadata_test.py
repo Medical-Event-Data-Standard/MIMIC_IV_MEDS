@@ -97,7 +97,7 @@ EXPECTED = {
     "INFUSION_START//225158//mL/min": "mL/min",
     "INFUSION_END//225158": "mL",
     # From the MIMIC-IV documentation of inputevents.patientweight.
-    "SUBJECT_WEIGHT_AT_INFUSION//KG": "kg",
+    "SUBJECT_WEIGHT_AT_INFUSION//KG": "kilogram",
 }
 #: Codes without a recorded unit, which get none.
 #: The start without a rate of an itemid whose starts mix units is `…//UNK`, which has none.
