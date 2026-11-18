@@ -13,9 +13,8 @@ entry-point group under the same name, which the config's ``sumeds_enrich`` post
 enrich the code metadata at the end of that run. The only code is two small stages the config
 declares, registered in MEDS-Transforms's ``MEDS_transforms.stages`` entry-point group:
 ``unit_keys.py``, the ``mimic_iv_unit_keys`` pre-stage that finds the infusion itemids recorded in
-more than one unit (whose codes end in it), and ``unit_metadata.py``, the
-``mimic_iv_collapse_unit_metadata`` post-stage, which makes the ``unit`` code metadata one String per
-code.
+more than one unit (whose codes end in it), and ``unit_metadata.py``, the ``mimic_iv_unit_metadata``
+post-stage, which fills the units item labels state and links codes that differ only by unit.
 
 This package exists so the YAML is addressable as package data —
 ``importlib.resources.files("MIMIC_IV_MEDS")`` — from an installed wheel. Nothing here is

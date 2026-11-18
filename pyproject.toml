@@ -25,10 +25,12 @@ classifiers = [
 # data. MEDS-transforms, polars and hydra all arrive through it at the versions it fences;
 # duplicating those pins here would only create drift.
 #
-# The floor is 0.8.1: this config names its joins `_table.joins`, which 0.8 renamed from
-# `_table.join` (and rejects the old name), and 0.8.1 runs the `etl.post_stages` it declares
-# and writes the dataset.json fields of its `etl:` block. It also relies on `_self` metadata
-# blocks and composite join keys from 0.7. MEDS-Extract 0.x minors are breaking (MESSY
+# The floor is 0.9.0: it writes the `unit` code metadata as one String per code (stripped, blanks
+# dropped, a code with several distinct units an error; MEDS_extract#336), which the
+# `mimic_iv_unit_metadata` post-stage reads. The config also relies on 0.8.1, which names joins
+# `_table.joins` (0.8 renamed them from `_table.join` and rejects the old name), runs the
+# `etl.post_stages` it declares and writes the dataset.json fields of its `etl:` block, and on
+# `_self` metadata blocks and composite join keys from 0.7. MEDS-Extract 0.x minors are breaking (MESSY
 # syntax, runner CLI), so the ceiling is raised deliberately when migrating.
 #
 # suMEDS 0.6.2 registers the `sumeds_enrich` stage that the config declares as a post-stage,
@@ -39,7 +41,7 @@ classifiers = [
 # modifier (0.6.2 fails with `unable to find column "unit"`). It is capped below the next
 # minor for the same reason (its rules format and CLI are still 0.x).
 dependencies = [
-    "meds-extract[download]>=0.8.1,<0.9",
+    "meds-extract[download]>=0.9.0,<0.10",
     "sumeds>=0.6.3,<0.7",
 ]
 
@@ -71,10 +73,10 @@ MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
 MIMIC-IV = "MIMIC_IV_MEDS:sumeds_rules.yaml"
 
 # The unit stages the config declares: the pre-stage that finds the infusion itemids needing their
-# unit in the code (`etl.pre_stages`), and the post-stage that makes the `unit` code metadata one
-# String per code and links codes that differ only by unit (`etl.post_stages`).
+# unit in the code (`etl.pre_stages`), and the post-stage that fills units the item labels state and
+# links codes that differ only by unit (`etl.post_stages`).
 [project.entry-points."MEDS_transforms.stages"]
-mimic_iv_collapse_unit_metadata = "MIMIC_IV_MEDS.unit_metadata:main"
+mimic_iv_unit_metadata = "MIMIC_IV_MEDS.unit_metadata:main"
 mimic_iv_unit_keys = "MIMIC_IV_MEDS.unit_keys:main"
 
 [project.urls]

@@ -1,45 +1,18 @@
-"""The `mimic_iv_collapse_unit_metadata` post-stage on small synthetic `codes.parquet` files: one unit per
-code, and the code without its unit as a parent of codes that differ only by unit."""
+"""The `mimic_iv_unit_metadata` post-stage on small synthetic `codes.parquet` files: the unit an item's label
+states, and the code without its unit as a parent of codes that differ only by unit."""
 
 from pathlib import Path
 
 import polars as pl
-import pytest
 
-from MIMIC_IV_MEDS.unit_metadata import collapse_unit_metadata
+from MIMIC_IV_MEDS.unit_metadata import complete_unit_metadata
 
 
 def _run(tmp_path: Path, codes: pl.DataFrame) -> pl.DataFrame:
     fp = tmp_path / "codes.parquet"
     codes.write_parquet(fp)
-    collapse_unit_metadata(fp)
+    complete_unit_metadata(fp)
     return pl.read_parquet(fp)
-
-
-def test_lists_become_one_string(tmp_path: Path):
-    codes = pl.DataFrame(
-        {
-            "code": ["one", "duplicates", "blanks", "nulls", "empty", "missing"],
-            "description": ["a", "b", "c", "d", "e", "f"],
-            "unit": [["mg"], ["mg/dL", "mg/dL"], [" ", "", "kg "], [None, "bpm"], [], None],
-        },
-        schema_overrides={"unit": pl.List(pl.String)},
-    )
-    out = _run(tmp_path, codes)
-    assert out.schema["unit"] == pl.String
-    assert out["unit"].to_list() == ["mg", "mg/dL", "kg", "bpm", None, None]
-    # Units are kept as recorded otherwise, and the other columns are untouched.
-    assert out.drop("unit").equals(codes.drop("unit"))
-
-
-def test_several_units_are_an_error(tmp_path: Path):
-    codes = pl.DataFrame({"code": ["A", "B", "C"], "unit": [["mg", "mcg"], ["mg"], ["mL/hr", "mL/min"]]})
-    fp = tmp_path / "codes.parquet"
-    codes.write_parquet(fp)
-    with pytest.raises(ValueError, match=r"2 code\(s\) .* more than one unit, e.g. \['A', 'C'\]"):
-        collapse_unit_metadata(fp)
-    # The file is left as it was.
-    assert pl.read_parquet(fp).equals(codes)
 
 
 def test_string_unit_passes_through(tmp_path: Path):
@@ -69,7 +42,7 @@ def test_unit_siblings_get_their_stem_as_parent(tmp_path: Path):
                 "Weight (Lbs)",  # the unit is not the last component
             ],
             "parent_codes": [["LOINC/1"], None, None, ["LOINC/2"], [], ["LAB//3"], None],
-            "unit": [["mg/dL"], ["mmol/L"], [], ["mg"], ["g"], ["mg"], ["Lbs"]],
+            "unit": ["mg/dL", "mmol/L", None, "mg", "g", "mg", "Lbs"],
         }
     )
     out = _run(tmp_path, codes)
@@ -99,7 +72,7 @@ def test_stem_row_shares_what_all_siblings_share(tmp_path: Path):
             "description": ["Sodium", "Sodium", "Potassium", "Potassium, serum"],
             "parent_codes": [["LOINC/1", "SNOMED/9"], ["LOINC/1"], ["LOINC/2"], ["LOINC/3"]],
             "code_template": ["t", "t", "t", "t"],
-            "unit": [["g"], ["mg"], ["g"], ["mg"]],
+            "unit": ["g", "mg", "g", "mg"],
         }
     )
     out = _by_code(_run(tmp_path, codes))
@@ -120,7 +93,7 @@ def test_existing_stem_row_is_untouched_and_a_second_run_adds_nothing(tmp_path: 
         {
             "code": ["B//1", "B//1//g", "B//1//mg", "C//1//g", "C//1//mg"],
             "description": ["kept", "x", "x", "y", "y"],
-            "unit": [["kg"], ["g"], ["mg"], ["g"], ["mg"]],
+            "unit": ["kg", "g", "mg", "g", "mg"],
         }
     )
     once = _run(tmp_path, codes)
@@ -158,7 +131,7 @@ def test_unit_stated_in_the_description_fills_a_missing_unit(tmp_path: Path):
                 "ADA-A (500ml)",  # a bag size, not a unit
                 "Volume (mL)",  # has its unit component: not filled
             ],
-            "unit": [[], ["kg"], [], [], []],
+            "unit": [None, "kg", None, None, None],
         }
     )
     out = _run(tmp_path, codes)
@@ -171,7 +144,7 @@ def test_stem_description_leaves_out_the_unit_its_siblings_differ_by(tmp_path: P
         {
             "code": ["A//1//mL/hour", "A//1//mL/hr", "A//2//mL", "A//2//mm"],
             "description": ["Rate (mL/hour)", "Rate (mL/hr)", "Volume (mL)", "Size (mm)"],
-            "unit": [["mL/hour"], ["mL/hr"], ["mL"], ["mm"]],
+            "unit": ["mL/hour", "mL/hr", "mL", "mm"],
         }
     )
     out = _by_code(_run(tmp_path, codes))

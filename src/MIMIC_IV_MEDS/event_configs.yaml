@@ -54,7 +54,7 @@ etl:
   pre_stages:
     - mimic_iv_unit_keys
   post_stages:
-    - mimic_iv_collapse_unit_metadata
+    - mimic_iv_unit_metadata
     - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:

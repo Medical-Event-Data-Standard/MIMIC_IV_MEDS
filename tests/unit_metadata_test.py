@@ -4,7 +4,7 @@ The ETL runs the shipped config's numeric tables over a few made-up rows (no dow
 unit comes from the code's own unit component (labs, charted items, outputs), from the infusion
 rows (in the code only for an itemid that mixes units), from the name of an OMR measurement, from
 an ICU item's label where it was charted without one, and, for the infusion weight, from
-MIMIC-IV's documentation. The `mimic_iv_collapse_unit_metadata` post-stage makes it a String. On the
+MIMIC-IV's documentation. MEDS-Extract writes it as one String per code. On the
 demo cohort the same column is checked by `e2e_demo_test.py`.
 """
 
@@ -136,7 +136,7 @@ def _units(codes: pl.DataFrame) -> dict[str, str | None]:
 
 
 def test_unit_is_a_string(codes: pl.DataFrame):
-    """The post-stage turned MEDS-Extract's list into one String per code."""
+    """MEDS-Extract (0.9 and later) writes one String per code."""
     assert codes.schema["unit"] == pl.String
 
 

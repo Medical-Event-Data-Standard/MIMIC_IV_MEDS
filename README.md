@@ -70,7 +70,7 @@ The entire ETL is one file —
     [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps);
 - an `etl:` block with the run's few knobs, the roles of the extension columns for
     `metadata/dataset.json`, the stage that runs before the pipeline, `mimic_iv_unit_keys`, and the
-    two that run after it, `mimic_iv_collapse_unit_metadata` and the suMEDS enrichment (the two
+    two that run after it, `mimic_iv_unit_metadata` and the suMEDS enrichment (the two
     unit stages, the package's only Python, are described under [Units](#units));
 - one block per raw table describing the events extracted from it, including joins,
     derived columns, and the code-metadata programs that attach descriptions and parent
@@ -228,12 +228,13 @@ is left uncovered, and why:
 
 Codes of events with a numeric value carry their unit in a `unit` column, so tools can read it
 from one place. It is a String: the unit of the code's numeric values, as recorded, one per code
-(null for a code without one). MEDS does not standardise this column. MEDS-Extract writes every
-`_metadata` column as a list of the values seen for a code, so the spec's first post-stage,
-`mimic_iv_collapse_unit_metadata` (`src/MIMIC_IV_MEDS/unit_metadata.py`), turns that list into its one unit
-(stripped of surrounding whitespace; a blank unit gives none), and fails the run, naming the codes,
-if a code has more than one. It runs before the suMEDS enrichment, so a retried enrichment reads the
-same file. For every code, the events' `unit`, where recorded and not blank, is the code's `unit`.
+(null for a code without one). MEDS does not standardise this column. MEDS-Extract (0.9 and later)
+writes it so: the code's one unit, stripped of surrounding whitespace (a blank unit gives none), and
+it fails the run, naming the codes, if a code has more than one. The spec's first post-stage,
+`mimic_iv_unit_metadata` (`src/MIMIC_IV_MEDS/unit_metadata.py`), then fills units from item labels
+and links unit siblings (both below). It runs before the suMEDS enrichment, so a retried enrichment
+reads the same file. For every code, the events' `unit`, where recorded and not blank, is the
+code's `unit`.
 
 There are no code modifier columns (`code_modifier_columns` in `metadata/dataset.json`): every code
 has one unit, so the events' `unit` column, which only the infusion events write, distinguishes
@@ -277,7 +278,7 @@ last component, decided separately for starts and ends: `INFUSION_START//<itemid
 other infusion code is unchanged, because renaming codes that already have one unit would break
 references to them for nothing. Which itemids mix units depends on the data, so no itemid is named
 in the config: the pre-stage `mimic_iv_unit_keys` (`src/MIMIC_IV_MEDS/unit_keys.py`) reads
-`icu/inputevents`, compares the units as the post-stage does (stripped, blanks and nulls left out),
+`icu/inputevents`, compares the units as MEDS-Extract does (stripped, blanks and nulls left out),
 and stages the side table `inputevents_unit_in_code` that the `icu/inputevents` block joins on the
 itemid.
 

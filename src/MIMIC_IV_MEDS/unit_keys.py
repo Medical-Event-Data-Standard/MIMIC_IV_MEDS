@@ -40,7 +40,7 @@ def itemids_with_unit_in_code(inputevents: pl.LazyFrame) -> pl.DataFrame:
     """The itemids whose starts or ends are recorded in more than one unit.
 
     Only rows that become events count (a time and an itemid). Units are compared stripped, with
-    blanks and nulls left out, as the ``mimic_iv_collapse_unit_metadata`` post-stage collapses them.
+    blanks and nulls left out, as MEDS-Extract compares them when it writes a code's one unit.
 
     Examples:
         >>> inputevents = pl.LazyFrame({

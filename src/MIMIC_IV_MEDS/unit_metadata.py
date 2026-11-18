@@ -1,11 +1,12 @@
-"""The ``mimic_iv_collapse_unit_metadata`` post-stage: one unit per code in ``metadata/codes.parquet``.
+"""The ``mimic_iv_unit_metadata`` post-stage: units stated in item labels, and unit siblings linked.
 
-MEDS-Extract writes every ``_metadata`` column as ``List(String)``, the distinct values seen for a
-code. Every code of this ETL has at most one unit (where an item's unit varies by row it is the
-code's last component), so this stage turns the list into that one String. Codes that differ only in
-that last unit component then get the code without it as a parent, with a row of its own, so they
-can be found together. The spec runs the stage after the canonical pipeline (``etl.post_stages``); it
-is registered in the ``MEDS_transforms.stages`` entry-point group.
+MEDS-Extract (0.9 and later) writes ``unit`` as one String per code: every code of this ETL has at
+most one unit (where an item's unit varies by row it is the code's last component). This stage no
+longer collapses anything. It gives an ICU item charted without a unit the unit its label states,
+and links codes that differ only in their last unit component: they get the code without it as a
+parent, with a row of its own, so they can be found together. The spec runs the stage after the
+canonical pipeline and before the suMEDS enrichment (``etl.post_stages``); it is registered in the
+``MEDS_transforms.stages`` entry-point group.
 """
 
 import logging
@@ -20,7 +21,7 @@ from MEDS_transforms.stages import Stage
 
 logger = logging.getLogger(__name__)
 
-STAGE_NAME = "mimic_iv_collapse_unit_metadata"
+STAGE_NAME = "mimic_iv_unit_metadata"
 UNIT = "unit"
 PARENTS = "parent_codes"
 
@@ -38,15 +39,13 @@ DESCRIPTION_UNITS = frozenset(
 NO_UNIT_COMPONENT = "//UNK"
 
 
-def collapse_unit_metadata(codes_fp: Path, output_fp: Path | None = None) -> None:
-    """Make ``unit`` one String per code in a ``codes.parquet``, and link codes that differ only by unit.
+def complete_unit_metadata(codes_fp: Path, output_fp: Path | None = None) -> None:
+    """Fill units stated in descriptions in a ``codes.parquet``, and link codes that differ only by unit.
 
-    Each list of units is stripped of surrounding whitespace, null and empty entries are dropped, and
-    the distinct values are kept: none gives a null unit, one gives that unit, as recorded. A code
-    with more than one is an error, since picking one would silently mislabel some of its values. A
-    ``unit`` that is already a String is kept as it is. A code whose unit component is missing
-    (``…//UNK``) and that has no unit then gets the unit its description states, if any (see
-    :data:`DESCRIPTION_UNIT`): MIMIC-IV's own item label is the last source, after the data.
+    ``unit`` is the String column MEDS-Extract writes, one unit per code, and is kept as it is. A
+    code whose unit component is missing (``…//UNK``) and that has no unit gets the unit its
+    description states, if any (see :data:`DESCRIPTION_UNIT`): MIMIC-IV's own item label is the last
+    source, after the data.
 
     A code is unit-suffixed when it ends with ``//`` and its unit; its stem is the code without that
     suffix. Where two or more unit-suffixed codes share a stem (the same item recorded in different
@@ -62,19 +61,14 @@ def collapse_unit_metadata(codes_fp: Path, output_fp: Path | None = None) -> Non
         codes_fp: The ``codes.parquet`` to read.
         output_fp: Where to write the result; defaults to ``codes_fp`` (in place).
 
-    Raises:
-        ValueError: If any code has more than one unit. The message gives the number of such codes
-            and up to five of them.
-        TypeError: If ``unit`` is neither a String nor a list of Strings.
-
     Examples:
         >>> import tempfile
         >>> with tempfile.TemporaryDirectory() as d:
         ...     fp = Path(d) / "codes.parquet"
         ...     code = ["X//1//mcg", "X//1//mg", "X//2//mg", "Y"]
-        ...     unit = [["mcg"], ["mg", " mg"], ["mg"], []]
+        ...     unit = ["mcg", "mg", "mg", None]
         ...     pl.DataFrame({"code": code, "unit": unit}).write_parquet(fp)
-        ...     collapse_unit_metadata(fp)
+        ...     complete_unit_metadata(fp)
         ...     for row in pl.read_parquet(fp).rows():
         ...         print(row)
         ('X//1', None, None)
@@ -90,32 +84,8 @@ def collapse_unit_metadata(codes_fp: Path, output_fp: Path | None = None) -> Non
             pq.write_table(table, output_fp)
         return
     index = table.column_names.index(UNIT)
-    table = table.set_column(index, pa.field(UNIT, pa.string()), _one_unit_per_code(table, codes_fp))
     table = table.set_column(index, pa.field(UNIT, pa.string()), _unit_from_description(table))
     pq.write_table(_link_unit_siblings(table), output_fp)
-
-
-def _one_unit_per_code(table: pa.Table, codes_fp: Path) -> pa.Array | pa.ChunkedArray:
-    """The ``unit`` column as one String per code (see :func:`collapse_unit_metadata`)."""
-    dtype = table.schema.field(UNIT).type
-    if pa.types.is_string(dtype) or pa.types.is_large_string(dtype) or pa.types.is_null(dtype):
-        return table[UNIT].cast(pa.string())
-    if not (pa.types.is_list(dtype) or pa.types.is_large_list(dtype)):
-        raise TypeError(f"`{UNIT}` in {codes_fp} is {dtype}, not a String or a list of Strings.")
-    lists = pl.from_arrow(table.select(["code", UNIT])).with_columns(
-        pl.col(UNIT)
-        .list.eval(pl.element().cast(pl.String).str.strip_chars())
-        .list.eval(pl.element().filter(pl.element().is_not_null() & (pl.element() != "")))
-        .list.unique(maintain_order=True)
-    )
-    several = lists.filter(pl.col(UNIT).list.len() > 1)["code"]
-    if len(several):
-        raise ValueError(
-            f"{len(several)} code(s) in {codes_fp} have more than one unit, e.g. "
-            f"{several.head(5).to_list()}. Each code must have one unit: put the unit into the code "
-            "(as its last component) for that code family."
-        )
-    return lists[UNIT].list.first().to_arrow().cast(pa.string())
 
 
 def description_unit(description: str | None) -> re.Match | None:
@@ -157,7 +127,7 @@ def _unit_from_description(table: pa.Table) -> pa.Array:
 
 
 def _link_unit_siblings(table: pa.Table) -> pa.Table:
-    """Give unit siblings their stem as a parent, and the stem a row (see :func:`collapse_unit_metadata`)."""
+    """Give unit siblings their stem as a parent, and the stem a row (see :func:`complete_unit_metadata`)."""
     suffix = "//" + pl.col(UNIT)
     stems = (
         pl.from_arrow(table.select(["code", UNIT]))
@@ -219,11 +189,11 @@ def _link_unit_siblings(table: pa.Table) -> pa.Table:
 
 
 def _main(cfg: Any) -> None:
-    """Collapse ``unit`` in the finished cohort's ``codes.parquet``, in place (see the module)."""
+    """Finish ``unit`` in the finished cohort's ``codes.parquet`` (see the module)."""
     if cfg.worker != 0:
         return
     name = "codes.parquet"
-    collapse_unit_metadata(
+    complete_unit_metadata(
         Path(cfg.stage_cfg.metadata_input_dir) / name, Path(cfg.stage_cfg.reducer_output_dir) / name
     )
 
