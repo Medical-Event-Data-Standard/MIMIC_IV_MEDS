@@ -312,11 +312,11 @@
     }
   },
   "dataset": {
-    "created_at": "2026-11-17T04:10:50.821588+00:00",
+    "created_at": "2026-11-19T23:25:51.045788+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.3.1.dev21+gc4e307c5e.d20261117",
+    "dataset_version": "2.2:0.3.1.dev26+gb4439973b.d20261119",
     "etl_name": "MEDS_transforms",
-    "etl_version": "0.7.0",
+    "etl_version": "0.7.3",
     "meds_version": "0.4.1",
     "other_extension_columns": [
       "source_block",
@@ -327,7 +327,6 @@
       "route",
       "frequency",
       "doses_per_24_hrs",
-      "unit",
       "ordercategorydescription",
       "statusdescription"
     ],
@@ -343,25 +342,25 @@
   },
   "dataset_digest": {
     "by_file": {
-      "data/held_out/0.parquet": "sha256:aebe6e4c929e554e44f13af3378553c06a58d1cd3740460dc8c474be449ce858",
-      "data/train/0.parquet": "sha256:506d656c66ad5e954791eb8838d9b353191bfe73fac8c0352980889c2fe4c246",
-      "data/tuning/0.parquet": "sha256:e316215145b1e7d00329ca614358dfb2b08b8ca38fa84f866e85eb7253072c2b",
-      "metadata/codes.parquet": "sha256:b154edb5be6d4bcde0a9f4cabad13cd6fa75fe36519f3d3089aeb40e4ce44170",
-      "metadata/dataset.json": "sha256:c40e03ddb8378cce7ff624ad4c2942c3ade046515294123b5f19f5486b17aeed",
+      "data/held_out/0.parquet": "sha256:334b516f1efe5d340169f74fe2a70139efcfa12ae689381bf0e8e497201f513b",
+      "data/train/0.parquet": "sha256:e54944f8cfba132cdc1ecac5a9830f056b40fae6a44e0c7f89bd39fb5c1fcfa9",
+      "data/tuning/0.parquet": "sha256:095b23377abcdb137c1d9fafcee0d1dbb7bf023a19e80ec4c2123d8949e56c6e",
+      "metadata/codes.parquet": "sha256:a50ae0898469504347208ed72d1922fb31cb75adf386885a5439f338fb304346",
+      "metadata/dataset.json": "sha256:965dfd007bce3e537ada917be09b4a87f8da71f50ac35527e65283f9f8fd9f61",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
-    "code_metadata": "sha256:3eccccb91b9f00236b7e4617a5f25b12243d630fd022ad1fa77c3446d31ab613",
-    "combined": "sha256:d3f7711b26d063911b2c138f2da3efd05dca1b91d4f5cf92a4f4154f31d99960",
+    "code_metadata": "sha256:bc9c8bf7f7242d0cbf3c0aa7ff8054d931d07c5b1c2a0515d96e9a2e7549629e",
+    "combined": "sha256:6ca273bc928c72c1186cf19115b0c529816e22e123c2e997468dc31eb2af5911",
     "data": {
-      "digest": "sha256:1d0ce27eeaeaf2104ac6be5f762661ce6a392bea83e66753c74486612ce09b7a",
+      "digest": "sha256:ed4dbb3b399954cc738ca35469c343d6ee0dc25e62c6e21e9be43d6aad095cca",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:05484d2ffd331f1c8675be8bc9ef16983c44355a026816199c94aae682bef136",
+    "dataset_metadata": "sha256:c5ada2d63b065e46999fd83e3284898488dfa694bd4a7ea1c2bc6070bb1bb452",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-17T04:13:03.964282",
+  "extracted_at": "2026-11-19T23:25:54.988797",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
@@ -369,7 +368,8 @@
       "description": "String",
       "parent_codes": "List(String)",
       "possibly_cpt_code": "List(String)",
-      "unit": "String"
+      "unit": "String",
+      "unit_source_value": "String"
     },
     "column_dtype_conflicts": {},
     "column_presence": {
@@ -393,8 +393,7 @@
       "statusdescription": 3,
       "subject_id": 3,
       "text_value": 3,
-      "time": 3,
-      "unit": 3
+      "time": 3
     },
     "data_columns": {
       "code": "String",
@@ -417,8 +416,7 @@
       "statusdescription": "String",
       "subject_id": "Int64",
       "text_value": "String",
-      "time": "Datetime(time_unit='us', time_zone=None)",
-      "unit": "String"
+      "time": "Datetime(time_unit='us', time_zone=None)"
     },
     "extra_data_columns": [
       "doses_per_24_hrs",
@@ -437,8 +435,7 @@
       "seq_num",
       "source_block",
       "statusdescription",
-      "text_value",
-      "unit"
+      "text_value"
     ],
     "has_code_metadata": true,
     "has_dataset_metadata": true,

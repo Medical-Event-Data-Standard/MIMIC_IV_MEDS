@@ -1,14 +1,17 @@
-"""Every code with a numeric value carries its one unit in `metadata/codes.parquet`.
+"""Every code with a numeric value carries its one unit in `metadata/codes.parquet`, and only there.
 
 The ETL runs the shipped config's numeric tables over a few made-up rows (no download): the
 unit comes from the code's own unit component (labs, charted items, outputs), from the infusion
 rows (in the code only for an itemid that mixes units), from the name of an OMR measurement, from
 an ICU item's label where it was charted without one, and, for the infusion weight, from
-MIMIC-IV's documentation. MEDS-Extract writes it as one String per code. On the
-demo cohort the same column is checked by `e2e_demo_test.py`.
+MIMIC-IV's documentation. MEDS-Extract writes it as one String per code; suMEDS's
+`sumeds_normalize_units` stage then writes it as UCUM in `unit` and keeps the spelling as recorded
+in `unit_source_value`. The events have no `unit` column. On the demo cohort the same columns are
+checked by `e2e_demo_test.py`.
 """
 
 from importlib.resources import files
+from pathlib import Path
 
 import polars as pl
 import pytest
@@ -78,26 +81,27 @@ RAW = {
     "outputevents_to_loinc.csv": [LAB_MAP, "226559,Foley,Urine output,LOINC,9187-6"],
 }
 
-#: code -> its `unit` metadata.
+#: code -> its unit as recorded (`unit_source_value`) and as UCUM (`unit`). Codes keep the recorded
+#: spelling (`…//mcg`, `…//mL/hour`); only the `unit` column is UCUM.
 EXPECTED = {
-    "LAB//RESULT//50912//mg/dL": "mg/dL",
-    "LAB//220045//bpm": "bpm",
+    "LAB//RESULT//50912//mg/dL": ("mg/dL", "mg/dL"),
+    "LAB//220045//bpm": ("bpm", "{beats}/min"),
     # Charted without a unit; the item's label states it.
-    "LAB//226531//UNK": "lbs.",
-    "SUBJECT_FLUID_OUTPUT//226559//mL": "mL",
-    "Weight (Lbs)": "Lbs",
-    "BMI (kg/m2)": "kg/m2",
+    "LAB//226531//UNK": ("lbs.", "[lb_av]"),
+    "SUBJECT_FLUID_OUTPUT//226559//mL": ("mL", "mL"),
+    "Weight (Lbs)": ("Lbs", "[lb_av]"),
+    "BMI (kg/m2)": ("kg/m2", "kg/m2"),
     # An itemid whose starts have one rate unit keeps its code; the push without a rate has none.
-    "INFUSION_START//221906": "mcg/kg/min",
+    "INFUSION_START//221906": ("mcg/kg/min", "ug/kg/min"),
     # Its ends are recorded in two units, which gives two codes, one per unit.
-    "INFUSION_END//221906//mg": "mg",
-    "INFUSION_END//221906//mcg": "mcg",
+    "INFUSION_END//221906//mg": ("mg", "mg"),
+    "INFUSION_END//221906//mcg": ("mcg", "ug"),
     # And the other way round.
-    "INFUSION_START//225158//mL/hour": "mL/hour",
-    "INFUSION_START//225158//mL/min": "mL/min",
-    "INFUSION_END//225158": "mL",
-    # From the MIMIC-IV documentation of inputevents.patientweight.
-    "SUBJECT_WEIGHT_AT_INFUSION//KG": "kilogram",
+    "INFUSION_START//225158//mL/hour": ("mL/hour", "mL/h"),
+    "INFUSION_START//225158//mL/min": ("mL/min", "mL/min"),
+    "INFUSION_END//225158": ("mL", "mL"),
+    # From the MIMIC-IV documentation of inputevents.patientweight, written as UCUM by the ETL.
+    "SUBJECT_WEIGHT_AT_INFUSION//KG": ("kg", "kg"),
 }
 #: Codes without a recorded unit, which get none.
 #: The start without a rate of an itemid whose starts mix units is `…//UNK`, which has none.
@@ -105,7 +109,7 @@ NO_UNIT = ["LAB//RESULT//50912//UNK", "Blood Pressure//SYSTOLIC", "eGFR", "INFUS
 
 
 @pytest.fixture(scope="module")
-def codes(tmp_path_factory) -> pl.DataFrame:
+def cohort(tmp_path_factory) -> Path:
     root = tmp_path_factory.mktemp("units")
     config = yaml.safe_load(files("MIMIC_IV_MEDS").joinpath("event_configs.yaml").read_text())
     # The id columns of the tables left out (emar_id, poe_id) are not in this data.
@@ -128,16 +132,30 @@ def codes(tmp_path_factory) -> pl.DataFrame:
         "do_download=false",
         "skip_stages=[sumeds_enrich]",
     )
-    return pl.read_parquet(out / "metadata" / "codes.parquet")
+    return out
 
 
-def _units(codes: pl.DataFrame) -> dict[str, str | None]:
-    return dict(zip(codes["code"].to_list(), codes["unit"].to_list(), strict=True))
+@pytest.fixture(scope="module")
+def codes(cohort: Path) -> pl.DataFrame:
+    return pl.read_parquet(cohort / "metadata" / "codes.parquet")
+
+
+def _units(codes: pl.DataFrame, column: str = "unit") -> dict[str, str | None]:
+    return dict(zip(codes["code"].to_list(), codes[column].to_list(), strict=True))
 
 
 def test_unit_is_a_string(codes: pl.DataFrame):
-    """MEDS-Extract (0.9 and later) writes one String per code."""
+    """MEDS-Extract (0.9 and later) writes one String per code, and suMEDS keeps it one."""
     assert codes.schema["unit"] == pl.String
+    assert codes.schema["unit_source_value"] in (pl.String, pl.Utf8)
+
+
+def test_events_have_no_unit(cohort: Path):
+    """A code's unit lives in `codes.parquet` only; join the events to it on `code` to get one."""
+    shards = sorted((cohort / "data").rglob("*.parquet"))
+    assert shards
+    for shard in shards:
+        assert "unit" not in pl.read_parquet_schema(shard)
 
 
 def test_only_itemids_that_mix_units_have_it_in_the_code(codes: pl.DataFrame):
@@ -157,7 +175,9 @@ def test_only_itemids_that_mix_units_have_it_in_the_code(codes: pl.DataFrame):
 
 @pytest.mark.parametrize("code", EXPECTED)
 def test_numeric_codes_carry_their_unit(codes: pl.DataFrame, code: str):
-    assert _units(codes)[code] == EXPECTED[code]
+    recorded, ucum = EXPECTED[code]
+    assert _units(codes, "unit_source_value")[code] == recorded
+    assert _units(codes)[code] == ucum
 
 
 def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFrame):
@@ -179,3 +199,4 @@ def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFra
 @pytest.mark.parametrize("code", NO_UNIT)
 def test_codes_without_a_recorded_unit_get_none(codes: pl.DataFrame, code: str):
     assert _units(codes)[code] is None
+    assert _units(codes, "unit_source_value")[code] is None

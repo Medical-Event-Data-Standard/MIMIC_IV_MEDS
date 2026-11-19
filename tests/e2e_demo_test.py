@@ -21,6 +21,7 @@ import polars as pl
 import pyarrow.parquet as pq
 from conftest import SPEC
 from meds import CodeMetadataSchema
+from sumeds.units import to_ucum
 
 from MIMIC_IV_MEDS.unit_metadata import description_unit
 
@@ -41,10 +42,12 @@ def test_e2e_demo(demo_cohort: Path):
     dataset_json = json.loads((metadata / "dataset.json").read_text())
     assert dataset_json["dataset_name"] == SPEC
     assert dataset_json["dataset_version"].startswith(f"{DEMO_RELEASE}:")
-    # Every code has one unit, so no column modifies a code: code metadata is keyed on the code alone,
-    # and the events' `unit` is an ordinary extension column.
+    # Every code has one unit, so no column modifies a code: code metadata is keyed on the code alone.
+    # That unit lives in `codes.parquet` only: the events have no `unit` column (join them to
+    # `codes.parquet` on `code` for an event's unit).
     assert not dataset_json.get("code_modifier_columns")
-    assert "unit" in dataset_json["other_extension_columns"]
+    assert "unit" not in dataset_json.get("other_extension_columns", [])
+    assert all("unit" not in pl.read_parquet_schema(f) for f in data_files)
 
     # Code metadata, as read from disk, is valid MEDS code metadata, and every code is
     # described except lab items absent from mimic-code's lab map, which have no other
@@ -58,10 +61,19 @@ def test_e2e_demo(demo_cohort: Path):
     multi = sorted(c for c, d in described.items() if d is not None and "\n" in d)
     assert not multi, f"codes with several joined descriptions: {multi}"
 
-    # Codes whose last component is the unit carry exactly that unit, as one String (see "Units"
-    # in the README); `UNK` there stands for a null unit, which gives none, as does a blank one.
+    # One row, so one unit, per code.
+    assert len(set(codes["code"].to_pylist())) == codes.num_rows, "codes.parquet repeats a code"
+    # `unit` is the UCUM code of the unit as recorded, which suMEDS's `sumeds_normalize_units` keeps in
+    # `unit_source_value`; a spelling suMEDS does not know is kept as it is.
     assert codes.schema.field("unit").type == "string"
-    units = dict(zip(codes["code"].to_pylist(), codes["unit"].to_pylist(), strict=True))
+    units = dict(zip(codes["code"].to_pylist(), codes["unit_source_value"].to_pylist(), strict=True))
+    ucum = dict(zip(codes["code"].to_pylist(), codes["unit"].to_pylist(), strict=True))
+    not_ucum = sorted(c for c, u in units.items() if ucum[c] != (u if u is None else to_ucum(u) or u))
+    assert not not_ucum, f"codes whose unit is not the UCUM code of their unit_source_value: {not_ucum[:10]}"
+    assert any(ucum[c] != u for c, u in units.items()), "no unit rewritten as UCUM on the demo"
+
+    # Codes whose last component is the unit carry exactly that unit as recorded, as one String (see
+    # "Units" in the README); `UNK` there stands for a null unit, which gives none, as does a blank one.
     data_codes = set(pl.scan_parquet(data_files).select("code").unique().collect()["code"])
     infusions = ("INFUSION_START//", "INFUSION_END//")
     unit_coded = [c for c in units if c in data_codes and c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
@@ -99,10 +111,8 @@ def test_e2e_demo(demo_cohort: Path):
     missing = sorted(stem for stem in siblings if stem not in units or units[stem] is not None)
     assert not missing, f"unit-sibling stems without a row of their own (and no unit): {missing[:10]}"
 
-    # Every code's events, where they record a (non-blank) unit, have one unit, the code's `unit` in
-    # `codes.parquet`: no code mixes units, whether or not the unit is in it.
-    events = pl.scan_parquet(data_files).with_columns(pl.col("unit").str.strip_chars())
-    events = events.filter(pl.col("unit").is_not_null() & (pl.col("unit") != ""))
-    data_units = events.group_by("code").agg(pl.col("unit").unique()).collect()
-    disagree = sorted(c for c, u in data_units.iter_rows() if u != [units.get(c)])
-    assert not disagree, f"codes whose events' unit is not their unit metadata: {disagree[:10]}"
+    # Every infusion end has a unit, its rows' `amountuom` (never null): MEDS-Extract (0.9) accepts a
+    # code's unit metadata only if the code has one, so no infusion code mixes units, and joining the
+    # events to `codes.parquet` on `code` gives each infusion end its unit.
+    unitless = sorted(c for c in infusion_codes if c.startswith("INFUSION_END//") and units[c] is None)
+    assert not unitless, f"infusion ends without a unit: {unitless[:10]}"

@@ -30,8 +30,8 @@ etl:
   # other extension column is listed under `other_extension_columns` automatically. There is
   # no `license` or `description_uri`: this one spec builds both the credentialed release
   # and the open demo (`dataset_key=demo`), whose licenses and PhysioNet pages differ.
-  # There are no code modifier columns: every code has one unit (in the code where an item
-  # mixes units), so the events' `unit` column distinguishes nothing the code does not, and
+  # There are no code modifier columns, and events have no `unit` column: every code has one
+  # unit (in the code where an item mixes units), which is in metadata/codes.parquet `unit`, so
   # code metadata is keyed on the code alone (see "Units" in the README).
   raw_source_id_columns:
     [hadm_id, icustay_id, emar_id, poe_id, order_id, link_order_id]
@@ -55,6 +55,9 @@ etl:
     - mimic_iv_unit_keys
   post_stages:
     - mimic_iv_unit_metadata
+    # One UCUM spelling for every `unit` (suMEDS's shared table, e.g. `Cel`, `mm[Hg]`, `mg/dL`); the
+    # spelling as recorded stays in `unit_source_value`, and an unknown spelling is kept as it is.
+    - sumeds_normalize_units
     - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:
@@ -672,7 +675,6 @@ icu/inputevents:
     order_id: $orderid
     link_order_id: $linkorderid
     numeric_value: $rate
-    unit: $rateuom
     ordercategorydescription: $ordercategorydescription
     _metadata:
       icu/d_items:
@@ -700,7 +702,6 @@ icu/inputevents:
     numeric_value: $amount
     ordercategorydescription: $ordercategorydescription
     statusdescription: $statusdescription
-    unit: $amountuom
     _metadata:
       icu/d_items:
         itemid: $itemid
@@ -726,9 +727,8 @@ icu/inputevents:
         description: "'Patient weight in kilograms, recorded with an ICU infusion (icu/inputevents.patientweight)'"
         # Not in the data: the MIMIC-IV documentation of inputevents.patientweight states "The
         # patient weight in kilograms" (https://mimic.mit.edu/docs/iv/modules/icu/inputevents/;
-        # MIT-LCP/mimic-website at 8182227, MIT), spelled `kilogram` as in the other MEDS ETLs
-        # (icu/d_items.unitname writes `kg`).
-        unit: "'kilogram'"
+        # MIT-LCP/mimic-website at 8182227, MIT), written as the UCUM code `kg`.
+        unit: "'kg'"
 
 icu/outputevents:
   output:
