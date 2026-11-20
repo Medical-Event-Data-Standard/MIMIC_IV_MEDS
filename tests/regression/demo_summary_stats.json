@@ -18,9 +18,14 @@
     "n_data_codes_missing_from_metadata": 0,
     "n_metadata_codes_absent_from_data": 98,
     "n_with_description": 10361,
-    "n_with_parent_codes": 8028,
+    "n_with_parent_codes": 8030,
     "ontology": {
       "by_vocabulary": {
+        "<suppressed>": {
+          "n_child_codes": 4,
+          "n_measurements": 9,
+          "n_vocabularies": 1
+        },
         "APR-DRG": {
           "keys_digest": "sha256:351f10257c5bfb811d245a14f0a51354761a5f5abb5c463270dbb6b28a7f23ae",
           "n_child_codes": 110,
@@ -29,34 +34,42 @@
           "n_subjects": 98,
           "recognized": false
         },
+        "Gender": {
+          "keys_digest": "sha256:e4b45da6fe1dc80b451f36d47db88ec674acc85ccd94f710db905a0aa75b53ca",
+          "n_child_codes": 2,
+          "n_distinct_keys": 2,
+          "n_measurements": 100,
+          "n_subjects": 100,
+          "recognized": true
+        },
         "ICD10CM": {
-          "keys_digest": "sha256:13164fed20c59cd59b80f7c9c688626dfbfe64fb3cf00a2f75daf295aed3373b",
+          "keys_digest": "sha256:25a773fec057dcab3e5cb5524456e45add2811260b0bfd7748e93b06c81bc7b4",
           "n_child_codes": 734,
-          "n_distinct_keys": 734,
+          "n_distinct_keys": 1541,
           "n_measurements": 2313,
           "n_subjects": 44,
           "recognized": true
         },
         "ICD10PCS": {
-          "keys_digest": "sha256:b947ef5b560c6442ff392a7dd2d22e99d384c1e4c5aa7c0856b4110cba5cb627",
+          "keys_digest": "sha256:12ab7e34dda7b4e83b166cd7453cd10fad0127b37606ec23f18c82b2ca8a6386",
           "n_child_codes": 169,
-          "n_distinct_keys": 169,
+          "n_distinct_keys": 755,
           "n_measurements": 297,
           "n_subjects": 38,
           "recognized": true
         },
         "ICD9CM": {
-          "keys_digest": "sha256:11346b99676c094a7f3e5f4edc54f838d0393ff383d48b2ad804af77a941a2be",
+          "keys_digest": "sha256:b77fe2570f1d7a6f3dd0956b7b4c730e6d0fed6ca08b170aa938d791bce0f4b3",
           "n_child_codes": 740,
-          "n_distinct_keys": 740,
+          "n_distinct_keys": 1303,
           "n_measurements": 2193,
           "n_subjects": 76,
           "recognized": true
         },
         "ICD9Proc": {
-          "keys_digest": "sha256:63799b8d413fcdead2d61ff2f84b0ad2280b79ec5f1bb8abf5943fdb3b1b33d4",
+          "keys_digest": "sha256:ed291df72b52beb56aedbabdf2715e0bf8cd716d49093eae8a60bb2330bf204a",
           "n_child_codes": 183,
-          "n_distinct_keys": 183,
+          "n_distinct_keys": 360,
           "n_measurements": 370,
           "n_subjects": 66,
           "recognized": true
@@ -157,23 +170,23 @@
         }
       },
       "coverage": {
-        "frac_measurements_mapped": 0.524231,
-        "frac_observed_codes_with_parents": 0.773958,
-        "n_measurements_mapped": 537754,
-        "n_measurements_unmapped": 488042,
+        "frac_measurements_mapped": 0.524328,
+        "frac_observed_codes_with_parents": 0.774153,
+        "n_measurements_mapped": 537854,
+        "n_measurements_unmapped": 487942,
         "n_observed_codes": 10268,
-        "n_observed_codes_with_parents": 7947,
-        "n_observed_codes_without_parents": 2321
+        "n_observed_codes_with_parents": 7949,
+        "n_observed_codes_without_parents": 2319
       },
-      "n_codes_in_multiple_vocabularies": 162,
-      "n_codes_with_parents": 8028,
-      "n_distinct_parents": 4104,
-      "n_parent_links": 8224,
+      "n_codes_in_multiple_vocabularies": 166,
+      "n_codes_with_parents": 8030,
+      "n_distinct_parents": 6247,
+      "n_parent_links": 12024,
       "n_parents_without_vocabulary": 0,
-      "n_vocabularies": 13,
-      "n_vocabularies_recognized": 8,
+      "n_vocabularies": 15,
+      "n_vocabularies_recognized": 9,
       "parents_per_code": {
-        "mean": 0.793363,
+        "mean": 1.15995,
         "n": 10366,
         "quantiles": {
           "p1": 0.0,
@@ -181,14 +194,14 @@
           "p5": 0.0,
           "p50": 1.0,
           "p75": 1.0,
-          "p95": 1.0,
-          "p99": 2.0
+          "p95": 3.0,
+          "p99": 7.0
         },
-        "std": 0.451762
+        "std": 1.16281
       },
       "present": true,
       "vocabularies_per_code": {
-        "mean": 0.790083,
+        "mean": 0.790662,
         "n": 10366,
         "quantiles": {
           "p1": 0.0,
@@ -199,7 +212,7 @@
           "p95": 1.0,
           "p99": 2.0
         },
-        "std": 0.44399
+        "std": 0.44448
       }
     },
     "present": true,
@@ -325,9 +338,9 @@
     }
   },
   "dataset": {
-    "created_at": "2026-11-20T15:32:28.702374+00:00",
+    "created_at": "2026-11-20T20:44:35.482774+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.3.1.dev14+g514fad87a.d20261120",
+    "dataset_version": "2.2:0.3.1.dev36+g84d593607.d20261120",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.3",
     "meds_version": "0.4.1",
@@ -351,38 +364,73 @@
       "poe_id",
       "order_id",
       "link_order_id"
-    ]
+    ],
+    "sumeds_enrichment": {
+      "athena": false,
+      "coverage": {
+        "codes": 10366,
+        "described": [
+          10361,
+          10361
+        ],
+        "with_parent_codes": [
+          8028,
+          8030
+        ]
+      },
+      "enriched": true,
+      "enriched_at": "2026-11-20T20:44:37Z",
+      "ontology_source": "rvandewater/sumeds-ontologies@v0.2.0",
+      "options": {
+        "child_codes": false,
+        "child_depth": 3,
+        "exclude_self_parent_code": false,
+        "loinc_hierarchy": false,
+        "packs": true,
+        "parent_codes": true,
+        "sibling_codes": false
+      },
+      "rules": "MIMIC-IV",
+      "rules_sha256": "d63566f80088f714f48d6830acca237bdd08bb555fa65b1eeb584e00ab678023",
+      "sumeds_version": "0.6.7"
+    }
   },
   "dataset_digest": {
     "by_file": {
       "data/held_out/0.parquet": "sha256:ab8bb64d4a89a1ab094e2f17e959025f16a0474fc59cfa0ea5f4c889d1e5ff52",
       "data/train/0.parquet": "sha256:2ca11ee24e43896a5a9ae387d80444b0039bb14c43ae782d2b9d48cfe60604cc",
       "data/tuning/0.parquet": "sha256:9702005cf487fc879c87978c76f037a18970ec6a5e3015be1a73d84f0205649e",
-      "metadata/codes.parquet": "sha256:3133e03010b410f751ed0c6a09a0323360a95d93548a9699e043dc9505c6290a",
-      "metadata/dataset.json": "sha256:25fa151fe44e762938c3f99fdf8b1d4f981042b14ea5da665fb0d83dde620099",
+      "metadata/codes.parquet": "sha256:ee8789c65d299b35fdf478795f49b726c6ccacb5ae4e83611850bd121a3f97d6",
+      "metadata/dataset.json": "sha256:285821e694a782186e6ef77ccace403a12b95505a6a3b117e21f3a865385e7c3",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
-    "code_metadata": "sha256:71312215b5de92902a2f2fb96b7b05bd1982c68d2a94e926671b8682ab4beb77",
-    "combined": "sha256:4fcaccf7b060dc221930ce2c261f47787b1b70eeefb2877d76f53c2fcc817ae4",
+    "code_metadata": "sha256:d18dcd42f90071a75be2f6bdf0bd9fa24f7b42ea6c69e222b13d27c1951aa140",
+    "combined": "sha256:d1a962a900399441d2853630000bac09bdf4d8e0eea15099c8d7e3abedadb3ba",
     "data": {
       "digest": "sha256:7267c7ad34ad5a3219587b3bbd81b03aab19c0c5e8629ba47b3e8c2e646a4a0b",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:d85c9723051331c74f04138b7a9ac74e3ab92060dc3420bf16cc5c2a2851cf16",
+    "dataset_metadata": "sha256:2194f7b3192eba3d1d48ad3720a3f864dd5e654fe9b4baf20e4ff02d20921fb5",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-20T15:32:31.017107",
+  "extracted_at": "2026-11-20T20:44:38.634834",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
       "code_template": "String",
+      "concept_code": "String",
+      "concept_id": "Int64",
       "description": "String",
+      "domain_id": "String",
       "parent_codes": "List(String)",
+      "parent_names": "Map(String, String)",
       "possibly_cpt_code": "List(String)",
+      "standard_concept": "String",
       "unit": "String",
-      "unit_source_value": "String"
+      "unit_source_value": "String",
+      "vocabulary_id": "String"
     },
     "column_dtype_conflicts": {},
     "column_presence": {
