@@ -1,10 +1,10 @@
 """The ``mimic_iv_unit_keys`` pre-stage: which infusion codes need their unit in the code.
 
-An infusion start is ``INFUSION_START//{itemid}`` with the rate (unit ``rateuom``) as its value, and
-an infusion end is ``INFUSION_END//{itemid}`` with the amount (unit ``amountuom``). Most itemids record
+An infusion start is ``INFUSION//START//{itemid}`` with the rate (unit ``rateuom``) as its value, and
+an infusion end is ``INFUSION//END//{itemid}`` with the amount (unit ``amountuom``). Most itemids record
 one unit, but some record several, which would give their code several units. Only the codes of those
-itemids get the unit as their last component (``INFUSION_START//{itemid}//{rateuom}``,
-``INFUSION_END//{itemid}//{amountuom}``), decided separately for starts and ends; every other code
+itemids get the unit as their last component (``INFUSION//START//{itemid}//{rateuom}``,
+``INFUSION//END//{itemid}//{amountuom}``), decided separately for starts and ends; every other code
 stays as it was.
 
 Which itemids those are depends on the data, so this stage writes them as a side table,

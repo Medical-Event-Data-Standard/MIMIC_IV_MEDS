@@ -92,20 +92,20 @@ EXPECTED = {
     "Weight (Lbs)": ("Lbs", "[lb_av]"),
     "BMI (kg/m2)": ("kg/m2", "kg/m2"),
     # An itemid whose starts have one rate unit keeps its code; the push without a rate has none.
-    "INFUSION_START//221906": ("mcg/kg/min", "ug/kg/min"),
+    "INFUSION//START//221906": ("mcg/kg/min", "ug/kg/min"),
     # Its ends are recorded in two units, which gives two codes, one per unit.
-    "INFUSION_END//221906//mg": ("mg", "mg"),
-    "INFUSION_END//221906//mcg": ("mcg", "ug"),
+    "INFUSION//END//221906//mg": ("mg", "mg"),
+    "INFUSION//END//221906//mcg": ("mcg", "ug"),
     # And the other way round.
-    "INFUSION_START//225158//mL/hour": ("mL/hour", "mL/h"),
-    "INFUSION_START//225158//mL/min": ("mL/min", "mL/min"),
-    "INFUSION_END//225158": ("mL", "mL"),
+    "INFUSION//START//225158//mL/hour": ("mL/hour", "mL/h"),
+    "INFUSION//START//225158//mL/min": ("mL/min", "mL/min"),
+    "INFUSION//END//225158": ("mL", "mL"),
     # From the MIMIC-IV documentation of inputevents.patientweight, written as UCUM by the ETL.
     "SUBJECT_WEIGHT_AT_INFUSION": ("kg", "kg"),
 }
 #: Codes without a recorded unit, which get none.
 #: The start without a rate of an itemid whose starts mix units is `…//UNK`, which has none.
-NO_UNIT = ["LAB//RESULT//50912//UNK", "Blood Pressure//SYSTOLIC", "eGFR", "INFUSION_START//225158//UNK"]
+NO_UNIT = ["LAB//RESULT//50912//UNK", "Blood Pressure//SYSTOLIC", "eGFR", "INFUSION//START//225158//UNK"]
 
 
 @pytest.fixture(scope="module")
@@ -159,17 +159,17 @@ def test_events_have_no_unit(cohort: Path):
 
 
 def test_only_itemids_that_mix_units_have_it_in_the_code(codes: pl.DataFrame):
-    infusions = sorted(c for c in codes["code"].to_list() if c.startswith("INFUSION_"))
+    infusions = sorted(c for c in codes["code"].to_list() if c.startswith("INFUSION//"))
     assert infusions == [
-        "INFUSION_END//221906",  # the stem row of the two ends below, without events
-        "INFUSION_END//221906//mcg",
-        "INFUSION_END//221906//mg",
-        "INFUSION_END//225158",
-        "INFUSION_START//221906",
-        "INFUSION_START//225158",  # the stem row
-        "INFUSION_START//225158//UNK",
-        "INFUSION_START//225158//mL/hour",
-        "INFUSION_START//225158//mL/min",
+        "INFUSION//END//221906",  # the stem row of the two ends below, without events
+        "INFUSION//END//221906//mcg",
+        "INFUSION//END//221906//mg",
+        "INFUSION//END//225158",
+        "INFUSION//START//221906",
+        "INFUSION//START//225158",  # the stem row
+        "INFUSION//START//225158//UNK",
+        "INFUSION//START//225158//mL/hour",
+        "INFUSION//START//225158//mL/min",
     ]
 
 
@@ -182,16 +182,16 @@ def test_numeric_codes_carry_their_unit(codes: pl.DataFrame, code: str):
 
 def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFrame):
     parents = dict(zip(codes["code"].to_list(), codes["parent_codes"].to_list(), strict=True))
-    for code in ["INFUSION_END//221906//mg", "INFUSION_END//221906//mcg"]:
-        assert parents[code] == ["RxNorm//7512", "INFUSION_END//221906"]
-    for code in ["INFUSION_START//225158//mL/hour", "INFUSION_START//225158//mL/min"]:
-        assert parents[code] == ["RxNorm//9863", "INFUSION_START//225158"]
+    for code in ["INFUSION//END//221906//mg", "INFUSION//END//221906//mcg"]:
+        assert parents[code] == ["RxNorm//7512", "INFUSION//END//221906"]
+    for code in ["INFUSION//START//225158//mL/hour", "INFUSION//START//225158//mL/min"]:
+        assert parents[code] == ["RxNorm//9863", "INFUSION//START//225158"]
     # A start whose unit was not recorded (`UNK`) joins its item's siblings; codes without unit
     # siblings get no extra parent.
-    assert parents["INFUSION_START//225158//UNK"] == ["RxNorm//9863", "INFUSION_START//225158"]
-    assert parents["INFUSION_START//221906"] == ["RxNorm//7512"]
+    assert parents["INFUSION//START//225158//UNK"] == ["RxNorm//9863", "INFUSION//START//225158"]
+    assert parents["INFUSION//START//221906"] == ["RxNorm//7512"]
     # The stem has a row of its own, with what both siblings share and no unit.
-    stem = codes.filter(pl.col("code") == "INFUSION_END//221906").to_dicts()
+    stem = codes.filter(pl.col("code") == "INFUSION//END//221906").to_dicts()
     assert [{k: row[k] for k in ("description", "parent_codes", "unit")} for row in stem] == [
         {"description": "Norepinephrine", "parent_codes": ["RxNorm//7512"], "unit": None}
     ]
