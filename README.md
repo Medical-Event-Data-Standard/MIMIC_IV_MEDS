@@ -412,13 +412,13 @@ For MIMIC-IV, the rules add:
 
 - `GENDER//F` and `GENDER//M` get the OMOP Gender codes `Gender//F` and `Gender//M` (a tag:
     Gender has no public pack; with `--athena-csv` suMEDS validates them against Athena).
-- `DIAGNOSIS//ICD//{9,10}//…` and `PROCEDURE//ICD//{9,10}//…` are matched to the dotted ICD-9-CM,
+- `DIAGNOSIS//ICD//{9CM,10CM}//…` and `PROCEDURE//ICD//{9CM,10PCS}//…` are matched to the dotted ICD-9-CM,
     ICD-10-CM, ICD-9 procedure or ICD-10-PCS code, which fills `vocabulary_id` and `concept_code`.
     The ETL's own reference (`ICD10CM//I50.23`) stays first in `parent_codes`, and every ancestor
     in the pack follows it (`ICD10CM//I50.2`, `ICD10CM//I50`).
 - Same-dataset parents: an ICD code of the table becomes the parent of another when its
-    vocabulary code is the nearest ancestor present (`DIAGNOSIS//ICD//10//I5023` gets
-    `DIAGNOSIS//ICD//10//I502` when both occur).
+    vocabulary code is the nearest ancestor present (`DIAGNOSIS//ICD//10CM//I5023` gets
+    `DIAGNOSIS//ICD//10CM//I502` when both occur).
 - `parent_names` maps each vocabulary code in `parent_codes` that a pack knows to its official
     name, including the ETL's own references. Lab and fluid-output codes whose parent is a
     LOINC code (`LOINC//2160-0`) also get `vocabulary_id` `LOINC` and the `concept_code`.
@@ -601,6 +601,16 @@ mappings may depend on, newest release first.
     are unchanged. To migrate, respell old parents with the regex `^([^/]+)/(?!/)` → `\1//` (only the
     first slash changes; codes after it are kept as they are). suMEDS and alignEHR already read both
     spellings as the same parent.
+- **ICD codes name their edition, `ICD//<edition>//<code>`.** `DIAGNOSIS//ICD//9//<code>` and
+    `DIAGNOSIS//ICD//10//<code>` are now `DIAGNOSIS//ICD//9CM//<code>` and
+    `DIAGNOSIS//ICD//10CM//<code>`; `PROCEDURE//ICD//9//<code>` and `PROCEDURE//ICD//10//<code>` are
+    now `PROCEDURE//ICD//9CM//<code>` and `PROCEDURE//ICD//10PCS//<code>`. MIMIC-IV's `icd_version` 9
+    and 10 are the US billing code sets: ICD-9-CM (diagnoses, and volume 3 for procedures), ICD-10-CM
+    and ICD-10-PCS, the vocabularies the parents already name (`ICD9CM`, `ICD9Proc`, `ICD10CM`,
+    `ICD10PCS`). Other MEDS ETLs use the same layout (`ICD//10GM`, `ICD//10CN`, ...). The code after
+    the edition is unchanged (undotted, as MIMIC-IV records it). To migrate, rename with
+    `^DIAGNOSIS//ICD//(9|10)//` → `DIAGNOSIS//ICD//\1CM//`, `^PROCEDURE//ICD//9//` →
+    `PROCEDURE//ICD//9CM//` and `^PROCEDURE//ICD//10//` → `PROCEDURE//ICD//10PCS//`.
 
 ## 📚 Citing this work
 

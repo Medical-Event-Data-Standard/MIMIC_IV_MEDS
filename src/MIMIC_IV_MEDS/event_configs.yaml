@@ -173,7 +173,12 @@ hosp/diagnoses_icd:
         key: hadm_id
         cols: [dischtime]
   diagnosis:
-    code: 'f"DIAGNOSIS//ICD//{$icd_version}//{$icd_code}"'
+    # `ICD//<edition>//<code>`: MIMIC-IV's billed diagnoses are ICD-9-CM (`icd_version` 9) and
+    # ICD-10-CM (10), so the edition is `9CM` or `10CM`. Any other version is written as recorded.
+    # The code stays undotted, as recorded.
+    code: >-
+      f"DIAGNOSIS//ICD//{'9CM' if $icd_version::str == '9' else '10CM' if $icd_version::str == '10'
+      else $icd_version::str}//{$icd_code}"
     hadm_id: $hadm_id
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
@@ -526,7 +531,12 @@ hosp/procedures_icd:
         key: hadm_id
         cols: [dischtime]
   procedure:
-    code: 'f"PROCEDURE//ICD//{$icd_version}//{$icd_code}"'
+    # `ICD//<edition>//<code>`: billed ICD-9 procedures are ICD-9-CM volume 3 (`9CM`; OMOP
+    # vocabulary ICD9Proc) and ICD-10 procedures are ICD-10-PCS (`10PCS`). Any other version is
+    # written as recorded. The code stays undotted, as recorded.
+    code: >-
+      f"PROCEDURE//ICD//{'9CM' if $icd_version::str == '9' else '10PCS' if $icd_version::str == '10'
+      else $icd_version::str}//{$icd_code}"
     hadm_id: $hadm_id
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
