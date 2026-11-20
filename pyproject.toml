@@ -76,6 +76,25 @@ MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
 [project.entry-points."sumeds.rules"]
 MIMIC-IV = "MIMIC_IV_MEDS:sumeds_rules.yaml"
 
+# The summary-stats baselines in tests/regression/, which `baseline_MEDS_summary_stats` (from
+# meds_summary_stats) regenerates and checks: `<kind>_summary_stats.json` for each kind below, compared
+# under meds_summary_stats's built-in `etl-regression` policy. Each baseline describes the dataset
+# `meds-extract-run spec=MIMIC-IV` builds, suMEDS enrichment included: the builds run the spec's
+# `sumeds_enrich` post-stage with `strict`, so a failed enrichment fails the build instead of
+# soft-failing, and a build whose metadata/dataset.json does not record an enrichment is refused. The
+# demo is the cohort CI builds (tests/conftest.py), which is built the same way. See "Summary
+# statistics" in the README.
+[tool.meds_summary_stats.baselines]
+require_dataset_metadata = { "sumeds_enrichment.enriched" = true }
+
+[tool.meds_summary_stats.baselines.kinds.full]
+build = "uv run --frozen meds-extract-run spec=MIMIC-IV do_download=false input_dir={input_dir} output_dir={output_dir} \"overrides=['++stage_cfg.strict=true']\""
+
+[tool.meds_summary_stats.baselines.kinds.demo]
+build = "uv run --frozen meds-extract-run spec=MIMIC-IV dataset_key=demo do_download=false input_dir={input_dir} output_dir={output_dir} \"overrides=['++stage_cfg.strict=true']\""
+# The demo is open, so the ETL downloads it when no --input-dir is given.
+build_without_input = "uv run --frozen meds-extract-run spec=MIMIC-IV dataset_key=demo output_dir={output_dir} \"overrides=['++stage_cfg.strict=true']\""
+
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"
 Issues = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues"

@@ -1,0 +1,41 @@
+name: Summary stats
+
+# tests/regression/full_summary_stats.json fingerprints the dataset this ETL builds from the full
+# MIMIC-IV release. The release is credentialed, so CI cannot rebuild it: whoever changes the ETL
+# regenerates the baseline where the data lives, with `baseline_MEDS_summary_stats full` (see the
+# README). This job reminds a pull request that changes the ETL but not the baseline. It warns rather
+# than fails, because not every contributor has access to the data and not every change to src/ moves
+# the output. (The demo baseline needs no reminder: the Tests workflow rebuilds and checks it.)
+
+on:
+  pull_request:
+    branches: [main, "release/*", "dev"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline-freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The pull_request checkout is a merge commit whose first parent is the base branch.
+          fetch-depth: 2
+          persist-credentials: false
+
+      # Pinned with the Tests workflow's meds_summary_stats. The suMEDS rules are under src/ too, so
+      # they count as ETL changes; documentation does not.
+      - name: Check that ETL changes regenerated the baseline
+        uses: Medical-Event-Data-Standard/meds_summary_stats/baseline-freshness@0.0.5
+        with:
+          regenerate-command: >-
+            uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats full
+            --input-dir "$RAW_INPUT_DIR"
