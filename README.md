@@ -543,10 +543,10 @@ checks a build without writing anything. Pin the version the Tests workflow uses
 
 ```bash
 # The demo: downloaded and built with this checkout
-uvx --from meds_summary_stats==X.Y.Z baseline_MEDS_summary_stats demo
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats demo
 # The full release, built from a copy on disk, or summarized from an existing build
-uvx --from meds_summary_stats==X.Y.Z baseline_MEDS_summary_stats full --input-dir $RAW_INPUT_DIR
-uvx --from meds_summary_stats==X.Y.Z baseline_MEDS_summary_stats full --meds-dir $MEDS_OUTPUT_DIR
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats full --input-dir $RAW_INPUT_DIR
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats full --meds-dir $MEDS_OUTPUT_DIR
 ```
 
 [`tests/regression/full_summary_stats.json`](tests/regression/full_summary_stats.json) is the same
@@ -556,8 +556,14 @@ access to the data. CI cannot rebuild the credentialed release, so regenerate it
 `baseline_MEDS_summary_stats full` in every pull request that changes the output; the Summary stats
 workflow reminds a pull request that changes `src/` without it.
 
-Both baselines are built with `skip_stages=[sumeds_enrich]`: they fingerprint what the ETL writes, which
-does not depend on network access or on the suMEDS pack release. Summarize a build made the same way.
+Both baselines describe the dataset `meds-extract-run spec=MIMIC-IV` builds, suMEDS enrichment
+included, so their code-metadata coverage counts the ontology parents the enrichment adds.
+`baseline_MEDS_summary_stats` builds with `strict` enrichment
+(`"overrides=['++stage_cfg.strict=true']"`), which fetches the suMEDS ontology packs over the network,
+and refuses to summarize a build whose `metadata/dataset.json` does not record
+`sumeds_enrichment.enriched: true` (`require_dataset_metadata` in `pyproject.toml`); enrich such a build
+with `suMEDS-enrich $MEDS_OUTPUT_DIR` first. The demo cohort the Tests workflow builds is enriched the same way. A suMEDS upgrade can move the
+enrichment statistics too, so check it with `--compare`.
 
 ## 📚 Citing this work
 

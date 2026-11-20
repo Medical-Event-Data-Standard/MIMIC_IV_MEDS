@@ -31,12 +31,11 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
 
-      # DRAFT: pinned to the branch of Medical-Event-Data-Standard/meds_summary_stats#29; pin the
-      # release that ships the action before merging. The suMEDS rules are under src/ too, so they
-      # count as ETL changes; documentation does not.
+      # Pinned with the Tests workflow's meds_summary_stats. The suMEDS rules are under src/ too, so
+      # they count as ETL changes; documentation does not.
       - name: Check that ETL changes regenerated the baseline
-        uses: Medical-Event-Data-Standard/meds_summary_stats/baseline-freshness@feat/etl-baselines
+        uses: Medical-Event-Data-Standard/meds_summary_stats/baseline-freshness@0.0.5
         with:
           regenerate-command: >-
-            uvx --from meds_summary_stats==X.Y.Z baseline_MEDS_summary_stats full
+            uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats full
             --input-dir "$RAW_INPUT_DIR"
