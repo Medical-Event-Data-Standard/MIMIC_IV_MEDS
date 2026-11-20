@@ -107,8 +107,8 @@ missing demographic produces no event — which is the honest encoding, and avoi
 **`drg_type: HCFA` means MS-DRG**, not the legacy CMS-DRG the name suggests. 302 distinct HCFA
 codes fall above 579, inside the MS-DRG-only numbering space (MS-DRG replaced CMS-DRG in FY2008;
 MIMIC-IV spans 2008–2022). `APR` is Solventum's proprietary APR-DRG. Both are genuine external
-classifications, so each code carries the bare identifier as a parent — `MS-DRG/003`,
-`APR-DRG/047` — via a `_self` metadata block.
+classifications, so each code carries the bare identifier as a parent — `MS-DRG//003`,
+`APR-DRG//047` — via a `_self` metadata block.
 
 **`description` is not part of the code.** It is not a function of the code: 87.8% of HCFA
 `(drg_type, drg_code)` pairs carry more than one description, up to five, and the variants are
@@ -206,7 +206,7 @@ so an old code maps to the new one by replacing a leading `LAB//` followed by a 
 ## Code metadata
 
 `metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary
-applies, `parent_codes` in OMOP form (`LOINC/2160-0`, `ICD10CM/I10`, `NDC/…`), so tooling
+applies, `parent_codes` in OMOP form (`LOINC//2160-0`, `ICD10CM//I10`, `NDC//…`), so tooling
 that maps codes across datasets or resolves them through OHDSI Athena has something to work
 with. All of it is declared in `event_configs.yaml`, through three routes:
 
@@ -240,7 +240,7 @@ is left uncovered, and why:
 - **No vocabulary parent:** medications whose order carries no NDC; ICU items absent from
     the mimic-code maps; admission, discharge, transfer, ICU-stay, demographic and OMR codes;
     CPT codes (`HCPCS//…` is keyed on MIMIC's short description, which for CPT is only the
-    section name). The `DRG` parents use `MS-DRG/` and `APR-DRG/` (see [DRG](#drg)), which
+    section name). The `DRG` parents use `MS-DRG//` and `APR-DRG//` (see [DRG](#drg)), which
     vocabulary tooling does not resolve; OMOP's own id for MS-DRGs is `DRG`.
 
 ### Units
@@ -412,22 +412,22 @@ For MIMIC-IV, the rules add:
 
 - `GENDER//F` and `GENDER//M` get the OMOP Gender codes `Gender//F` and `Gender//M` (a tag:
     Gender has no public pack; with `--athena-csv` suMEDS validates them against Athena).
-- `DIAGNOSIS//ICD//{9,10}//…` and `PROCEDURE//ICD//{9,10}//…` are matched to the dotted ICD-9-CM,
+- `DIAGNOSIS//ICD//{9CM,10CM}//…` and `PROCEDURE//ICD//{9CM,10PCS}//…` are matched to the dotted ICD-9-CM,
     ICD-10-CM, ICD-9 procedure or ICD-10-PCS code, which fills `vocabulary_id` and `concept_code`.
-    The ETL's own reference (`ICD10CM/I50.23`) stays first in `parent_codes`, and every ancestor
+    The ETL's own reference (`ICD10CM//I50.23`) stays first in `parent_codes`, and every ancestor
     in the pack follows it (`ICD10CM//I50.2`, `ICD10CM//I50`).
 - Same-dataset parents: an ICD code of the table becomes the parent of another when its
-    vocabulary code is the nearest ancestor present (`DIAGNOSIS//ICD//10//I5023` gets
-    `DIAGNOSIS//ICD//10//I502` when both occur).
+    vocabulary code is the nearest ancestor present (`DIAGNOSIS//ICD//10CM//I5023` gets
+    `DIAGNOSIS//ICD//10CM//I502` when both occur).
 - `parent_names` maps each vocabulary code in `parent_codes` that a pack knows to its official
     name, including the ETL's own references. Lab and fluid-output codes whose parent is a
-    LOINC code (`LOINC/2160-0`) also get `vocabulary_id` `LOINC` and the `concept_code`.
+    LOINC code (`LOINC//2160-0`) also get `vocabulary_id` `LOINC` and the `concept_code`.
 
 On the demo (2.2), the published packs add parents to 1,779 codes (1,777 of its 1,826 ICD codes, 4
 of them with a same-dataset parent, and both Gender codes) and names to 3,222 codes. The ETL alone
 does not emit any of this: a plain `meds-extract-run` build has no Gender parents, no ICD ancestors,
 no same-dataset parents and no names. suMEDS enrichment never removes or rewrites existing parents
-or descriptions, so the ETL's own parents (`ICD10CM/…`, `LOINC/…`, `NDC/…`, RxNorm, SNOMED, DRG) and
+or descriptions, so the ETL's own parents (`ICD10CM//…`, `LOINC//…`, `NDC//…`, RxNorm, SNOMED, DRG) and
 its descriptions from MIMIC-IV's dictionary tables stay as they are.
 
 ## Parallel and multi-node runs
@@ -599,6 +599,23 @@ mappings may depend on, newest release first.
 - **Infusion codes** (`INFUSION_START//<itemid>`, `INFUSION_END//<itemid>`) end in their unit
     (`//<unit>`, `//UNK` for a start without a rate) where the itemid is recorded in more than one
     unit, and only there.
+- **Vocabulary parents are spelled `VOCABULARY//CODE`.** The `parent_codes` the ETL writes itself
+    (`ICD9CM`, `ICD10CM`, `ICD9Proc`, `ICD10PCS`, `NDC`, `MS-DRG`, `APR-DRG`, and the LOINC, SNOMED
+    and RxNorm parents from the mimic-code maps) used one slash, `ICD10CM/I50.23`; they now use two,
+    `ICD10CM//I50.23`, the spelling suMEDS already writes for the ancestors it adds. Codes and events
+    are unchanged. To migrate, respell old parents with the regex `^([^/]+)/(?!/)` → `\1//` (only the
+    first slash changes; codes after it are kept as they are). suMEDS and alignEHR already read both
+    spellings as the same parent.
+- **ICD codes name their edition, `ICD//<edition>//<code>`.** `DIAGNOSIS//ICD//9//<code>` and
+    `DIAGNOSIS//ICD//10//<code>` are now `DIAGNOSIS//ICD//9CM//<code>` and
+    `DIAGNOSIS//ICD//10CM//<code>`; `PROCEDURE//ICD//9//<code>` and `PROCEDURE//ICD//10//<code>` are
+    now `PROCEDURE//ICD//9CM//<code>` and `PROCEDURE//ICD//10PCS//<code>`. MIMIC-IV's `icd_version` 9
+    and 10 are the US billing code sets: ICD-9-CM (diagnoses, and volume 3 for procedures), ICD-10-CM
+    and ICD-10-PCS, the vocabularies the parents already name (`ICD9CM`, `ICD9Proc`, `ICD10CM`,
+    `ICD10PCS`). Other MEDS ETLs use the same layout (`ICD//10GM`, `ICD//10CN`, ...). The code after
+    the edition is unchanged (undotted, as MIMIC-IV records it). To migrate, rename with
+    `^DIAGNOSIS//ICD//(9|10)//` → `DIAGNOSIS//ICD//\1CM//`, `^PROCEDURE//ICD//9//` →
+    `PROCEDURE//ICD//9CM//` and `^PROCEDURE//ICD//10//` → `PROCEDURE//ICD//10PCS//`.
 
 ## 📚 Citing this work
 
