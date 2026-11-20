@@ -1,9 +1,8 @@
 name: Tests
 
-# This repo ships `event_configs.yaml`, the entry-point registration naming it `MIMIC-IV`,
-# and one small Python stage (`mimic_iv_unit_keys`, src/MIMIC_IV_MEDS/unit_keys.py, whose
-# logic is its doctest). So CI asks exactly two questions, and both are answered by
-# building the public demo cohort:
+# This repo ships no Python — only `event_configs.yaml` and the entry-point
+# registration naming it `MIMIC-IV`. So CI asks exactly two questions, and both are
+# answered by building the public demo cohort:
 #
 #   1. does the ETL still run?          -> tests/e2e_demo_test.py
 #      and does suMEDS enrich it?       -> tests/run_with_enrichment_test.py
@@ -18,7 +17,7 @@ name: Tests
 # baseline. The enrichment test reruns the ETL offline from the raw files that build
 # downloaded.
 # A Python-version matrix would multiply PhysioNet downloads for no signal about a package
-# whose only Python is one polars stage.
+# that contains no Python.
 
 on:
   push:
@@ -75,8 +74,8 @@ jobs:
       - name: Build and validate the demo cohort
         # The demo release is fully open, so no PhysioNet credentials are needed.
         #
-        # `src/` is passed with `--doctest-modules` so the doctest of the `mimic_iv_unit_keys`
-        # pre-stage runs; there is no coverage measurement.
+        # `src/` is not passed to pytest and there is no coverage measurement: this package
+        # ships no Python.
         #
         # `--reruns`/`--only-rerun` (pytest-rerunfailures) retries the extraction when
         # PhysioNet returns transient network errors. Those are upstream failures, not
@@ -93,7 +92,7 @@ jobs:
         # fetch an ontology pack file; a rerun resumes at the enrichment stage.
         run: |
           mkdir -p "$MEDS_DEMO_OUTPUT_DIR"
-          uv run pytest tests/ src/ --doctest-modules -v \
+          uv run pytest tests/ -v \
             --junitxml=junit.xml -s \
             --reruns 3 --reruns-delay 20 \
             --only-rerun "RemoteProtocolError|ReadError|ConnectError|ConnectTimeout|ReadTimeout|PoolTimeout|IncompleteRead|ChunkedEncodingError|ConnectionError|MaxRetryError|[Cc]onnection broken|could not download"
