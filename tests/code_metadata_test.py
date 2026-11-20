@@ -38,7 +38,7 @@ def test_literal_codes_are_plain_literals():
         "ED_OUT",
         "MEDS_BIRTH",
         "MEDS_DEATH",
-        "SUBJECT_WEIGHT_AT_INFUSION//KG",
+        "SUBJECT_WEIGHT_AT_INFUSION",
     }
     from_a_column = [name for name, event in _events() if re.fullmatch(r"\$\w+", str(event["code"]).strip())]
     assert not from_a_column, f"codes read from a bare column: {from_a_column}"

@@ -85,7 +85,7 @@ etl:
     - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:
-  # ED_REGISTRATION and ED_OUT, like MEDS_BIRTH, MEDS_DEATH and SUBJECT_WEIGHT_AT_INFUSION//KG
+  # ED_REGISTRATION and ED_OUT, like MEDS_BIRTH, MEDS_DEATH and SUBJECT_WEIGHT_AT_INFUSION
   # below, are plain literal codes: MEDS-Extract (>= 0.8.1, mmcdermott/MEDS_extract#166) attaches
   # `_self` metadata to literal codes, and a row whose time is null yields no event.
   #
@@ -746,7 +746,9 @@ icu/inputevents:
       _self:
         unit: $amountuom
   subject_weight:
-    code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'" # quoted: a bare `//` would parse as division
+    # No unit in the code: `kg` is the code's `unit` in codes.parquet, as for eICU's
+    # SUBJECT_WEIGHT_AT_INFUSION. Up to 0.3.0 this was SUBJECT_WEIGHT_AT_INFUSION//KG.
+    code: SUBJECT_WEIGHT_AT_INFUSION
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $patientweight
     _metadata:

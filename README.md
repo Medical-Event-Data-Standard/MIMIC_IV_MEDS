@@ -214,13 +214,12 @@ with. All of it is declared in `event_configs.yaml`, through three routes:
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DIAGNOSIS`, `PROCEDURE//ICD`, `HCPCS`, ICU itemid codes (`ICU_CHART//<itemid>`, `PROCEDURE//START`/`END`, `INFUSION_*`, `SUBJECT_FLUID_OUTPUT`), `LAB//RESULT`, `LAB//SPECIMEN_COLLECTED` | `_metadata` joins against dictionary tables at run time | MIMIC-IV's own `d_icd_diagnoses`, `d_icd_procedures`, `d_hcpcs` and `d_items`; the [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps (MIT, tag v2.4.0, checksum-pinned under `sources:`) for lab descriptions and the LOINC, SNOMED and RxNorm parents |
 | every other component-coded event (admissions, demographics, transfers, ICU stays, DRGs, medications, OMR)                                                                                 | `_self` templates over the code's own components        | the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) of the column each component comes from (MIT-LCP/mimic-website, MIT), paraphrased, with the column named in parentheses                                                                                  |
-| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION//KG`                                                                                                  | `_self` text on the literal code                        | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                   |
+| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION`                                                                                                      | `_self` text on the literal code                        | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                   |
 
 Literal codes are written as plain literals (`code: MEDS_BIRTH`) with a `_self` block:
 MEDS-Extract 0.8.1 and later attach `_self` metadata to literal codes
 ([MEDS_extract#166](https://github.com/mmcdermott/MEDS_extract/issues/166)), and their
-`code_template` is the literal itself. `SUBJECT_WEIGHT_AT_INFUSION//KG` is quoted
-(`"'SUBJECT_WEIGHT_AT_INFUSION//KG'"`), because a bare `//` parses as division.
+`code_template` is the literal itself.
 
 Every parent the ETL writes is read from MIMIC-IV's own tables or the mimic-code maps;
 links that need an external ontology (the OMOP Gender tags, the ICD pack hierarchy) come from
@@ -320,7 +319,7 @@ pair a unit with `…//UNK`). This shared stage replaced the package's own `mimi
 | `LAB//RESULT`, `ICU_CHART//<itemid>`, `SUBJECT_FLUID_OUTPUT` | `valueuom`, the code's last component, so one unit per code (none for `…//UNK`)                                                        |
 | OMR `BMI (kg/m2)`, `Weight (Lbs)`, `Height (Inches)`         | the unit in parentheses in `result_name`                                                                                               |
 | `INFUSION_START//<itemid>`, `INFUSION_END//<itemid>`         | `rateuom` and `amountuom` of the code's rows; the code's last component where the itemid mixes units (see below)                       |
-| `SUBJECT_WEIGHT_AT_INFUSION//KG`                             | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT) |
+| `SUBJECT_WEIGHT_AT_INFUSION`                                 | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT) |
 
 Where a charted item has no unit in the data (`ICU_CHART//<itemid>//UNK`), the unit its MIMIC-IV label
 states is used instead: a label ending in a bracketed unit, such as `Admission Weight (lbs.)`. The
@@ -615,6 +614,9 @@ mappings may depend on, newest release first.
     the edition is unchanged (undotted, as MIMIC-IV records it). To migrate, rename with
     `^DIAGNOSIS//ICD//(9|10)//` → `DIAGNOSIS//ICD//\1CM//`, `^PROCEDURE//ICD//9//` →
     `PROCEDURE//ICD//9CM//` and `^PROCEDURE//ICD//10//` → `PROCEDURE//ICD//10PCS//`.
+- **`SUBJECT_WEIGHT_AT_INFUSION//KG` is `SUBJECT_WEIGHT_AT_INFUSION`**, eICU's code for the same
+    value; its unit, `kg`, is in `metadata/codes.parquet`. The events and values are unchanged.
+    Migrate by replacing `SUBJECT_WEIGHT_AT_INFUSION//KG` with `SUBJECT_WEIGHT_AT_INFUSION`.
 
 ## 📚 Citing this work
 
