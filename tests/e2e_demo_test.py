@@ -4,8 +4,8 @@ This distribution is `event_configs.yaml` plus the entry-point registration that
 `MIMIC-IV` (and one small pre-stage, tested in `unit_keys_test.py`). So the main thing worth
 testing is that
 `meds-extract-run spec=MIMIC-IV` resolves that registration, downloads the demo bucket from
-PhysioNet (no credentials needed), runs the pipeline, and leaves a well-formed MEDS cohort
-behind. That build is the `demo_cohort` fixture of `conftest.py`, shared with
+PhysioNet (no credentials needed), runs the pipeline and the suMEDS enrichment, and leaves a
+well-formed MEDS cohort behind. That build is the `demo_cohort` fixture of `conftest.py`, shared with
 `run_with_enrichment_test.py` so the demo is downloaded once.
 
 Whether the *contents* of that cohort have changed is a separate question, answered by the
@@ -59,6 +59,11 @@ def test_e2e_demo(demo_cohort: Path):
     dataset_json = json.loads((metadata / "dataset.json").read_text())
     assert dataset_json["dataset_name"] == SPEC
     assert dataset_json["dataset_version"].startswith(f"{DEMO_RELEASE}:")
+    # The spec's `sumeds_enrich` stage enriched the code metadata with the published suMEDS packs. The
+    # build is strict, so a failed enrichment fails it instead; `run_with_enrichment_test.py` checks what
+    # the enrichment added.
+    assert dataset_json["sumeds_enrichment"]["enriched"] is True
+    assert dataset_json["sumeds_enrichment"]["rules"] == SPEC
     # Every code has one unit, so no column modifies a code: code metadata is keyed on the code alone.
     # That unit lives in `codes.parquet` only: the events have no `unit` column (join them to
     # `codes.parquet` on `code` for an event's unit).
