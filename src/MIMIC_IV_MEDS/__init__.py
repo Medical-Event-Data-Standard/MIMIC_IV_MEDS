@@ -11,10 +11,9 @@ as::
 It also ships ``MIMIC_IV_MEDS/sumeds_rules.yaml``, registered with suMEDS's ``sumeds.rules``
 entry-point group under the same name, which the config's ``sumeds_enrich`` post-stage uses to
 enrich the code metadata at the end of that run; suMEDS's ``sumeds_link_unit_siblings`` post-stage
-fills the units item labels state and links codes that differ only by unit. The only code is one
-small stage the config declares, registered in MEDS-Transforms's ``MEDS_transforms.stages``
-entry-point group: ``unit_keys.py``, the ``mimic_iv_unit_keys`` pre-stage that finds the infusion
-itemids recorded in more than one unit (whose codes end in it).
+fills the units item labels state and links codes that differ only by unit. The config's one
+pre-stage, MEDS-Extract's ``mixed_unit_keys``, finds the infusion itemids recorded in more than one
+unit (whose codes end in it).
 
 This package exists so the YAML is addressable as package data —
 ``importlib.resources.files("MIMIC_IV_MEDS")`` — from an installed wheel. Nothing here is

@@ -51,11 +51,19 @@ etl:
   # `(cm at teeth)` are not units). It runs first so that unit normalisation and the enrichment,
   # now or retried later with `suMEDS-enrich`, always read the same `codes.parquet`.
   #
-  # Before the canonical pipeline, `mimic_iv_unit_keys` (unit_keys.py) stages the side table
-  # `inputevents_unit_in_code`: the itemids whose infusion starts or ends are recorded in more
-  # than one unit, whose codes therefore end in the unit (see icu/inputevents below).
+  # Before the canonical pipeline, MEDS-Extract's `mixed_unit_keys` pre-stage stages the side table
+  # `inputevents_unit_in_code`: the itemids whose infusion starts (with a `starttime`) or ends (with an
+  # `endtime`) are recorded in more than one unit (`rateuom`, `amountuom`), whose codes therefore end
+  # in the unit (see icu/inputevents below). Units are compared stripped, nulls and blanks left out.
   pre_stages:
-    - mimic_iv_unit_keys
+    - mixed_unit_keys:
+        side_tables:
+          inputevents_unit_in_code:
+            table: icu/inputevents
+            keys: [itemid]
+            flags:
+              start_unit_in_code: { unit: $rateuom, time: $starttime }
+              end_unit_in_code: { unit: $amountuom, time: $endtime }
   post_stages:
     - sumeds_link_unit_siblings:
         description_unit_pattern: '\s[(\[]([^()\[\]]+)[)\]]\s*$'
@@ -675,7 +683,7 @@ icu/procedureevents:
 icu/inputevents:
   _table:
     joins:
-      # Staged by the `mimic_iv_unit_keys` pre-stage (unit_keys.py): `start_unit_in_code` is true
+      # Staged by the `mixed_unit_keys` pre-stage (see `etl:`): `start_unit_in_code` is true
       # for the itemids whose starts are recorded in more than one `rateuom`, `end_unit_in_code`
       # for those whose ends are recorded in more than one `amountuom`; null otherwise.
       inputevents_unit_in_code:

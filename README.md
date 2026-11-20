@@ -69,10 +69,10 @@ The entire ETL is one file —
     (PhysioNet for MIMIC-IV itself, checksum-pinned GitHub URLs for the
     [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps);
 - an `etl:` block with the run's few knobs, the roles of the extension columns for
-    `metadata/dataset.json`, the stage that runs before the pipeline, `mimic_iv_unit_keys`, and the
-    three suMEDS stages that run after it, in this order: `sumeds_link_unit_siblings`,
-    `sumeds_normalize_units` and the suMEDS enrichment (the package's own unit stage, its only
-    Python, and the two suMEDS unit stages are described under [Units](#units));
+    `metadata/dataset.json`, the stage that runs before the pipeline, MEDS-Extract's
+    `mixed_unit_keys`, and the three suMEDS stages that run after it, in this order:
+    `sumeds_link_unit_siblings`, `sumeds_normalize_units` and the suMEDS enrichment (the unit
+    pre-stage and the two suMEDS unit stages are described under [Units](#units));
 - one block per raw table describing the events extracted from it, including joins,
     derived columns, and the code-metadata programs that attach descriptions and parent
     vocabulary codes.
@@ -323,9 +323,9 @@ last component, decided separately for starts and ends: `INFUSION_START//<itemid
 `INFUSION_END//<itemid>//<amountuom>`, written like the `LAB` and `SUBJECT_FLUID_OUTPUT` codes. Every
 other infusion code is unchanged, because renaming codes that already have one unit would break
 references to them for nothing. Which itemids mix units depends on the data, so no itemid is named
-in the config: the pre-stage `mimic_iv_unit_keys` (`src/MIMIC_IV_MEDS/unit_keys.py`) reads
-`icu/inputevents`, compares the units as MEDS-Extract does (stripped, blanks and nulls left out),
-and stages the side table `inputevents_unit_in_code` that the `icu/inputevents` block joins on the
+in the config: MEDS-Extract's pre-stage `mixed_unit_keys`, configured under `etl.pre_stages`,
+reads `icu/inputevents`, compares the units of the rows with a start (end) time as MEDS-Extract
+does (stripped, blanks and nulls left out), and stages the side table `inputevents_unit_in_code` that the `icu/inputevents` block joins on the
 itemid.
 
 Within such an itemid, a start without a unit is `INFUSION_START//<itemid>//UNK`, as in the other

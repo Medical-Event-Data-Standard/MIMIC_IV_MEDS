@@ -19,8 +19,8 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-# The whole ETL is `event_configs.yaml`, run by MEDS-Extract's own `meds-extract-run`; the only
-# Python is the small unit pre-stage it declares (`unit_keys.py`). The
+# The whole ETL is `event_configs.yaml`, run by MEDS-Extract's own `meds-extract-run`; this package
+# has no Python stages of its own (the unit pre-stage, `mixed_unit_keys`, is MEDS-Extract's). The
 # `[download]` extra adds `meds-extract-download` (httpx + tenacity), which the runner spawns to stage the raw
 # data. MEDS-transforms, polars and hydra all arrive through it at the versions it fences;
 # duplicating those pins here would only create drift.
@@ -66,6 +66,11 @@ dev = [
 
 [tool.setuptools_scm]
 
+# DRAFT: MEDS-Extract's `mixed_unit_keys` pre-stage is not released yet (mmcdermott/MEDS_extract#339,
+# pinned to its head commit). Drop this source and raise the floor to that release once it is out.
+[tool.uv.sources]
+meds-extract = { git = "https://github.com/mmcdermott/MEDS_extract", rev = "a8763c260bd87e5c11d4a2623d85854851e47628" }
+
 [project.entry-points."MEDS_extract.pipelines"]
 MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
 
@@ -73,11 +78,6 @@ MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
 # and `--rules MIMIC-IV` find them.
 [project.entry-points."sumeds.rules"]
 MIMIC-IV = "MIMIC_IV_MEDS:sumeds_rules.yaml"
-
-# The unit pre-stage the config declares: it finds the infusion itemids needing their unit in the
-# code (`etl.pre_stages`).
-[project.entry-points."MEDS_transforms.stages"]
-mimic_iv_unit_keys = "MIMIC_IV_MEDS.unit_keys:main"
 
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"

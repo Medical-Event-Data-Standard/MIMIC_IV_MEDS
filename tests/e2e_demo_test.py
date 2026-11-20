@@ -1,7 +1,7 @@
 """End-to-end run of the shipped ETL over the public MIMIC-IV demo release.
 
 This distribution is `event_configs.yaml` plus the entry-point registration that names it
-`MIMIC-IV` (and one small pre-stage, tested in `unit_keys_test.py`). So the main thing worth
+`MIMIC-IV`; its unit pre-stage is MEDS-Extract's `mixed_unit_keys`. So the main thing worth
 testing is that
 `meds-extract-run spec=MIMIC-IV` resolves that registration, downloads the demo bucket from
 PhysioNet (no credentials needed), runs the pipeline, and leaves a well-formed MEDS cohort
