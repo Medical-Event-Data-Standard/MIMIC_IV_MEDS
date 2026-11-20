@@ -26,8 +26,11 @@ RAW = {
     "hosp/labevents.csv": [
         "subject_id,hadm_id,itemid,charttime,storetime,value,valuenum,valueuom,priority",
         "1,10,50912,2180-01-01 10:00:00,2180-01-01 11:00:00,1.1,1.1,mg/dL,STAT",
-        "2,20,50912,2180-01-02 10:00:00,2180-01-02 11:00:00,0.9,0.9,mg/dL,ROUTINE",
+        # A unit padded with whitespace gives the same code as the unit itself.
+        "2,20,50912,2180-01-02 10:00:00,2180-01-02 11:00:00,0.9,0.9, mg/dL ,ROUTINE",
         "3,30,50912,2180-01-03 10:00:00,2180-01-03 11:00:00,1.0,1.0,,ROUTINE",
+        # A blank unit is `UNK`, as a missing one is.
+        "4,40,50912,2180-01-04 10:00:00,2180-01-04 11:00:00,1.2,1.2,  ,ROUTINE",
     ],
     "d_labitems_to_loinc.csv": [LAB_MAP, "50912,Creatinine,Creatinine,LOINC,2160-0"],
     "hosp/omr.csv": [
@@ -40,7 +43,7 @@ RAW = {
     "icu/chartevents.csv": [
         "subject_id,hadm_id,stay_id,charttime,itemid,value,valuenum,valueuom",
         "1,10,100,2180-01-01 10:00:00,220045,80,80,bpm",
-        "2,20,200,2180-01-02 10:00:00,220045,90,90,bpm",
+        "2,20,200,2180-01-02 10:00:00,220045,90,90,bpm\t",
         "3,30,300,2180-01-03 10:00:00,226531,150,150,",
     ],
     "icu/d_items.csv": [
@@ -79,6 +82,8 @@ RAW = {
     "icu/outputevents.csv": [
         "subject_id,hadm_id,stay_id,charttime,itemid,value,valueuom",
         "1,10,100,2180-01-01 10:00:00,226559,200,mL",
+        "2,20,200,2180-01-02 10:00:00,226559,300, mL",
+        "3,30,300,2180-01-03 10:00:00,226559,100, ",
     ],
     "outputevents_to_loinc.csv": [LAB_MAP, "226559,Foley,Urine output,LOINC,9187-6"],
 }
@@ -108,6 +113,7 @@ EXPECTED = {
 #: A start without a rate is `…//UNK`, which has none.
 NO_UNIT = [
     "LAB//RESULT//50912//UNK",
+    "SUBJECT_FLUID_OUTPUT//226559//UNK",
     "Blood Pressure//SYSTOLIC",
     "eGFR",
     "INFUSION//START//221906//UNK",
@@ -231,3 +237,15 @@ def test_infusion_unit_component_is_stripped_and_blank_is_unk():
     for event, kind in (("input_start", "START"), ("input_end", "END")):
         codes = raw.select(**Parser.to_polars({"code": block[event]["code"]}))["code"].to_list()
         assert codes == [f"INFUSION//{kind}//221906//{unit}" for unit in expected], event
+
+
+def test_unit_component_is_stripped_and_blank_is_unk(cohort: Path):
+    """Padded units join the stripped unit's code, and blank ones the `…//UNK` code."""
+    events = pl.concat([pl.read_parquet(f) for f in sorted((cohort / "data").rglob("*.parquet"))])
+    counts = dict(events["code"].value_counts().iter_rows())
+    assert counts["LAB//RESULT//50912//mg/dL"] == 2
+    assert counts["LAB//RESULT//50912//UNK"] == 2
+    assert counts["ICU_CHART//220045//bpm"] == 2
+    assert counts["SUBJECT_FLUID_OUTPUT//226559//mL"] == 2
+    assert counts["SUBJECT_FLUID_OUTPUT//226559//UNK"] == 1
+    assert [c for c in counts if c.endswith(("//", " ", "\t"))] == []
