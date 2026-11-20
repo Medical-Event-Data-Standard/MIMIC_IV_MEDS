@@ -253,8 +253,8 @@ wheels = [
 
 [[package]]
 name = "meds-extract"
-version = "0.9.1.dev1+ga8763c260"
-source = { git = "https://github.com/mmcdermott/MEDS_extract?rev=a8763c260bd87e5c11d4a2623d85854851e47628#a8763c260bd87e5c11d4a2623d85854851e47628" }
+version = "0.9.1.dev2+g2d8b9640d"
+source = { git = "https://github.com/mmcdermott/MEDS_extract?rev=2d8b9640d193cdd94f55fefee55856439a1628ef#2d8b9640d193cdd94f55fefee55856439a1628ef" }
 dependencies = [
     { name = "dftly" },
     { name = "hydra-core" },
@@ -333,7 +333,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "meds-extract", extras = ["download"], git = "https://github.com/mmcdermott/MEDS_extract?rev=a8763c260bd87e5c11d4a2623d85854851e47628" },
+    { name = "meds-extract", extras = ["download"], git = "https://github.com/mmcdermott/MEDS_extract?rev=2d8b9640d193cdd94f55fefee55856439a1628ef" },
     { name = "sumeds", specifier = ">=0.6.7,<0.7" },
 ]
 

@@ -69,7 +69,7 @@ dev = [
 # DRAFT: MEDS-Extract's `mixed_unit_keys` pre-stage is not released yet (mmcdermott/MEDS_extract#339,
 # pinned to its head commit). Drop this source and raise the floor to that release once it is out.
 [tool.uv.sources]
-meds-extract = { git = "https://github.com/mmcdermott/MEDS_extract", rev = "a8763c260bd87e5c11d4a2623d85854851e47628" }
+meds-extract = { git = "https://github.com/mmcdermott/MEDS_extract", rev = "2d8b9640d193cdd94f55fefee55856439a1628ef" }
 
 [project.entry-points."MEDS_extract.pipelines"]
 MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
