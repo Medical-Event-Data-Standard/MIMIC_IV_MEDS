@@ -674,15 +674,22 @@ icu/inputevents:
     cols:
       # Constant rendering a literal code; see `ed_registration_code` in hosp/admissions.
       subject_weight_code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'"
+      # The units as the codes' last component: stripped of surrounding whitespace, and `UNK` where
+      # missing or blank, as MEDS-Extract compares units when it writes `codes.parquet` (stripped,
+      # blanks dropped), so ` mg` and `mg` give one code. dftly 0.7 has no strip function, so the
+      # extract takes the text from the first to the last non-whitespace character (`(?s)` lets it
+      # span line breaks), which is null when there is none.
+      _rate_unit: '(extract /(?s)\S(?:.*\S)?/ from $rateuom) ?? "UNK"'
+      _amount_unit: '(extract /(?s)\S(?:.*\S)?/ from $amountuom) ?? "UNK"'
   # An infusion is two codes, `INFUSION//START//<itemid>//<rateuom>` and
   # `INFUSION//END//<itemid>//<amountuom>` (alignEHR#53). The unit is always the code's last
   # component, as in the `LAB` codes, so every code has one unit by construction; suMEDS's
   # `sumeds_link_unit_siblings` gives the codes of an itemid recorded in several units (or also
-  # without one) the code without the unit as a parent. `UNK` marks the rows without a unit, which
-  # for starts are exactly those without a rate (`rateuom` is null if and only if `rate` is);
-  # `amountuom` is never null.
+  # without one) the code without the unit as a parent. `UNK` marks the rows without a unit (null or
+  # blank), which for starts are exactly those without a rate (`rateuom` is null if and only if
+  # `rate` is); `amountuom` is never null.
   input_start:
-    code: f"INFUSION//START//{$itemid}//{$rateuom ?? 'UNK'}"
+    code: f"INFUSION//START//{$itemid}//{$_rate_unit}"
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
@@ -707,7 +714,7 @@ icu/inputevents:
       _self:
         unit: $rateuom
   input_end:
-    code: f"INFUSION//END//{$itemid}//{$amountuom ?? 'UNK'}"
+    code: f"INFUSION//END//{$itemid}//{$_amount_unit}"
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id

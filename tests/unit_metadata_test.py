@@ -16,6 +16,7 @@ import polars as pl
 import pytest
 import yaml
 from conftest import run_script
+from dftly import Parser
 
 #: The tables whose events carry a numeric value, and the dictionaries their `_metadata` blocks read.
 TABLES = ["hosp/labevents", "hosp/omr", "icu/chartevents", "icu/inputevents", "icu/outputevents"]
@@ -54,7 +55,9 @@ RAW = {
     "icu/inputevents.csv": [
         "subject_id,hadm_id,stay_id,starttime,endtime,itemid,amount,amountuom,rate,rateuom,orderid,"
         "linkorderid,ordercategorydescription,patientweight,statusdescription",
-        "1,10,100,2180-01-01 10:00:00,2180-01-01 11:00:00,221906,1.0,mg,0.1,mcg/kg/min,1,1,"
+        # Units padded with whitespace, and a blank one, as `codes.parquet` compares them: the code
+        # drops the whitespace (`…//mg`, `…//mL/min`) and a blank unit is `UNK`.
+        "1,10,100,2180-01-01 10:00:00,2180-01-01 11:00:00,221906,1.0,mg ,0.1,mcg/kg/min,1,1,"
         "Continuous Med,70.0,FinishedRunning",
         "2,20,200,2180-01-02 10:00:00,2180-01-02 11:00:00,221906,500,mcg,0.2,mcg/kg/min,2,2,"
         "Continuous Med,80.0,FinishedRunning",
@@ -63,9 +66,9 @@ RAW = {
         # Starts of one itemid at rates in two units, and one without a rate; all ends in mL.
         "1,10,100,2180-01-01 12:00:00,2180-01-01 13:00:00,225158,100,mL,100,mL/hour,4,4,"
         "Continuous IV,70.0,FinishedRunning",
-        "2,20,200,2180-01-02 12:00:00,2180-01-02 13:00:00,225158,60,mL,1,mL/min,5,5,"
+        "2,20,200,2180-01-02 12:00:00,2180-01-02 13:00:00,225158,60,mL,1, mL/min,5,5,"
         "Continuous IV,80.0,FinishedRunning",
-        "3,30,300,2180-01-03 12:00:00,2180-01-03 12:01:00,225158,250,mL,,,6,6,"
+        "3,30,300,2180-01-03 12:00:00,2180-01-03 12:01:00,225158,250,mL,,  ,6,6,"
         "Fluid Bolus,90.0,FinishedRunning",
     ],
     "inputevents_to_rxnorm.csv": [
@@ -212,3 +215,19 @@ def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFra
 def test_codes_without_a_recorded_unit_get_none(codes: pl.DataFrame, code: str):
     assert _units(codes)[code] is None
     assert _units(codes, "unit_source_value")[code] is None
+
+
+def test_infusion_unit_component_is_stripped_and_blank_is_unk():
+    """The unit component is the unit stripped, and `UNK` where it is missing or blank, evaluated from the
+    shipped config with dftly as MEDS-Extract evaluates it."""
+    block = yaml.safe_load(files("MIMIC_IV_MEDS").joinpath("event_configs.yaml").read_text())[
+        "icu/inputevents"
+    ]
+    units = ["mg", " mg", "mg ", "\tmg\n", "mL / h", "  ", "", None]
+    cols = {k: block["_table"]["cols"][k] for k in ("_rate_unit", "_amount_unit")}
+    raw = pl.DataFrame({"itemid": [221906] * len(units), "rateuom": units, "amountuom": units})
+    raw = raw.with_columns(**Parser.to_polars(cols))
+    expected = ["mg", "mg", "mg", "mg", "mL / h", "UNK", "UNK", "UNK"]
+    for event, kind in (("input_start", "START"), ("input_end", "END")):
+        codes = raw.select(**Parser.to_polars({"code": block[event]["code"]}))["code"].to_list()
+        assert codes == [f"INFUSION//{kind}//221906//{unit}" for unit in expected], event

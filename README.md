@@ -318,9 +318,12 @@ none. On the full 3.1 release, 77% of numeric events have a code with a unit.
 `INFUSION//START//<itemid>//<rateuom>`, valued by its rate, and an end is
 `INFUSION//END//<itemid>//<amountuom>`, valued by its amount, written like the `LAB` and
 `SUBJECT_FLUID_OUTPUT` codes. A code then has one unit by construction, whatever units an itemid is
-recorded in, and the config needs no stage of its own to find the itemids that mix units. A start
-without a unit is `INFUSION//START//<itemid>//UNK`: `rateuom` is null exactly when `rate` is, so these
-are the starts without a rate, and they have no unit. `amountuom` is never null.
+recorded in, and the config needs no stage of its own to find the itemids that mix units. The unit
+in the code is stripped of surrounding whitespace, and a missing or blank one is `UNK`, which matches
+how MEDS-Extract compares units when it writes `unit` (stripped, blanks dropped), so ` mg` and `mg`
+give one code. A start without a unit is `INFUSION//START//<itemid>//UNK`: `rateuom` is null exactly
+when `rate` is, so these are the starts without a rate, and they have no unit. `amountuom` is never
+null. On the demo no `rateuom` or `amountuom` is blank or padded with whitespace.
 
 Where an itemid's starts (ends) are recorded in several units, or also without one, the unit-free
 code `INFUSION//START//<itemid>` (`INFUSION//END//<itemid>`) is the parent `sumeds_link_unit_siblings`
@@ -583,7 +586,8 @@ mappings may depend on, newest release first.
     `INFUSION//\1//`.
 
 - **Every infusion code ends in its unit**: `INFUSION//START//<itemid>//<rateuom>` and
-    `INFUSION//END//<itemid>//<amountuom>`, with `//UNK` for a start without a rate. Before, only the
+    `INFUSION//END//<itemid>//<amountuom>`, with the unit stripped of surrounding whitespace and
+    `//UNK` for a start without a rate (or any row whose unit is missing or blank). Before, only the
     codes of an itemid whose starts (ends) mixed units ended in it, which took a package pre-stage
     (`mimic_iv_unit_keys`, now removed) and a side table to decide; now every code has one unit by
     construction, as the `LAB` codes do, and suMEDS's `sumeds_link_unit_siblings` still gives the
