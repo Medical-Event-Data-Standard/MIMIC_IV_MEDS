@@ -5,6 +5,7 @@ the descriptions actually land in `metadata/codes.parquet` is checked on the bui
 by `e2e_demo_test.py`.
 """
 
+import re
 from importlib.resources import files
 
 import yaml
@@ -23,14 +24,24 @@ def _events():
                 yield f"{table}/{name}", event
 
 
-def test_every_code_has_a_component():
-    """A literal code cannot carry metadata: MEDS-Extract attaches it only through components.
+def test_literal_codes_are_plain_literals():
+    """The literal codes are written as literals, not read from constant `_table.cols` columns.
 
-    Literal codes are rendered from a constant `_table.cols` column instead (see
-    `ed_registration_code` in the config).
+    MEDS-Extract >= 0.8.1 attaches `_self` metadata to literal codes (mmcdermott/MEDS_extract#166),
+    so a literal needs no column to be described.
     """
-    literal = [name for name, event in _events() if "$" not in str(event["code"])]
-    assert not literal, f"literal code expressions (no $column) cannot be described: {literal}"
+    literal = {
+        str(event["code"]).strip().strip("'") for _, event in _events() if "$" not in str(event["code"])
+    }
+    assert literal == {
+        "ED_REGISTRATION",
+        "ED_OUT",
+        "MEDS_BIRTH",
+        "MEDS_DEATH",
+        "SUBJECT_WEIGHT_AT_INFUSION//KG",
+    }
+    from_a_column = [name for name, event in _events() if re.fullmatch(r"\$\w+", str(event["code"]).strip())]
+    assert not from_a_column, f"codes read from a bare column: {from_a_column}"
 
 
 def test_every_event_declares_one_description():

@@ -6,6 +6,7 @@ codes are rendered from the code templates in `event_configs.yaml` with syntheti
 a code layout that the rules no longer match fails here rather than silently dropping the enrichment.
 """
 
+import re
 from importlib.resources import files
 
 import polars as pl
@@ -42,8 +43,13 @@ def _events():
 
 
 def _render(template, constants, values):
-    """Render a MESSY code expression with synthetic values, evaluated by dftly as MEDS-Extract does."""
+    """Render a MESSY code expression (`f"..."`, a bare `$column` or a literal) with synthetic values.
+
+    `f"..."` templates are evaluated by dftly as MEDS-Extract does.
+    """
     template = template.strip().strip("'")
+    if re.fullmatch(r"[A-Z_/]+", template):  # a literal code
+        return template
     if template.startswith("$"):
         column = template[1:].split()[0]
         return constants[column].strip("'") if column in constants else values.get(column, DEFAULT_VALUE)
