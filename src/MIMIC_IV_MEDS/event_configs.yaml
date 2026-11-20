@@ -301,6 +301,15 @@ hosp/hcpcsevents:
         possibly_cpt_code: $code
 
 hosp/labevents:
+  _table:
+    cols:
+      # The unit as the code's last part: `valueuom` stripped of surrounding whitespace, and `UNK`
+      # where it is missing or blank. MEDS-Extract compares units the same way when it writes `unit`
+      # in codes.parquet (stripped, blanks dropped), so ` mg` and `mg` give one code. dftly 0.7 has
+      # no strip function, so the extract takes the text from the first to the last non-whitespace
+      # character (`(?s)` lets it span line breaks), which is null when there is none. `unit` below
+      # stays the raw `valueuom`; MEDS-Extract strips it. See "Units" in the README.
+      _value_unit: '(extract /(?s)\S(?:.*\S)?/ from $valueuom) ?? "UNK"'
   lab_specimen_collected:
     code: 'f"LAB//SPECIMEN_COLLECTED//{$itemid}//{$priority ?? ''UNK''}"'
     hadm_id: $hadm_id
@@ -314,7 +323,7 @@ hosp/labevents:
         description: coalesce($omop_concept_name, $label)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
   lab_result:
-    code: f"LAB//RESULT//{$itemid}//{$valueuom ?? 'UNK'}"
+    code: f"LAB//RESULT//{$itemid}//{$_value_unit}"
     hadm_id: $hadm_id
     time: '$storetime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $valuenum
@@ -580,8 +589,12 @@ icu/icustays:
           f"End of an ICU stay; last ICU care unit: {$last_careunit} (icu/icustays.last_careunit)"
 
 icu/chartevents:
+  _table:
+    cols:
+      # The unit as the code's last part, stripped; `UNK` if missing or blank (as in labevents).
+      _value_unit: '(extract /(?s)\S(?:.*\S)?/ from $valueuom) ?? "UNK"'
   event:
-    code: f"LAB//{$itemid}//{$valueuom ?? 'UNK'}"
+    code: f"LAB//{$itemid}//{$_value_unit}"
     time: '$charttime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $valuenum
     text_value: $value
@@ -593,7 +606,7 @@ icu/chartevents:
       # name; without it every one of these codes reads as a bare `LAB//220045//bpm`.
       #
       # Joining on `itemid` alone is a deliberate PARTIAL match on the code's components
-      # (`itemid` and `valueuom`): the metadata broadcasts to every code sharing the itemid,
+      # (`itemid` and the unit): the metadata broadcasts to every code sharing the itemid,
       # whatever unit it was charted in. That is what the old "TODO: make this work even
       # with missing valueuom" wanted. Keying on the unit as well is what made this block
       # useless before -- `d_items.unitname` agrees with the charted `valueuom` for only
@@ -755,8 +768,12 @@ icu/inputevents:
         unit: "'kg'"
 
 icu/outputevents:
+  _table:
+    cols:
+      # The unit as the code's last part, stripped; `UNK` if missing or blank (as in labevents).
+      _value_unit: '(extract /(?s)\S(?:.*\S)?/ from $valueuom) ?? "UNK"'
   output:
-    code: f"SUBJECT_FLUID_OUTPUT//{$itemid}//{$valueuom ?? 'UNK'}"
+    code: f"SUBJECT_FLUID_OUTPUT//{$itemid}//{$_value_unit}"
     time: '$charttime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id

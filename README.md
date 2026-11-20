@@ -301,10 +301,16 @@ pair a unit with `…//UNK`). This shared stage replaced the package's own `mimi
 
 | Codes                                                  | unit as recorded from                                                                                                                  |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `LAB//RESULT`, `LAB//<itemid>`, `SUBJECT_FLUID_OUTPUT` | `valueuom`, the code's last component, so one unit per code (none for `…//UNK`)                                                        |
+| `LAB//RESULT`, `LAB//<itemid>`, `SUBJECT_FLUID_OUTPUT` | `valueuom`, the code's last component (stripped; missing or blank is `UNK`), so one unit per code (none for `…//UNK`)                  |
 | OMR `BMI (kg/m2)`, `Weight (Lbs)`, `Height (Inches)`   | the unit in parentheses in `result_name`                                                                                               |
 | `INFUSION_START//<itemid>`, `INFUSION_END//<itemid>`   | `rateuom` and `amountuom` of the code's rows; the code's last component where the itemid mixes units (see below)                       |
 | `SUBJECT_WEIGHT_AT_INFUSION//KG`                       | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT) |
+
+The unit in a lab, chart or output code is `valueuom` stripped of surrounding whitespace; missing or
+blank is `UNK`. MEDS-Extract compares units the same way when it writes `unit` (stripped, blanks
+dropped), so ` mg` and `mg` give one code, with one unit. The config computes it once per table, as
+the `_table.cols` helper `_value_unit`. On the demo, lab item 51498 records its unit as a single
+space on all 339 rows, which gives `LAB//RESULT//51498//UNK`.
 
 Where a charted item has no unit in the data (`LAB//<itemid>//UNK`), the unit its MIMIC-IV label
 states is used instead: a label ending in a bracketed unit, such as `Admission Weight (lbs.)`. The
@@ -561,6 +567,24 @@ ontology packs over the network, and refuses to summarize a build whose `metadat
 record `sumeds_enrichment.enriched: true`; enrich such a build with `suMEDS-enrich $MEDS_OUTPUT_DIR`
 first. The demo cohort the Tests workflow builds is enriched the same way. A suMEDS upgrade can move the
 enrichment statistics too, so check it with `--compare`.
+
+## Breaking changes
+
+Changes that alter codes, columns or metadata that cohorts, predicates, tokenizers or downstream
+mappings may depend on, newest release first.
+
+### Unreleased (next release, 0.4.0)
+
+- **The unit in a lab, chart or output code is stripped of surrounding whitespace, and a blank one is
+    `UNK`.** This covers `LAB//RESULT//{itemid}//{valueuom}`, `LAB//{itemid}//{valueuom}` (chart
+    events) and `SUBJECT_FLUID_OUTPUT//{itemid}//{valueuom}`. Before, the unit was copied as
+    recorded, so a padded unit gave a code of its own and a blank one a code ending in whitespace,
+    with no `unit`. On the demo, lab item 51498 records its unit as a single space (339
+    events), so its code was `LAB//RESULT//51498//` followed by a space; it is now
+    `LAB//RESULT//51498//UNK`, with its description, parents and (null) unit unchanged. No
+    other code changes. On the full release, codes change only where a unit was padded or blank. To
+    migrate, strip the last part of an old code and write `UNK` for an empty one:
+    `^(.*//)\s*(\S(?:.*\S)?)?\s*$` → `\1\2`, then `//$` → `//UNK`.
 
 ## 📚 Citing this work
 

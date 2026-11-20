@@ -96,7 +96,7 @@ def test_e2e_demo(demo_cohort: Path):
     assert any(ucum[c] != u for c, u in units.items()), "no unit rewritten as UCUM on the demo"
 
     # Codes whose last component is the unit carry exactly that unit as recorded, as one String (see
-    # "Units" in the README); `UNK` there stands for a null unit, which gives none, as does a blank one.
+    # "Units" in the README); `UNK` there stands for a null or blank unit, which gives none.
     data_codes = set(pl.scan_parquet(data_files).select("code").unique().collect()["code"])
     infusions = ("INFUSION_START//", "INFUSION_END//")
     unit_coded = [c for c in units if c in data_codes and c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
@@ -110,7 +110,12 @@ def test_e2e_demo(demo_cohort: Path):
     unit_coded += split
     # Split from the left: a unit may itself contain a slash (`/hpf`).
     unit_part = {c: c.split("//", 3 if c.startswith("LAB//RESULT//") else 2)[-1] for c in unit_coded}
-    expected = {c: None if u == "UNK" or not u.strip() else u for c, u in unit_part.items()}
+    # The unit component is stripped of surrounding whitespace, and a blank unit is `UNK`: the demo
+    # records the unit of lab item 51498 as a single space on every row.
+    padded = sorted(repr(c) for c, u in unit_part.items() if not u or u != u.strip())
+    assert not padded, f"unit components that are blank or padded: {padded[:10]}"
+    assert "LAB//RESULT//51498//UNK" in data_codes
+    expected = {c: None if u == "UNK" else u for c, u in unit_part.items()}
     # Except where the item's label states the unit, which then fills it.
     from_label = {
         c: m.group(1) for c in unit_coded if unit_part[c] == "UNK" and (m := description_unit(described[c]))
