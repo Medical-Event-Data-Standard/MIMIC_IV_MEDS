@@ -574,6 +574,27 @@ access to the data. CI cannot rebuild the credentialed release, so regenerate it
 Both baselines are built with `skip_stages=[sumeds_enrich]`: they fingerprint what the ETL writes, which
 does not depend on network access or on the suMEDS pack release. Summarize a build made the same way.
 
+## Breaking changes
+
+Changes that alter codes, columns or metadata that cohorts, predicates, tokenizers or downstream
+mappings may depend on, newest release first.
+
+### Unreleased (next release, 0.4.0)
+
+- **ICU chart events are `ICU_CHART//…`.** `icu/chartevents` was coded `LAB//{itemid}//{valueuom}` up
+    to 0.3.0 and is now `ICU_CHART//{itemid}//{valueuom}`; `LAB//…` is hospital labs only. Migrate by
+    replacing `^LAB//(?=\d)` with `ICU_CHART//` (see [ICU chart events](#icu-chart-events), #64).
+- **The events have no `unit` column.** Every code has one unit, which is in `metadata/codes.parquet`
+    only; join the events to it on `code` (see [Units](#units)). `unit` is no longer a code modifier
+    (`code_modifier_columns` is empty).
+- **`codes.parquet` `unit` is a UCUM code** (`mcg` → `ug`, `mL/hour` → `mL/h`); the unit as recorded
+    is in the new column `unit_source_value`. Code strings keep the recorded spelling.
+- **New rows in `codes.parquet` without events:** codes that differ only in their unit component get
+    the code without the unit as a parent, which has a row of its own (98 on the demo).
+- **Infusion codes** (`INFUSION_START//<itemid>`, `INFUSION_END//<itemid>`) end in their unit
+    (`//<unit>`, `//UNK` for a start without a rate) where the itemid is recorded in more than one
+    unit, and only there.
+
 ## 📚 Citing this work
 
 If you use this software in your research, please cite it! You can use the **"Cite this repository"** button on GitHub.
