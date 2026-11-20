@@ -1,13 +1,12 @@
 """Every code with a numeric value carries its one unit in `metadata/codes.parquet`, and only there.
 
 The ETL runs the shipped config's numeric tables over a few made-up rows (no download): the
-unit comes from the code's own unit component (labs, charted items, outputs), from the infusion
-rows (in the code only for an itemid that mixes units), from the name of an OMR measurement, from
-an ICU item's label where it was charted without one, and, for the infusion weight, from
-MIMIC-IV's documentation. MEDS-Extract writes it as one String per code; suMEDS's
-`sumeds_normalize_units` stage then writes it as UCUM in `unit` and keeps the spelling as recorded
-in `unit_source_value`. The events have no `unit` column. On the demo cohort the same columns are
-checked by `e2e_demo_test.py`.
+unit comes from the code's own unit component (labs, charted items, outputs, infusions), from
+the name of an OMR measurement, from an ICU item's label where it was charted without one, and,
+for the infusion weight, from MIMIC-IV's documentation. MEDS-Extract writes it as one String per
+code; suMEDS's `sumeds_normalize_units` stage then writes it as UCUM in `unit` and keeps the
+spelling as recorded in `unit_source_value`. The events have no `unit` column. On the demo cohort
+the same columns are checked by `e2e_demo_test.py`.
 """
 
 from importlib.resources import files
@@ -17,6 +16,7 @@ import polars as pl
 import pytest
 import yaml
 from conftest import run_script
+from dftly import Parser
 
 #: The tables whose events carry a numeric value, and the dictionaries their `_metadata` blocks read.
 TABLES = ["hosp/labevents", "hosp/omr", "icu/chartevents", "icu/inputevents", "icu/outputevents"]
@@ -26,8 +26,11 @@ RAW = {
     "hosp/labevents.csv": [
         "subject_id,hadm_id,itemid,charttime,storetime,value,valuenum,valueuom,priority",
         "1,10,50912,2180-01-01 10:00:00,2180-01-01 11:00:00,1.1,1.1,mg/dL,STAT",
-        "2,20,50912,2180-01-02 10:00:00,2180-01-02 11:00:00,0.9,0.9,mg/dL,ROUTINE",
+        # A unit padded with whitespace gives the same code as the unit itself.
+        "2,20,50912,2180-01-02 10:00:00,2180-01-02 11:00:00,0.9,0.9, mg/dL ,ROUTINE",
         "3,30,50912,2180-01-03 10:00:00,2180-01-03 11:00:00,1.0,1.0,,ROUTINE",
+        # A blank unit is `UNK`, as a missing one is.
+        "4,40,50912,2180-01-04 10:00:00,2180-01-04 11:00:00,1.2,1.2,  ,ROUTINE",
     ],
     "d_labitems_to_loinc.csv": [LAB_MAP, "50912,Creatinine,Creatinine,LOINC,2160-0"],
     "hosp/omr.csv": [
@@ -40,7 +43,7 @@ RAW = {
     "icu/chartevents.csv": [
         "subject_id,hadm_id,stay_id,charttime,itemid,value,valuenum,valueuom",
         "1,10,100,2180-01-01 10:00:00,220045,80,80,bpm",
-        "2,20,200,2180-01-02 10:00:00,220045,90,90,bpm",
+        "2,20,200,2180-01-02 10:00:00,220045,90,90,bpm\t",
         "3,30,300,2180-01-03 10:00:00,226531,150,150,",
     ],
     "icu/d_items.csv": [
@@ -55,7 +58,9 @@ RAW = {
     "icu/inputevents.csv": [
         "subject_id,hadm_id,stay_id,starttime,endtime,itemid,amount,amountuom,rate,rateuom,orderid,"
         "linkorderid,ordercategorydescription,patientweight,statusdescription",
-        "1,10,100,2180-01-01 10:00:00,2180-01-01 11:00:00,221906,1.0,mg,0.1,mcg/kg/min,1,1,"
+        # Units padded with whitespace, and a blank one, as `codes.parquet` compares them: the code
+        # drops the whitespace (`…//mg`, `…//mL/min`) and a blank unit is `UNK`.
+        "1,10,100,2180-01-01 10:00:00,2180-01-01 11:00:00,221906,1.0,mg ,0.1,mcg/kg/min,1,1,"
         "Continuous Med,70.0,FinishedRunning",
         "2,20,200,2180-01-02 10:00:00,2180-01-02 11:00:00,221906,500,mcg,0.2,mcg/kg/min,2,2,"
         "Continuous Med,80.0,FinishedRunning",
@@ -64,9 +69,9 @@ RAW = {
         # Starts of one itemid at rates in two units, and one without a rate; all ends in mL.
         "1,10,100,2180-01-01 12:00:00,2180-01-01 13:00:00,225158,100,mL,100,mL/hour,4,4,"
         "Continuous IV,70.0,FinishedRunning",
-        "2,20,200,2180-01-02 12:00:00,2180-01-02 13:00:00,225158,60,mL,1,mL/min,5,5,"
+        "2,20,200,2180-01-02 12:00:00,2180-01-02 13:00:00,225158,60,mL,1, mL/min,5,5,"
         "Continuous IV,80.0,FinishedRunning",
-        "3,30,300,2180-01-03 12:00:00,2180-01-03 12:01:00,225158,250,mL,,,6,6,"
+        "3,30,300,2180-01-03 12:00:00,2180-01-03 12:01:00,225158,250,mL,,  ,6,6,"
         "Fluid Bolus,90.0,FinishedRunning",
     ],
     "inputevents_to_rxnorm.csv": [
@@ -77,6 +82,8 @@ RAW = {
     "icu/outputevents.csv": [
         "subject_id,hadm_id,stay_id,charttime,itemid,value,valueuom",
         "1,10,100,2180-01-01 10:00:00,226559,200,mL",
+        "2,20,200,2180-01-02 10:00:00,226559,300, mL",
+        "3,30,300,2180-01-03 10:00:00,226559,100, ",
     ],
     "outputevents_to_loinc.csv": [LAB_MAP, "226559,Foley,Urine output,LOINC,9187-6"],
 }
@@ -85,27 +92,33 @@ RAW = {
 #: spelling (`…//mcg`, `…//mL/hour`); only the `unit` column is UCUM.
 EXPECTED = {
     "LAB//RESULT//50912//mg/dL": ("mg/dL", "mg/dL"),
-    "LAB//220045//bpm": ("bpm", "{beats}/min"),
+    "ICU_CHART//220045//bpm": ("bpm", "{beats}/min"),
     # Charted without a unit; the item's label states it.
-    "LAB//226531//UNK": ("lbs.", "[lb_av]"),
+    "ICU_CHART//226531//UNK": ("lbs.", "[lb_av]"),
     "SUBJECT_FLUID_OUTPUT//226559//mL": ("mL", "mL"),
     "Weight (Lbs)": ("Lbs", "[lb_av]"),
     "BMI (kg/m2)": ("kg/m2", "kg/m2"),
-    # An itemid whose starts have one rate unit keeps its code; the push without a rate has none.
-    "INFUSION_START//221906": ("mcg/kg/min", "ug/kg/min"),
-    # Its ends are recorded in two units, which gives two codes, one per unit.
-    "INFUSION_END//221906//mg": ("mg", "mg"),
-    "INFUSION_END//221906//mcg": ("mcg", "ug"),
-    # And the other way round.
-    "INFUSION_START//225158//mL/hour": ("mL/hour", "mL/h"),
-    "INFUSION_START//225158//mL/min": ("mL/min", "mL/min"),
-    "INFUSION_END//225158": ("mL", "mL"),
+    # Infusion codes always end in their unit: one code per unit an itemid's starts (ends) record.
+    "INFUSION//START//221906//mcg/kg/min": ("mcg/kg/min", "ug/kg/min"),
+    "INFUSION//END//221906//mg": ("mg", "mg"),
+    "INFUSION//END//221906//mcg": ("mcg", "ug"),
+    "INFUSION//START//225158//mL/hour": ("mL/hour", "mL/h"),
+    "INFUSION//START//225158//mL/min": ("mL/min", "mL/min"),
+    # Also where every row has the same unit.
+    "INFUSION//END//225158//mL": ("mL", "mL"),
     # From the MIMIC-IV documentation of inputevents.patientweight, written as UCUM by the ETL.
-    "SUBJECT_WEIGHT_AT_INFUSION//KG": ("kg", "kg"),
+    "SUBJECT_WEIGHT_AT_INFUSION": ("kg", "kg"),
 }
 #: Codes without a recorded unit, which get none.
-#: The start without a rate of an itemid whose starts mix units is `…//UNK`, which has none.
-NO_UNIT = ["LAB//RESULT//50912//UNK", "Blood Pressure//SYSTOLIC", "eGFR", "INFUSION_START//225158//UNK"]
+#: A start without a rate is `…//UNK`, which has none.
+NO_UNIT = [
+    "LAB//RESULT//50912//UNK",
+    "SUBJECT_FLUID_OUTPUT//226559//UNK",
+    "Blood Pressure//SYSTOLIC",
+    "eGFR",
+    "INFUSION//START//221906//UNK",
+    "INFUSION//START//225158//UNK",
+]
 
 
 @pytest.fixture(scope="module")
@@ -158,19 +171,30 @@ def test_events_have_no_unit(cohort: Path):
         assert "unit" not in pl.read_parquet_schema(shard)
 
 
-def test_only_itemids_that_mix_units_have_it_in_the_code(codes: pl.DataFrame):
-    infusions = sorted(c for c in codes["code"].to_list() if c.startswith("INFUSION_"))
+def test_every_infusion_code_ends_in_its_unit(cohort: Path, codes: pl.DataFrame):
+    infusions = sorted(c for c in codes["code"].to_list() if c.startswith("INFUSION//"))
     assert infusions == [
-        "INFUSION_END//221906",  # the stem row of the two ends below, without events
-        "INFUSION_END//221906//mcg",
-        "INFUSION_END//221906//mg",
-        "INFUSION_END//225158",
-        "INFUSION_START//221906",
-        "INFUSION_START//225158",  # the stem row
-        "INFUSION_START//225158//UNK",
-        "INFUSION_START//225158//mL/hour",
-        "INFUSION_START//225158//mL/min",
+        "INFUSION//END//221906",  # the stem row of the two ends below, without events
+        "INFUSION//END//221906//mcg",
+        "INFUSION//END//221906//mg",
+        "INFUSION//END//225158",  # a stem row also for one unit (`link_single_units`)
+        "INFUSION//END//225158//mL",
+        "INFUSION//START//221906",  # the stem row
+        "INFUSION//START//221906//UNK",
+        "INFUSION//START//221906//mcg/kg/min",
+        "INFUSION//START//225158",  # the stem row
+        "INFUSION//START//225158//UNK",
+        "INFUSION//START//225158//mL/hour",
+        "INFUSION//START//225158//mL/min",
     ]
+    events = pl.read_parquet(sorted((cohort / "data").rglob("*.parquet")))
+    in_data = set(events.filter(pl.col("code").str.starts_with("INFUSION//"))["code"].to_list())
+    assert in_data == {c for c in infusions if c.count("//") == 3}
+    # Every start pairs with its end by stem, swapping START for END (alignEHR#53).
+    stems = {c for c in infusions if c.count("//") == 2}
+    assert {c.replace("//START//", "//END//") for c in stems if "//START//" in c} == {
+        c for c in stems if "//END//" in c
+    }
 
 
 @pytest.mark.parametrize("code", EXPECTED)
@@ -182,18 +206,20 @@ def test_numeric_codes_carry_their_unit(codes: pl.DataFrame, code: str):
 
 def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFrame):
     parents = dict(zip(codes["code"].to_list(), codes["parent_codes"].to_list(), strict=True))
-    for code in ["INFUSION_END//221906//mg", "INFUSION_END//221906//mcg"]:
-        assert parents[code] == ["RxNorm/7512", "INFUSION_END//221906"]
-    for code in ["INFUSION_START//225158//mL/hour", "INFUSION_START//225158//mL/min"]:
-        assert parents[code] == ["RxNorm/9863", "INFUSION_START//225158"]
-    # A start whose unit was not recorded (`UNK`) joins its item's siblings; codes without unit
-    # siblings get no extra parent.
-    assert parents["INFUSION_START//225158//UNK"] == ["RxNorm/9863", "INFUSION_START//225158"]
-    assert parents["INFUSION_START//221906"] == ["RxNorm/7512"]
+    for code in ["INFUSION//END//221906//mg", "INFUSION//END//221906//mcg"]:
+        assert parents[code] == ["RxNorm//7512", "INFUSION//END//221906"]
+    for code in ["INFUSION//START//225158//mL/hour", "INFUSION//START//225158//mL/min"]:
+        assert parents[code] == ["RxNorm//9863", "INFUSION//START//225158"]
+    # A start whose unit was not recorded (`UNK`) joins its item's siblings, and with
+    # `link_single_units` a code with one unit gets its stem too.
+    assert parents["INFUSION//START//225158//UNK"] == ["RxNorm//9863", "INFUSION//START//225158"]
+    for code in ["INFUSION//START//221906//mcg/kg/min", "INFUSION//START//221906//UNK"]:
+        assert parents[code] == ["RxNorm//7512", "INFUSION//START//221906"]
+    assert parents["INFUSION//END//225158//mL"] == ["RxNorm//9863", "INFUSION//END//225158"]
     # The stem has a row of its own, with what both siblings share and no unit.
-    stem = codes.filter(pl.col("code") == "INFUSION_END//221906").to_dicts()
+    stem = codes.filter(pl.col("code") == "INFUSION//END//221906").to_dicts()
     assert [{k: row[k] for k in ("description", "parent_codes", "unit")} for row in stem] == [
-        {"description": "Norepinephrine", "parent_codes": ["RxNorm/7512"], "unit": None}
+        {"description": "Norepinephrine", "parent_codes": ["RxNorm//7512"], "unit": None}
     ]
 
 
@@ -201,3 +227,31 @@ def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFra
 def test_codes_without_a_recorded_unit_get_none(codes: pl.DataFrame, code: str):
     assert _units(codes)[code] is None
     assert _units(codes, "unit_source_value")[code] is None
+
+
+def test_infusion_unit_component_is_stripped_and_blank_is_unk():
+    """The unit component is the unit stripped, and `UNK` where it is missing or blank, evaluated from the
+    shipped config with dftly as MEDS-Extract evaluates it."""
+    block = yaml.safe_load(files("MIMIC_IV_MEDS").joinpath("event_configs.yaml").read_text())[
+        "icu/inputevents"
+    ]
+    units = ["mg", " mg", "mg ", "\tmg\n", "mL / h", "  ", "", None]
+    cols = {k: block["_table"]["cols"][k] for k in ("_rate_unit", "_amount_unit")}
+    raw = pl.DataFrame({"itemid": [221906] * len(units), "rateuom": units, "amountuom": units})
+    raw = raw.with_columns(**Parser.to_polars(cols))
+    expected = ["mg", "mg", "mg", "mg", "mL / h", "UNK", "UNK", "UNK"]
+    for event, kind in (("input_start", "START"), ("input_end", "END")):
+        codes = raw.select(**Parser.to_polars({"code": block[event]["code"]}))["code"].to_list()
+        assert codes == [f"INFUSION//{kind}//221906//{unit}" for unit in expected], event
+
+
+def test_unit_component_is_stripped_and_blank_is_unk(cohort: Path):
+    """Padded units join the stripped unit's code, and blank ones the `…//UNK` code."""
+    events = pl.concat([pl.read_parquet(f) for f in sorted((cohort / "data").rglob("*.parquet"))])
+    counts = dict(events["code"].value_counts().iter_rows())
+    assert counts["LAB//RESULT//50912//mg/dL"] == 2
+    assert counts["LAB//RESULT//50912//UNK"] == 2
+    assert counts["ICU_CHART//220045//bpm"] == 2
+    assert counts["SUBJECT_FLUID_OUTPUT//226559//mL"] == 2
+    assert counts["SUBJECT_FLUID_OUTPUT//226559//UNK"] == 1
+    assert [c for c in counts if c.endswith(("//", " ", "\t"))] == []

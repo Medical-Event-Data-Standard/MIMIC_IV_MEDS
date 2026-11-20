@@ -21,6 +21,8 @@ etl:
   # this is a fallback: it is what makes the spec self-describing when it is resolved by
   # `pkg://` reference or filesystem path instead of by registered name.
   dataset_name: MIMIC-IV
+  # Delete the <output_dir>/<stage> dirs after a successful run; keep: "overrides=['cleanup_intermediates=false']"
+  cleanup_intermediates: true
   # Carried over from the pre-0.7 `ETL.yaml` stage block. That block's other entry,
   # `shard_events.infer_schema_length: 999999999`, has no successor and needs none: 0.7
   # removed the knob and always infers CSV schemas from the full file, which is exactly
@@ -31,7 +33,7 @@ etl:
   # no `license` or `description_uri`: this one spec builds both the credentialed release
   # and the open demo (`dataset_key=demo`), whose licenses and PhysioNet pages differ.
   # There are no code modifier columns, and events have no `unit` column: every code has one
-  # unit (in the code where an item mixes units), which is in metadata/codes.parquet `unit`, so
+  # unit (or none), which is in metadata/codes.parquet `unit`, so
   # code metadata is keyed on the code alone (see "Units" in the README).
   raw_source_id_columns:
     [hadm_id, icustay_id, emar_id, poe_id, order_id, link_order_id]
@@ -48,14 +50,14 @@ etl:
   # was not recorded (`…//UNK`) joins its item's siblings. A charted item without a recorded unit
   # (`…//UNK`) gets the unit its label states, only from the list below (read off the public
   # demo's `icu/d_items` labels; other bracketed endings such as `(serum)`, `(500ml)` or
-  # `(cm at teeth)` are not units). It runs first so that unit normalisation and the enrichment,
-  # now or retried later with `suMEDS-enrich`, always read the same `codes.parquet`.
-  #
-  # Before the canonical pipeline, `mimic_iv_unit_keys` (unit_keys.py) stages the side table
-  # `inputevents_unit_in_code`: the itemids whose infusion starts or ends are recorded in more
-  # than one unit, whose codes therefore end in the unit (see icu/inputevents below).
-  pre_stages:
-    - mimic_iv_unit_keys
+  # `(cm at teeth)` are not units). With `link_single_units`, a code that ends in its unit gets
+  # its stem also when its item has a single unit, so that every infusion start pairs with its end
+  # by stem (alignEHR#53); `unknown_unit_prefixes` does the same for an infusion code without a
+  # recorded unit (a bolus start has no rate: `INFUSION//START//<itemid>//UNK`), while `UNK`
+  # elsewhere (`TRANSFER_TO//UNK`, a medication's missing NDC) is no unit and gets no stem. The
+  # prefixes are the infusion codes' spelling since alignEHR#53 (`INFUSION//START//<itemid>`,
+  # `INFUSION//END//<itemid>`). It runs first so that unit normalisation and the enrichment, now
+  # or retried later with `suMEDS-enrich`, always read the same `codes.parquet`.
   post_stages:
     - sumeds_link_unit_siblings:
         description_unit_pattern: '\s[(\[]([^()\[\]]+)[)\]]\s*$'
@@ -79,34 +81,29 @@ etl:
             units/mL,
           ]
         fill_units: unknown_component
+        link_single_units: true
+        unknown_unit_prefixes: [INFUSION//START//, INFUSION//END//]
     # One UCUM spelling for every `unit` (suMEDS's shared table, e.g. `Cel`, `mm[Hg]`, `mg/dL`); the
     # spelling as recorded stays in `unit_source_value`, and an unknown spelling is kept as it is.
     - sumeds_normalize_units
     - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:
-  _table:
-    cols:
-      # Constants that render the two literal ED codes. MEDS-Extract attaches code metadata
-      # (`_self` included) only through a code's components and rejects a `_metadata` block on
-      # a literal code; the pre-existing `codes.parquet` it suggests instead is not read by
-      # the standard pipeline. A constant component gives these codes something to attach
-      # through without changing the data: the code strings are identical, and rows without
-      # a time are still dropped. The same idiom renders MEDS_BIRTH, MEDS_DEATH and
-      # SUBJECT_WEIGHT_AT_INFUSION//KG below. See "Code metadata" in the README.
-      ed_registration_code: "'ED_REGISTRATION'"
-      ed_out_code: "'ED_OUT'"
+  # ED_REGISTRATION and ED_OUT, like MEDS_BIRTH, MEDS_DEATH and SUBJECT_WEIGHT_AT_INFUSION
+  # below, are plain literal codes: MEDS-Extract (>= 0.8.1, mmcdermott/MEDS_extract#166) attaches
+  # `_self` metadata to literal codes, and a row whose time is null yields no event.
+  #
   # The `_self` descriptions in this file paraphrase the MIMIC-IV documentation of the
   # column each code component comes from (https://mimic.mit.edu/docs/iv/; source
   # MIT-LCP/mimic-website at 8182227, MIT), and name that column in parentheses.
   ed_registration:
-    code: $ed_registration_code
+    code: ED_REGISTRATION
     time: '$edregtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
       _self:
         description: "'Registration in the emergency department (hosp/admissions.edregtime)'"
   ed_out:
-    code: $ed_out_code
+    code: ED_OUT
     time: '$edouttime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
       _self:
@@ -173,7 +170,12 @@ hosp/diagnoses_icd:
         key: hadm_id
         cols: [dischtime]
   diagnosis:
-    code: 'f"DIAGNOSIS//ICD//{$icd_version}//{$icd_code}"'
+    # `ICD//<edition>//<code>`: MIMIC-IV's billed diagnoses are ICD-9-CM (`icd_version` 9) and
+    # ICD-10-CM (10), so the edition is `9CM` or `10CM`. Any other version is written as recorded.
+    # The code stays undotted, as recorded.
+    code: >-
+      f"DIAGNOSIS//ICD//{'9CM' if $icd_version::str == '9' else '10CM' if $icd_version::str == '10'
+      else $icd_version::str}//{$icd_code}"
     hadm_id: $hadm_id
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
@@ -187,13 +189,13 @@ hosp/diagnoses_icd:
         icd_code: $icd_code
         description: $long_title
         parent_codes: >-
-          f"ICD{$icd_version}CM/{$icd_code[0:4]}.{$icd_code[4:]}"
+          f"ICD{$icd_version}CM//{$icd_code[0:4]}.{$icd_code[4:]}"
           if $icd_version == "9" and $icd_code[0:1] == "E" and len_chars($icd_code) > 4
-          else f"ICD{$icd_version}CM/{$icd_code}"
+          else f"ICD{$icd_version}CM//{$icd_code}"
           if $icd_version == "9" and $icd_code[0:1] == "E"
-          else f"ICD{$icd_version}CM/{$icd_code[0:3]}.{$icd_code[3:]}"
+          else f"ICD{$icd_version}CM//{$icd_code[0:3]}.{$icd_code[3:]}"
           if len_chars($icd_code) > 3
-          else f"ICD{$icd_version}CM/{$icd_code}"
+          else f"ICD{$icd_version}CM//{$icd_code}"
 
 hosp/drgcodes:
   _table:
@@ -214,7 +216,7 @@ hosp/drgcodes:
         # `003`. dftly has no format specifiers and `len_chars` rejects an integer, hence the
         # prefix-and-slice. `HCFA` denotes MS-DRG; see "DRG" in the README.
         parent_codes: >-
-          f"{'MS-DRG' if $drg_type == 'HCFA' else 'APR-DRG'}/{f'000{$drg_code}'[-3:]}"
+          f"{'MS-DRG' if $drg_type == 'HCFA' else 'APR-DRG'}//{f'000{$drg_code}'[-3:]}"
         # The DRG title is not used: it varies in spelling across rows of one DRG (see "DRG" in
         # the README), and `_self` would join the variants into one multi-line description.
         description: >-
@@ -270,12 +272,12 @@ hosp/emar:
         # The conditional deliberately has no `else`: an else-less dftly conditional yields
         # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
         # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
-        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # than emitting a meaningless `NDC//0`. This reproduces the old external join, where a
         # code whose segment rendered 'UNK' matched no metadata row.
         #
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
-        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
+        parent_codes: 'f"NDC//{$ndc}" if ($ndc ?? "0") != "0"'
         description: >-
           f"Medication administration recorded in the eMAR: {$medication ?? 'UNK'} (hosp/emar.medication);
           administration event: {$event_txt ?? 'UNK'} (emar.event_txt); NDC dispensed for the order:
@@ -301,6 +303,15 @@ hosp/hcpcsevents:
         possibly_cpt_code: $code
 
 hosp/labevents:
+  _table:
+    cols:
+      # The unit as the code's last part: `valueuom` stripped of surrounding whitespace, and `UNK`
+      # where it is missing or blank. MEDS-Extract compares units the same way when it writes `unit`
+      # in codes.parquet (stripped, blanks dropped), so ` mg` and `mg` give one code. dftly 0.7 has
+      # no strip function, so the extract takes the text from the first to the last non-whitespace
+      # character (`(?s)` lets it span line breaks), which is null when there is none. `unit` below
+      # stays the raw `valueuom`; MEDS-Extract strips it. See "Units" in the README.
+      _value_unit: '(extract /(?s)\S(?:.*\S)?/ from $valueuom) ?? "UNK"'
   lab_specimen_collected:
     code: 'f"LAB//SPECIMEN_COLLECTED//{$itemid}//{$priority ?? ''UNK''}"'
     hadm_id: $hadm_id
@@ -312,9 +323,9 @@ hosp/labevents:
         itemid:
           column: itemid (omop_source_code)
         description: coalesce($omop_concept_name, $label)
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
   lab_result:
-    code: f"LAB//RESULT//{$itemid}//{$valueuom ?? 'UNK'}"
+    code: f"LAB//RESULT//{$itemid}//{$_value_unit}"
     hadm_id: $hadm_id
     time: '$storetime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $valuenum
@@ -330,7 +341,7 @@ hosp/labevents:
         # unique in this file (1630 rows / 1630 distinct), so there is never a second
         # candidate row that the unit would have disambiguated.
         description: coalesce($omop_concept_name, $label)
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The unit is a component of the code, so each code has exactly one; null (`UNK` in the
       # code) gives none. See "Units" in the README.
       _self:
@@ -392,9 +403,6 @@ hosp/patients:
   _table:
     cols:
       year_of_birth: "($anchor_year - $anchor_age)::str"
-      # Constants rendering the literal MEDS codes; see `ed_registration_code` in hosp/admissions.
-      meds_birth_code: "'MEDS_BIRTH'"
-      meds_death_code: "'MEDS_DEATH'"
     joins:
       # Earliest per-subject in-hospital death time, via an aggregated join
       # (mmcdermott/MEDS_extract#65 / #98, on the 0.7 line). `min` over the fixed-width
@@ -413,7 +421,7 @@ hosp/patients:
         # No `parent_codes`: the OMOP Gender tag (`Gender//F`, `Gender//M`) is an external-ontology
         # link, added by suMEDS from `sumeds_rules.yaml` (see the README).
   dob:
-    code: $meds_birth_code # MEDS_BIRTH, the MEDS official code for birth.
+    code: MEDS_BIRTH # the MEDS official code for birth.
     time: "$year_of_birth::year"
     _metadata:
       _self:
@@ -421,7 +429,7 @@ hosp/patients:
           'Birth (MEDS standard code). MIMIC-IV gives the year only: hosp/patients.anchor_year minus
           anchor_age, in the shifted calendar, with ages over 89 recorded as 91'
   death:
-    code: $meds_death_code # MEDS_DEATH, the MEDS official code for death.
+    code: MEDS_DEATH # the MEDS official code for death.
     # `deathtime` (precise, in-hospital, joined above) takes precedence over the raw
     # date-only `dod`. The `::?` casts are lenient (null on format mismatch) so the two
     # formats coalesce cleanly; rows where both are null (living subjects) are dropped
@@ -481,17 +489,20 @@ hosp/pharmacy:
         # The conditional deliberately has no `else`: an else-less dftly conditional yields
         # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
         # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
-        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # than emitting a meaningless `NDC//0`. This reproduces the old external join, where a
         # code whose segment rendered 'UNK' matched no metadata row.
         #
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
-        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
+        parent_codes: 'f"NDC//{$ndc}" if ($ndc ?? "0") != "0"'
         description: >-
           f"Start of a pharmacy medication order: {$medication ?? 'UNK'} (hosp/pharmacy.medication,
           starttime); NDC dispensed for the order: {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
+  # An order is two codes, `MEDICATION//START//<drug>//<ndc>` and `MEDICATION//END//<drug>//<ndc>`,
+  # the spelling the MEDS ETLs move to for the two ends of an interval (alignEHR#53); both carry the
+  # drug and NDC, so swapping START for END pairs them.
   medication_stop:
-    code: f"MEDICATION//STOP//{$medication ?? 'UNK'}//{$ndc_clean}"
+    code: f"MEDICATION//END//{$medication ?? 'UNK'}//{$ndc_clean}"
     time: coalesce($stoptime::?"%Y-%m-%d %H:%M:%S", $stoptime::?"%Y-%m-%d")
     poe_id: $poe_id
     _metadata:
@@ -509,12 +520,12 @@ hosp/pharmacy:
         # The conditional deliberately has no `else`: an else-less dftly conditional yields
         # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
         # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
-        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # than emitting a meaningless `NDC//0`. This reproduces the old external join, where a
         # code whose segment rendered 'UNK' matched no metadata row.
         #
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
-        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
+        parent_codes: 'f"NDC//{$ndc}" if ($ndc ?? "0") != "0"'
         description: >-
           f"End of a pharmacy medication order: {$medication ?? 'UNK'} (hosp/pharmacy.medication,
           stoptime); NDC dispensed for the order: {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
@@ -526,7 +537,12 @@ hosp/procedures_icd:
         key: hadm_id
         cols: [dischtime]
   procedure:
-    code: 'f"PROCEDURE//ICD//{$icd_version}//{$icd_code}"'
+    # `ICD//<edition>//<code>`: billed ICD-9 procedures are ICD-9-CM volume 3 (`9CM`; OMOP
+    # vocabulary ICD9Proc) and ICD-10 procedures are ICD-10-PCS (`10PCS`). Any other version is
+    # written as recorded. The code stays undotted, as recorded.
+    code: >-
+      f"PROCEDURE//ICD//{'9CM' if $icd_version::str == '9' else '10PCS' if $icd_version::str == '10'
+      else $icd_version::str}//{$icd_code}"
     hadm_id: $hadm_id
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
@@ -538,11 +554,11 @@ hosp/procedures_icd:
         icd_code: $icd_code
         description: $long_title
         parent_codes: >-
-          f"ICD9Proc/{$icd_code[0:2]}.{$icd_code[2:]}"
+          f"ICD9Proc//{$icd_code[0:2]}.{$icd_code[2:]}"
           if $icd_version == "9" and len_chars($icd_code) > 2
-          else f"ICD9Proc/{$icd_code}"
+          else f"ICD9Proc//{$icd_code}"
           if $icd_version == "9"
-          else f"ICD10PCS/{$icd_code}"
+          else f"ICD10PCS//{$icd_code}"
           if $icd_version == "10"
 
 hosp/transfers:
@@ -580,8 +596,17 @@ icu/icustays:
           f"End of an ICU stay; last ICU care unit: {$last_careunit} (icu/icustays.last_careunit)"
 
 icu/chartevents:
+  # `ICU_CHART`, not `LAB`: these are values charted at the ICU bedside (vital signs, scores,
+  # assessments, device settings, point-of-care values; `icu/d_items` itemids, 22xxxx), not
+  # hospital lab results, which are `LAB//RESULT` and `LAB//SPECIMEN_COLLECTED` from
+  # `hosp/labevents`. Up to 0.3.0 this was `LAB//{itemid}//{unit}`, so a `^LAB//` filter
+  # mixed the two (#64). The itemid and unit segments are unchanged.
+  _table:
+    cols:
+      # The unit as the code's last part, stripped; `UNK` if missing or blank (as in labevents).
+      _value_unit: '(extract /(?s)\S(?:.*\S)?/ from $valueuom) ?? "UNK"'
   event:
-    code: f"LAB//{$itemid}//{$valueuom ?? 'UNK'}"
+    code: f"ICU_CHART//{$itemid}//{$_value_unit}"
     time: '$charttime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $valuenum
     text_value: $value
@@ -590,10 +615,10 @@ icu/chartevents:
     _metadata:
       # `icu/d_items` is the dictionary for chartevents itemids and ships inside MIMIC-IV
       # itself, so it covers 100% of them and needs no external map. It supplies the human
-      # name; without it every one of these codes reads as a bare `LAB//220045//bpm`.
+      # name; without it every one of these codes reads as a bare `ICU_CHART//220045//bpm`.
       #
       # Joining on `itemid` alone is a deliberate PARTIAL match on the code's components
-      # (`itemid` and `valueuom`): the metadata broadcasts to every code sharing the itemid,
+      # (`itemid` and the unit): the metadata broadcasts to every code sharing the itemid,
       # whatever unit it was charted in. That is what the old "TODO: make this work even
       # with missing valueuom" wanted. Keying on the unit as well is what made this block
       # useless before -- `d_items.unitname` agrees with the charted `valueuom` for only
@@ -610,7 +635,7 @@ icu/chartevents:
       meas_chartevents_main:
         itemid:
           column: itemid (omop_source_code)
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The charted unit, a component of the code (not `d_items.unitname`, which disagrees with
       # it for 10% of pairs; see above).
       _self:
@@ -634,7 +659,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       proc_itemid:
         itemid:
           column: itemid (omop_source_code)
@@ -643,7 +668,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
   end:
     code: 'f"PROCEDURE//END//{$itemid}"'
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
@@ -661,7 +686,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       proc_itemid:
         itemid:
           column: itemid (omop_source_code)
@@ -670,29 +695,27 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
 
 icu/inputevents:
   _table:
-    joins:
-      # Staged by the `mimic_iv_unit_keys` pre-stage (unit_keys.py): `start_unit_in_code` is true
-      # for the itemids whose starts are recorded in more than one `rateuom`, `end_unit_in_code`
-      # for those whose ends are recorded in more than one `amountuom`; null otherwise.
-      inputevents_unit_in_code:
-        left_on: itemid
-        right_on: itemid
-        cols: [start_unit_in_code, end_unit_in_code]
     cols:
-      # Constant rendering a literal code; see `ed_registration_code` in hosp/admissions.
-      subject_weight_code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'"
-      # A code holds one unit: only where an itemid's starts (ends) mix units does the unit become
-      # the code's last component; every other code is unchanged. Within such an itemid, `UNK`
-      # marks the rows without a unit, which for starts are exactly those without a rate
-      # (`rateuom` is null if and only if `rate` is); `amountuom` is never null.
-      _start_unit_suffix: '(f"//{$rateuom ?? ''UNK''}" if $start_unit_in_code else "")'
-      _end_unit_suffix: '(f"//{$amountuom ?? ''UNK''}" if $end_unit_in_code else "")'
+      # The units as the codes' last component: stripped of surrounding whitespace, and `UNK` where
+      # missing or blank, as MEDS-Extract compares units when it writes `codes.parquet` (stripped,
+      # blanks dropped), so ` mg` and `mg` give one code. dftly 0.7 has no strip function, so the
+      # extract takes the text from the first to the last non-whitespace character (`(?s)` lets it
+      # span line breaks), which is null when there is none.
+      _rate_unit: '(extract /(?s)\S(?:.*\S)?/ from $rateuom) ?? "UNK"'
+      _amount_unit: '(extract /(?s)\S(?:.*\S)?/ from $amountuom) ?? "UNK"'
+  # An infusion is two codes, `INFUSION//START//<itemid>//<rateuom>` and
+  # `INFUSION//END//<itemid>//<amountuom>` (alignEHR#53). The unit is always the code's last
+  # component, as in the `LAB` codes, so every code has one unit by construction; suMEDS's
+  # `sumeds_link_unit_siblings` gives the codes of an itemid recorded in several units (or also
+  # without one) the code without the unit as a parent. `UNK` marks the rows without a unit (null or
+  # blank), which for starts are exactly those without a rate (`rateuom` is null if and only if
+  # `rate` is); `amountuom` is never null.
   input_start:
-    code: 'f"INFUSION_START//{$itemid}{$_start_unit_suffix}"'
+    code: f"INFUSION//START//{$itemid}//{$_rate_unit}"
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
@@ -712,12 +735,12 @@ icu/inputevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
-      # The rate's unit: one per code, as the itemids that mix units have it in the code.
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
+      # The rate's unit, the code's last component.
       _self:
         unit: $rateuom
   input_end:
-    code: 'f"INFUSION_END//{$itemid}{$_end_unit_suffix}"'
+    code: f"INFUSION//END//{$itemid}//{$_amount_unit}"
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
@@ -738,12 +761,14 @@ icu/inputevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The amount's unit, as for `input_start`.
       _self:
         unit: $amountuom
   subject_weight:
-    code: $subject_weight_code
+    # No unit in the code: `kg` is the code's `unit` in codes.parquet, as for eICU's
+    # SUBJECT_WEIGHT_AT_INFUSION. Up to 0.3.0 this was SUBJECT_WEIGHT_AT_INFUSION//KG.
+    code: SUBJECT_WEIGHT_AT_INFUSION
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $patientweight
     _metadata:
@@ -755,8 +780,12 @@ icu/inputevents:
         unit: "'kg'"
 
 icu/outputevents:
+  _table:
+    cols:
+      # The unit as the code's last part, stripped; `UNK` if missing or blank (as in labevents).
+      _value_unit: '(extract /(?s)\S(?:.*\S)?/ from $valueuom) ?? "UNK"'
   output:
-    code: f"SUBJECT_FLUID_OUTPUT//{$itemid}//{$valueuom ?? 'UNK'}"
+    code: f"SUBJECT_FLUID_OUTPUT//{$itemid}//{$_value_unit}"
     time: '$charttime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
@@ -771,7 +800,7 @@ icu/outputevents:
         # `valueuom: $unitname` was a second join key; dropped for the same reason as in
         # labevents. Only one itemid in this file has duplicate rows and they agree on both
         # label and concept code, so the unit never disambiguated anything.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The unit is a component of the code, as in labevents.
       _self:
         unit: $valueuom

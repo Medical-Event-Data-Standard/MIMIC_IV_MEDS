@@ -19,11 +19,11 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-# The whole ETL is `event_configs.yaml`, run by MEDS-Extract's own `meds-extract-run`; the only
-# Python is the small unit pre-stage it declares (`unit_keys.py`). The
-# `[download]` extra adds `meds-extract-download` (httpx + tenacity), which the runner spawns to stage the raw
-# data. MEDS-transforms, polars and hydra all arrive through it at the versions it fences;
-# duplicating those pins here would only create drift.
+# The whole ETL is `event_configs.yaml`, run by MEDS-Extract's own `meds-extract-run`; this package
+# has no Python stages of its own. The `[download]` extra adds `meds-extract-download` (httpx +
+# tenacity), which the runner spawns to stage the raw data. MEDS-transforms, polars and hydra
+# all arrive through it at the versions it fences; duplicating those pins here would only create
+# drift.
 #
 # The floor is 0.9.0: it writes the `unit` code metadata as one String per code (stripped, blanks
 # dropped, a code with several distinct units an error; MEDS_extract#336), which the
@@ -42,9 +42,13 @@ classifiers = [
 # `sumeds_link_unit_siblings` post-stage, which links codes that differ only by unit and fills the
 # units item labels state (it replaced this package's own `mimic_iv_unit_metadata`). It is capped below the next
 # minor for the same reason (its rules format and CLI are still 0.x).
+# suMEDS 0.6.9 adds the `link_single_units` and `unknown_unit_prefixes` options of
+# `sumeds_link_unit_siblings`, which the spec sets.
 dependencies = [
-    "meds-extract[download]>=0.9.0,<0.10",
-    "sumeds>=0.6.7,<0.7",
+    # 0.9.2 is the first MEDS-Extract release that reads the spec's
+    # `etl.cleanup_intermediates` (mmcdermott/MEDS_extract#340).
+    "meds-extract[download]>=0.9.2,<0.10",
+    "sumeds>=0.6.9,<0.7",
 ]
 
 [dependency-groups]
@@ -74,10 +78,24 @@ MIMIC-IV = "MIMIC_IV_MEDS:event_configs.yaml"
 [project.entry-points."sumeds.rules"]
 MIMIC-IV = "MIMIC_IV_MEDS:sumeds_rules.yaml"
 
-# The unit pre-stage the config declares: it finds the infusion itemids needing their unit in the
-# code (`etl.pre_stages`).
-[project.entry-points."MEDS_transforms.stages"]
-mimic_iv_unit_keys = "MIMIC_IV_MEDS.unit_keys:main"
+# The summary-stats baselines in tests/regression/, which `baseline_MEDS_summary_stats` (from
+# meds_summary_stats) regenerates and checks: `<kind>_summary_stats.json` for each kind below, compared
+# under meds_summary_stats's built-in `etl-regression` policy. Each baseline describes the dataset
+# `meds-extract-run spec=MIMIC-IV` builds, suMEDS enrichment included: the builds run the spec's
+# `sumeds_enrich` post-stage with `strict`, so a failed enrichment fails the build instead of
+# soft-failing, and a build whose metadata/dataset.json does not record an enrichment is refused. The
+# demo is the cohort CI builds (tests/conftest.py), which is built the same way. See "Summary
+# statistics" in the README.
+[tool.meds_summary_stats.baselines]
+require_dataset_metadata = { "sumeds_enrichment.enriched" = true }
+
+[tool.meds_summary_stats.baselines.kinds.full]
+build = "uv run --frozen meds-extract-run spec=MIMIC-IV do_download=false input_dir={input_dir} output_dir={output_dir} \"overrides=['++stage_cfg.strict=true']\""
+
+[tool.meds_summary_stats.baselines.kinds.demo]
+build = "uv run --frozen meds-extract-run spec=MIMIC-IV dataset_key=demo do_download=false input_dir={input_dir} output_dir={output_dir} \"overrides=['++stage_cfg.strict=true']\""
+# The demo is open, so the ETL downloads it when no --input-dir is given.
+build_without_input = "uv run --frozen meds-extract-run spec=MIMIC-IV dataset_key=demo output_dir={output_dir} \"overrides=['++stage_cfg.strict=true']\""
 
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"

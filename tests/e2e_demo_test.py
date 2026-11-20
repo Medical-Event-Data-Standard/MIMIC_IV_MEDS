@@ -1,8 +1,7 @@
 """End-to-end run of the shipped ETL over the public MIMIC-IV demo release.
 
 This distribution is `event_configs.yaml` plus the entry-point registration that names it
-`MIMIC-IV` (and one small pre-stage, tested in `unit_keys_test.py`). So the main thing worth
-testing is that
+`MIMIC-IV`. So the main thing worth testing is that
 `meds-extract-run spec=MIMIC-IV` resolves that registration, downloads the demo bucket from
 PhysioNet (no credentials needed), runs the pipeline and the suMEDS enrichment, and leaves a
 well-formed MEDS cohort behind. That build is the `demo_cohort` fixture of `conftest.py`, shared with
@@ -72,13 +71,17 @@ def test_e2e_demo(demo_cohort: Path):
     assert all("unit" not in pl.read_parquet_schema(f) for f in data_files)
 
     # Code metadata, as read from disk, is valid MEDS code metadata, and every code is
-    # described except lab items absent from mimic-code's lab map, which have no other
-    # source (see "Code metadata" in the README). No description may hold a newline:
-    # that is MEDS-Extract joining the output of two `_metadata` blocks for one code.
+    # described except `hosp/labevents` items absent from mimic-code's lab map (the 53xxx
+    # itemids), which have no other source (see "Code metadata" in the README), and the
+    # unit-less stem suMEDS links their unit variants to (`LAB//RESULT//53153`). ICU chart
+    # codes (`ICU_CHART//…`) are described from `icu/d_items` and get no exemption. No
+    # description may hold a newline: that is MEDS-Extract joining the output of two
+    # `_metadata` blocks for one code.
     codes = pq.read_table(metadata / "codes.parquet")
     CodeMetadataSchema.validate(codes)
     described = dict(zip(codes["code"].to_pylist(), codes["description"].to_pylist(), strict=True))
-    undescribed = sorted(c for c, d in described.items() if d is None and not c.startswith("LAB//"))
+    unmapped_lab = re.compile(r"^LAB//(RESULT|SPECIMEN_COLLECTED)//53\d{3}(//|$)")
+    undescribed = sorted(c for c, d in described.items() if d is None and not unmapped_lab.match(c))
     assert not undescribed, f"codes without a description: {undescribed}"
     multi = sorted(c for c, d in described.items() if d is not None and "\n" in d)
     assert not multi, f"codes with several joined descriptions: {multi}"
@@ -96,21 +99,32 @@ def test_e2e_demo(demo_cohort: Path):
     assert any(ucum[c] != u for c, u in units.items()), "no unit rewritten as UCUM on the demo"
 
     # Codes whose last component is the unit carry exactly that unit as recorded, as one String (see
-    # "Units" in the README); `UNK` there stands for a null unit, which gives none, as does a blank one.
+    # "Units" in the README); `UNK` there stands for a null or blank unit, which gives none.
     data_codes = set(pl.scan_parquet(data_files).select("code").unique().collect()["code"])
-    infusions = ("INFUSION_START//", "INFUSION_END//")
-    unit_coded = [c for c in units if c in data_codes and c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
+    infusions = ("INFUSION//START//", "INFUSION//END//")
+    unit_coded = [
+        c
+        for c in units
+        if c in data_codes and c.startswith(("LAB//", "ICU_CHART//", "SUBJECT_FLUID_OUTPUT//"))
+    ]
     unit_coded = [c for c in unit_coded if not c.startswith("LAB//SPECIMEN_COLLECTED//")]
     assert unit_coded, "no unit-coded codes in the demo"
-    # Infusion codes end in their unit only where the itemid mixes units (`…//<itemid>//<unit>`).
+    # Every infusion code ends in its unit (`…//<itemid>//<unit>`, `…//UNK` without one).
     infusion_codes = [c for c in units if c in data_codes and c.startswith(infusions)]
-    split = [c for c in infusion_codes if c.count("//") == 2]
-    assert split, "no infusion itemid recorded in several units in the demo"
-    assert len(split) < len(infusion_codes), "every infusion code has its unit in the code"
-    unit_coded += split
+    assert infusion_codes, "no infusion codes in the demo"
+    no_unit_part = sorted(c for c in infusion_codes if c.count("//") != 3)
+    assert not no_unit_part, f"infusion codes without a unit component: {no_unit_part[:10]}"
+    unit_coded += infusion_codes
     # Split from the left: a unit may itself contain a slash (`/hpf`).
-    unit_part = {c: c.split("//", 3 if c.startswith("LAB//RESULT//") else 2)[-1] for c in unit_coded}
-    expected = {c: None if u == "UNK" or not u.strip() else u for c, u in unit_part.items()}
+    unit_part = {
+        c: c.split("//", 3 if c.startswith(("LAB//RESULT//", *infusions)) else 2)[-1] for c in unit_coded
+    }
+    # The unit component is stripped of surrounding whitespace, and a blank unit is `UNK`: the demo
+    # records the unit of lab item 51498 as a single space on every row.
+    padded = sorted(repr(c) for c, u in unit_part.items() if not u or u != u.strip())
+    assert not padded, f"unit components that are blank or padded: {padded[:10]}"
+    assert "LAB//RESULT//51498//UNK" in data_codes
+    expected = {c: None if u == "UNK" else u for c, u in unit_part.items()}
     # Except where the item's label states the unit, which then fills it.
     from_label = {
         c: m.group(1) for c in unit_coded if unit_part[c] == "UNK" and (m := description_unit(described[c]))
@@ -143,5 +157,5 @@ def test_e2e_demo(demo_cohort: Path):
     # Every infusion end has a unit, its rows' `amountuom` (never null): MEDS-Extract (0.9) accepts a
     # code's unit metadata only if the code has one, so no infusion code mixes units, and joining the
     # events to `codes.parquet` on `code` gives each infusion end its unit.
-    unitless = sorted(c for c in infusion_codes if c.startswith("INFUSION_END//") and units[c] is None)
+    unitless = sorted(c for c in infusion_codes if c.startswith("INFUSION//END//") and units[c] is None)
     assert not unitless, f"infusion ends without a unit: {unitless[:10]}"
