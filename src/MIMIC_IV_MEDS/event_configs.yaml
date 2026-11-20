@@ -85,28 +85,21 @@ etl:
     - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:
-  _table:
-    cols:
-      # Constants that render the two literal ED codes. MEDS-Extract attaches code metadata
-      # (`_self` included) only through a code's components and rejects a `_metadata` block on
-      # a literal code; the pre-existing `codes.parquet` it suggests instead is not read by
-      # the standard pipeline. A constant component gives these codes something to attach
-      # through without changing the data: the code strings are identical, and rows without
-      # a time are still dropped. The same idiom renders MEDS_BIRTH, MEDS_DEATH and
-      # SUBJECT_WEIGHT_AT_INFUSION//KG below. See "Code metadata" in the README.
-      ed_registration_code: "'ED_REGISTRATION'"
-      ed_out_code: "'ED_OUT'"
+  # ED_REGISTRATION and ED_OUT, like MEDS_BIRTH, MEDS_DEATH and SUBJECT_WEIGHT_AT_INFUSION//KG
+  # below, are plain literal codes: MEDS-Extract (>= 0.8.1, mmcdermott/MEDS_extract#166) attaches
+  # `_self` metadata to literal codes, and a row whose time is null yields no event.
+  #
   # The `_self` descriptions in this file paraphrase the MIMIC-IV documentation of the
   # column each code component comes from (https://mimic.mit.edu/docs/iv/; source
   # MIT-LCP/mimic-website at 8182227, MIT), and name that column in parentheses.
   ed_registration:
-    code: $ed_registration_code
+    code: ED_REGISTRATION
     time: '$edregtime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
       _self:
         description: "'Registration in the emergency department (hosp/admissions.edregtime)'"
   ed_out:
-    code: $ed_out_code
+    code: ED_OUT
     time: '$edouttime::"%Y-%m-%d %H:%M:%S"'
     _metadata:
       _self:
@@ -392,9 +385,6 @@ hosp/patients:
   _table:
     cols:
       year_of_birth: "($anchor_year - $anchor_age)::str"
-      # Constants rendering the literal MEDS codes; see `ed_registration_code` in hosp/admissions.
-      meds_birth_code: "'MEDS_BIRTH'"
-      meds_death_code: "'MEDS_DEATH'"
     joins:
       # Earliest per-subject in-hospital death time, via an aggregated join
       # (mmcdermott/MEDS_extract#65 / #98, on the 0.7 line). `min` over the fixed-width
@@ -413,7 +403,7 @@ hosp/patients:
         # No `parent_codes`: the OMOP Gender tag (`Gender//F`, `Gender//M`) is an external-ontology
         # link, added by suMEDS from `sumeds_rules.yaml` (see the README).
   dob:
-    code: $meds_birth_code # MEDS_BIRTH, the MEDS official code for birth.
+    code: MEDS_BIRTH # the MEDS official code for birth.
     time: "$year_of_birth::year"
     _metadata:
       _self:
@@ -421,7 +411,7 @@ hosp/patients:
           'Birth (MEDS standard code). MIMIC-IV gives the year only: hosp/patients.anchor_year minus
           anchor_age, in the shifted calendar, with ages over 89 recorded as 91'
   death:
-    code: $meds_death_code # MEDS_DEATH, the MEDS official code for death.
+    code: MEDS_DEATH # the MEDS official code for death.
     # `deathtime` (precise, in-hospital, joined above) takes precedence over the raw
     # date-only `dod`. The `::?` casts are lenient (null on format mismatch) so the two
     # formats coalesce cleanly; rows where both are null (living subjects) are dropped
@@ -688,8 +678,6 @@ icu/inputevents:
         right_on: itemid
         cols: [start_unit_in_code, end_unit_in_code]
     cols:
-      # Constant rendering a literal code; see `ed_registration_code` in hosp/admissions.
-      subject_weight_code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'"
       # A code holds one unit: only where an itemid's starts (ends) mix units does the unit become
       # the code's last component; every other code is unchanged. Within such an itemid, `UNK`
       # marks the rows without a unit, which for starts are exactly those without a rate
@@ -748,7 +736,7 @@ icu/inputevents:
       _self:
         unit: $amountuom
   subject_weight:
-    code: $subject_weight_code
+    code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'" # quoted: a bare `//` would parse as division
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     numeric_value: $patientweight
     _metadata:

@@ -40,8 +40,10 @@ def _events():
 
 
 def _render(template, constants, values):
-    """Render a MESSY code expression (`f"..."` or a bare `$column`) with synthetic values."""
+    """Render a MESSY code expression (`f"..."`, a bare `$column` or a literal) with synthetic values."""
     template = template.strip().strip("'")
+    if re.fullmatch(r"[A-Z_/]+", template):  # a literal code
+        return template
     if template.startswith("$"):
         column = template[1:].split()[0]
         return constants[column].strip("'") if column in constants else values.get(column, DEFAULT_VALUE)
