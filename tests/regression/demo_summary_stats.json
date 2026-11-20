@@ -1,24 +1,24 @@
 {
   "code_metadata": {
     "description_length": {
-      "mean": 112.249,
-      "n": 10250,
+      "mean": 111.383,
+      "n": 10361,
       "quantiles": {
         "p1": 4.0,
         "p25": 32.0,
         "p5": 11.0,
-        "p50": 132.0,
+        "p50": 122.0,
         "p75": 177.0,
         "p95": 222.0,
         "p99": 239.0
       },
-      "std": 79.3815
+      "std": 79.4233
     },
-    "n_codes": 10254,
+    "n_codes": 10366,
     "n_data_codes_missing_from_metadata": 0,
-    "n_metadata_codes_absent_from_data": 0,
-    "n_with_description": 10250,
-    "n_with_parent_codes": 7899,
+    "n_metadata_codes_absent_from_data": 98,
+    "n_with_description": 10361,
+    "n_with_parent_codes": 8028,
     "ontology": {
       "by_vocabulary": {
         "APR-DRG": {
@@ -61,9 +61,35 @@
           "n_subjects": 66,
           "recognized": true
         },
+        "INFUSION_END": {
+          "keys_digest": "sha256:d033a8aada04ce721a4bb54667887ba0493ca49ee0c36612c9e1695e462e0a93",
+          "n_child_codes": 28,
+          "n_distinct_keys": 14,
+          "n_measurements": 1360,
+          "n_subjects": 80,
+          "numeric": {
+            "mean": 32.4758,
+            "n_finite": 1360,
+            "std": 99.5547
+          },
+          "recognized": false
+        },
+        "LAB": {
+          "keys_digest": "sha256:9718b9593745b176d158de348b0c66c6da7381e5262cd1ae6f043387ae353c60",
+          "n_child_codes": 168,
+          "n_distinct_keys": 84,
+          "n_measurements": 29975,
+          "n_subjects": 100,
+          "numeric": {
+            "mean": 57.958,
+            "n_finite": 22957,
+            "std": 305.654
+          },
+          "recognized": false
+        },
         "LOINC": {
           "keys_digest": "sha256:7e1025301545708e6a2084baa4f6c9d157fb51025441675ae468e9fa5c749d06",
-          "n_child_codes": 1403,
+          "n_child_codes": 1470,
           "n_distinct_keys": 540,
           "n_measurements": 424219,
           "n_subjects": 100,
@@ -92,7 +118,7 @@
         },
         "RxNorm": {
           "keys_digest": "sha256:31635e0efd2886ae6d90fc4f0b2ee57d1656fc7730f7b33910309beeae1edcc7",
-          "n_child_codes": 208,
+          "n_child_codes": 236,
           "n_distinct_keys": 106,
           "n_measurements": 20078,
           "n_subjects": 96,
@@ -118,24 +144,24 @@
         }
       },
       "coverage": {
-        "frac_measurements_mapped": 0.513527,
-        "frac_observed_codes_with_parents": 0.770334,
-        "n_measurements_mapped": 526774,
-        "n_measurements_unmapped": 499022,
-        "n_observed_codes": 10254,
-        "n_observed_codes_with_parents": 7899,
-        "n_observed_codes_without_parents": 2355
+        "frac_measurements_mapped": 0.524231,
+        "frac_observed_codes_with_parents": 0.773958,
+        "n_measurements_mapped": 537754,
+        "n_measurements_unmapped": 488042,
+        "n_observed_codes": 10268,
+        "n_observed_codes_with_parents": 7947,
+        "n_observed_codes_without_parents": 2321
       },
-      "n_codes_in_multiple_vocabularies": 0,
-      "n_codes_with_parents": 7899,
-      "n_distinct_parents": 4006,
-      "n_parent_links": 7921,
+      "n_codes_in_multiple_vocabularies": 162,
+      "n_codes_with_parents": 8028,
+      "n_distinct_parents": 4104,
+      "n_parent_links": 8224,
       "n_parents_without_vocabulary": 0,
-      "n_vocabularies": 10,
+      "n_vocabularies": 12,
       "n_vocabularies_recognized": 8,
       "parents_per_code": {
-        "mean": 0.772479,
-        "n": 10254,
+        "mean": 0.793363,
+        "n": 10366,
         "quantiles": {
           "p1": 0.0,
           "p25": 1.0,
@@ -143,14 +169,14 @@
           "p50": 1.0,
           "p75": 1.0,
           "p95": 1.0,
-          "p99": 1.0
+          "p99": 2.0
         },
-        "std": 0.424339
+        "std": 0.451762
       },
       "present": true,
       "vocabularies_per_code": {
-        "mean": 0.770334,
-        "n": 10254,
+        "mean": 0.790083,
+        "n": 10366,
         "quantiles": {
           "p1": 0.0,
           "p25": 1.0,
@@ -158,29 +184,29 @@
           "p50": 1.0,
           "p75": 1.0,
           "p95": 1.0,
-          "p99": 1.0
+          "p99": 2.0
         },
-        "std": 0.420639
+        "std": 0.44399
       }
     },
     "present": true,
-    "vocabulary_digest": "sha256:4b8dff72077df67fe9346a6306bb9d1b40658d241d92c8fb13da09643f5302c0"
+    "vocabulary_digest": "sha256:056315932d6a89dcfdf3cde19ad921c3c628e93f8d4032e666b2f3c52f59b8ee"
   },
   "codes": {
     "concentration": {
       "frac_measurements_in_top_10": 0.11802,
       "frac_measurements_in_top_100": 0.394522,
-      "frac_measurements_in_top_1000": 0.903636,
+      "frac_measurements_in_top_1000": 0.903583,
       "n_codes_covering_50pct": 160,
       "n_codes_covering_90pct": 969,
-      "n_codes_covering_99pct": 4523
+      "n_codes_covering_99pct": 4531
     },
     "digests": {
-      "alphabetical": "sha256:4b8dff72077df67fe9346a6306bb9d1b40658d241d92c8fb13da09643f5302c0",
-      "by_measurement_frequency": "sha256:be3b31481b38a47b8f131ed4dabd4ca56889db9bd9e8902cf5ab94dfcc94093e",
-      "by_subject_frequency": "sha256:9d25cd00fa1b3062e8f2ff404a46209b931d169a7e1797acb734d778fcdccff3",
+      "alphabetical": "sha256:6e48ad1cb834082ce7b44ae3821ef89d726f7466f705c17ccd1faf0387eb8c94",
+      "by_measurement_frequency": "sha256:4dee34543e9910ffd4a387ef0ab82c6fe124c93762392a27cb69e4581d8fd7bc",
+      "by_subject_frequency": "sha256:2915cc3eabcfac93ed3cf979037ac422194aeaee820fe3e95f94b170d3e61a5d",
       "numeric_moments": {
-        "digest": "sha256:f4d74613f04c5b218bc90228d32378c383bea10e349dce22a06291941fd331d8",
+        "digest": "sha256:4a55faaff7dfb55a2326c48e4193ba79508b556ee9c216a8332d6036979764b4",
         "n_codes": 393
       },
       "thresholded": {
@@ -197,19 +223,19 @@
           "n_codes": 0
         },
         "20": {
-          "alphabetical": "sha256:698a0b18fac6ff4ada944aa0716c7cfa26fb98b1ff8a3582ec303d58f3a22c33",
-          "by_measurement_frequency": "sha256:2c63cb30a4369dc5eccac2fdedd1030d904e74f975df376b6996ebb493222cd4",
-          "by_subject_frequency": "sha256:853826a2a01139915dc96c5c88b4bb0d1282657a5b98dc823cd5f492c5baa50b",
+          "alphabetical": "sha256:e643559eddf026e07aaf17e9bcd47e716d05443e71a2b862e4e68c8fcc3d9359",
+          "by_measurement_frequency": "sha256:8948d00e54898600fee4ee626c1d1f1526e91157fade26ae985cdfd9f0934ad4",
+          "by_subject_frequency": "sha256:644dbf3a2431d2e149629a4b097c8d9e6dc5a851c5feea11613f475ea714dc8c",
           "n_codes": 1129
         }
       }
     },
-    "n_codes_below_min_cell_size": 9125,
-    "n_unique_codes": 10254,
+    "n_codes_below_min_cell_size": 9139,
+    "n_unique_codes": 10268,
     "occurrence": {
       "n_measurements": {
-        "mean": 100.039,
-        "n": 10254,
+        "mean": 99.9022,
+        "n": 10268,
         "quantiles": {
           "p1": 1.0,
           "p25": 1.0,
@@ -217,13 +243,13 @@
           "p50": 3.0,
           "p75": 17.0,
           "p95": 402.0,
-          "p99": 2093.88
+          "p99": 2093.32
         },
-        "std": 541.697
+        "std": 541.337
       },
       "n_subjects": {
-        "mean": 8.56319,
-        "n": 10254,
+        "mean": 8.55337,
+        "n": 10268,
         "quantiles": {
           "p1": 1.0,
           "p25": 1.0,
@@ -233,7 +259,7 @@
           "p95": 51.0,
           "p99": 99.0
         },
-        "std": 18.3246
+        "std": 18.3136
       }
     }
   },
@@ -268,7 +294,7 @@
     "n_subjects_with_birth": 100,
     "n_subjects_with_death": 31,
     "n_subjects_with_static": 100,
-    "n_unique_codes": 10254,
+    "n_unique_codes": 10268,
     "numeric": {
       "mean": 80.7248,
       "n_finite": 409038,
@@ -286,14 +312,11 @@
     }
   },
   "dataset": {
-    "code_modifier_columns": [
-      "unit"
-    ],
-    "created_at": "2026-11-12T21:14:10.428471+00:00",
+    "created_at": "2026-11-20T15:19:18.528020+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.2.1.dev13+gca0b06662.d20261112",
+    "dataset_version": "2.2:0.3.1.dev31+g031571273",
     "etl_name": "MEDS_transforms",
-    "etl_version": "0.7.0",
+    "etl_version": "0.7.3",
     "meds_version": "0.4.1",
     "other_extension_columns": [
       "source_block",
@@ -319,32 +342,34 @@
   },
   "dataset_digest": {
     "by_file": {
-      "data/held_out/0.parquet": "sha256:5d193b7a92d9a0bd50515ddd55170d8cd535cfb852a69fb2c2f265024ab0cf0d",
-      "data/train/0.parquet": "sha256:cca5f2fde08ec7fc1da98bbb9d205d3aea65c00a50494efb535ba8cfe05d9778",
-      "data/tuning/0.parquet": "sha256:94b5676a828dd369d52230db7fcb86ac7478bc4efe527cd0a1a48d0235cd7ae5",
-      "metadata/codes.parquet": "sha256:e1a3483dbed2cbd03afeb4dace75f74e9c21a4a4c41cc7f77a1ad37887a57698",
-      "metadata/dataset.json": "sha256:46eae5305ba86a2dedb4bfa88895d3fd3ced1ec3c3e6e8935978558a7262f964",
+      "data/held_out/0.parquet": "sha256:334b516f1efe5d340169f74fe2a70139efcfa12ae689381bf0e8e497201f513b",
+      "data/train/0.parquet": "sha256:e54944f8cfba132cdc1ecac5a9830f056b40fae6a44e0c7f89bd39fb5c1fcfa9",
+      "data/tuning/0.parquet": "sha256:095b23377abcdb137c1d9fafcee0d1dbb7bf023a19e80ec4c2123d8949e56c6e",
+      "metadata/codes.parquet": "sha256:9735a143c25c75a6b46053bff8117125b6ba7c0b34bac23b71a8a0e5cf2ee35d",
+      "metadata/dataset.json": "sha256:114f2e231581f65c6f44874716ad2eef4e5d9d4209b0883da31d99318d742ffb",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
-    "code_metadata": "sha256:54ea160099469a8fa26a704c564bc61969e504a0a819041f21537215fc69c736",
-    "combined": "sha256:36c73d8a11d5e9f22d2609256410fc50107ab3503cec0abb50fbc297d2c7ef84",
+    "code_metadata": "sha256:2d27e9bd6279425638a8d2b3d1d4e221590f8f038886207e7ec68a81bc1d9c58",
+    "combined": "sha256:a74df2b49eef6079e9f227291a7b247e2f250fca8a03275adb7f58a136b30001",
     "data": {
-      "digest": "sha256:5fc3989c5f2c2d6b5c4c564cd90c3989810a13a2198235bd87252cad772949ef",
+      "digest": "sha256:ed4dbb3b399954cc738ca35469c343d6ee0dc25e62c6e21e9be43d6aad095cca",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:a50d3ee44e8bb5f62d4afa40576f9ddc400e56c5bfa9dfa520bdd299a617e598",
+    "dataset_metadata": "sha256:1e4b0f5a6e7e6e0664995cd787339be78b56b96b0c9574df776194a16b49d438",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-12T21:14:12.363026",
+  "extracted_at": "2026-11-20T15:19:21.031195",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
       "code_template": "String",
       "description": "String",
       "parent_codes": "List(String)",
-      "possibly_cpt_code": "List(String)"
+      "possibly_cpt_code": "List(String)",
+      "unit": "String",
+      "unit_source_value": "String"
     },
     "column_dtype_conflicts": {},
     "column_presence": {
@@ -368,8 +393,7 @@
       "statusdescription": 3,
       "subject_id": 3,
       "text_value": 3,
-      "time": 3,
-      "unit": 3
+      "time": 3
     },
     "data_columns": {
       "code": "String",
@@ -392,8 +416,7 @@
       "statusdescription": "String",
       "subject_id": "Int64",
       "text_value": "String",
-      "time": "Datetime(time_unit='us', time_zone=None)",
-      "unit": "String"
+      "time": "Datetime(time_unit='us', time_zone=None)"
     },
     "extra_data_columns": [
       "doses_per_24_hrs",
@@ -412,8 +435,7 @@
       "seq_num",
       "source_block",
       "statusdescription",
-      "text_value",
-      "unit"
+      "text_value"
     ],
     "has_code_metadata": true,
     "has_dataset_metadata": true,
@@ -466,16 +488,16 @@
       "std": 12213.3
     },
     "n_unique_codes": {
-      "mean": 878.07,
+      "mean": 878.26,
       "n": 100,
       "quantiles": {
-        "p25": 588.0,
-        "p5": 454.95,
+        "p25": 588.75,
+        "p5": 455.0,
         "p50": 783.5,
         "p75": 988.75,
-        "p95": 1645.0
+        "p95": 1645.95
       },
-      "std": 390.901
+      "std": 391.056
     },
     "span_days": {
       "mean": 23298.5,

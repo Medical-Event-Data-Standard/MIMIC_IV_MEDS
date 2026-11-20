@@ -61,7 +61,7 @@ with `download_dest_dir`; see [Expected runtime and compute needs](#expected-run
 
 ## How this ETL is defined
 
-There is no Python in this package. The entire ETL is one file —
+The entire ETL is one file —
 [`src/MIMIC_IV_MEDS/event_configs.yaml`](src/MIMIC_IV_MEDS/event_configs.yaml)
 — written in MESSY (MEDS-Extract Specification Syntax YAML):
 
@@ -69,7 +69,10 @@ There is no Python in this package. The entire ETL is one file —
     (PhysioNet for MIMIC-IV itself, checksum-pinned GitHub URLs for the
     [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps);
 - an `etl:` block with the run's few knobs, the roles of the extension columns for
-    `metadata/dataset.json`, and the suMEDS enrichment that runs after the pipeline;
+    `metadata/dataset.json`, the stage that runs before the pipeline, `mimic_iv_unit_keys`, and the
+    three suMEDS stages that run after it, in this order: `sumeds_link_unit_siblings`,
+    `sumeds_normalize_units` and the suMEDS enrichment (the package's own unit stage, its only
+    Python, and the two suMEDS unit stages are described under [Units](#units));
 - one block per raw table describing the events extracted from it, including joins,
     derived columns, and the code-metadata programs that attach descriptions and parent
     vocabulary codes.
@@ -177,11 +180,12 @@ always emitted. It is coalesced, being 4.8% null.
 4.53× of that across 177 values. That fragments the medication vocabulary far more than it
 sharpens it.
 
-`icu/inputevents` is untouched for related reasons: `ordercategorydescription` (5 values) and
-`statusdescription` (6 values) are closed enums rather than text, they cannot both occupy the
-single `text_value` slot on `input_end` (100% of rows carry both), and `rateuom` is 44.7% null
-so promoting it would stamp `UNK` into half of all `INFUSION_START` codes. See
-[#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15).
+`ordercategorydescription` (5 values) and `statusdescription` (6 values) on `icu/inputevents`
+stay extension columns: they are closed enums rather than text, and they cannot both occupy the
+single `text_value` slot on `input_end` (100% of rows carry both). See
+[#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15). The infusion units
+(`rateuom`, `amountuom`) are the codes' `unit` in `metadata/codes.parquet`, and the code's last
+component where an itemid mixes units; the events have no `unit` column (see [Units](#units)).
 
 ## Code metadata
 
@@ -221,6 +225,121 @@ is left uncovered, and why:
     CPT codes (`HCPCS//…` is keyed on MIMIC's short description, which for CPT is only the
     section name). The `DRG` parents use `MS-DRG/` and `APR-DRG/` (see [DRG](#drg)), which
     vocabulary tooling does not resolve; OMOP's own id for MS-DRGs is `DRG`.
+
+### Units
+
+**A code's unit is in `metadata/codes.parquet`, and only there: the events have no `unit` column.**
+Every code has exactly one unit (or none), so an event's unit is its code's. To get it, join the
+events to `codes.parquet` on `code`:
+
+```python
+import polars as pl
+
+codes = pl.scan_parquet(f"{MEDS_DIR}/metadata/codes.parquet").select(
+    "code", "unit", "unit_source_value"
+)
+events = pl.scan_parquet(f"{MEDS_DIR}/data/**/*.parquet").join(
+    codes, on="code", how="left"
+)
+```
+
+`codes.parquet` has two unit columns, both Strings, null for a code without a unit:
+
+| Column              | What it holds                                                                                                                                                                                                                                                                      |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `unit`              | the unit as a [UCUM](https://ucum.org/) code (`mg/dL`, `ug`, `mL/h`, `{beats}/min`, `[lb_av]`), written by suMEDS's `sumeds_normalize_units` post-stage from the unit as recorded; a spelling suMEDS does not know is kept as it is (on the demo, 63 of the 949 codes with a unit) |
+| `unit_source_value` | the unit as recorded in MIMIC-IV (`mcg`, `mL/hour`, `bpm`, `lbs.`), stripped of surrounding whitespace                                                                                                                                                                             |
+
+Codes keep their names: where an item is recorded in several units, the code ends in the unit as
+recorded, so the code alone tells them apart (`INFUSION_END//221906//mcg`, whose `unit` is `ug` and
+`unit_source_value` `mcg`; see below for which codes end in their unit).
+
+**Breaking change** ([#102](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/pull/102)): before, the infusion events carried their unit in an event
+`unit` column (`rateuom` on `INFUSION_START`, `amountuom` on `INFUSION_END`), listed in
+`metadata/dataset.json` under `other_extension_columns`; no other event had one. That column is gone.
+It held nothing the code did not: MEDS-Extract accepts a code's unit only if all its events agree, so
+on the demo every one of the 31,442 events with a unit had its code's `unit_source_value`. Readers of
+the events' `unit` read the code's instead, through the join above. A code's unit is now in one place,
+as in the sibling MEDS ETLs (eICU, HiRID, AUMCdb, SICdb and others), none of which writes an event
+`unit`.
+
+MEDS does not standardise these columns. MEDS-Extract (0.9 and later) writes `unit` from the
+config's `_metadata` `unit:` fields: the code's one unit, stripped of surrounding whitespace (a blank
+unit gives none), and it fails the run, naming the codes, if a code has more than one. The spec's
+first post-stage, suMEDS's
+[`sumeds_link_unit_siblings`](https://github.com/rvandewater/suMEDS/blob/main/docs/unit_siblings.md),
+then fills units from item labels and links unit siblings (both below), still in the spelling as
+recorded. Next,
+suMEDS's `sumeds_normalize_units` writes `unit` as UCUM and keeps the recorded spelling in
+`unit_source_value`. Both run before the suMEDS enrichment, so a retried enrichment reads the same
+file.
+
+There are no code modifier columns (`code_modifier_columns` in `metadata/dataset.json`): every code
+has one unit, so the code metadata is keyed on the code alone. Declaring `unit` a modifier made tools
+that join code metadata on the code and its modifiers, such as suMEDS's summary, miss the metadata of
+every code whose events have no `unit` (on the demo, 241 of the 1,129 codes the summary released lost
+their description; none does without the modifier).
+
+`sumeds_link_unit_siblings` also links codes that differ only in their unit component: where two or
+more codes are the same code followed by `//<unit>` (an item recorded in several units, such as
+`INFUSION_END//225150//mcg` and `INFUSION_END//225150//mg` on the demo), each gets that code without
+the unit (`INFUSION_END//225150`) appended to its `parent_codes`. A code whose unit was not recorded
+(`…//UNK`) joins its item's siblings if one of them has a unit (`LAB//220545//%` and
+`LAB//220545//UNK`), but two `…//UNK`-style codes alone are never a group. The parent gets a row of its
+own in `codes.parquet`, which has no events: the siblings' description if they all have the same one
+(or the same one but for the unit each states, which is left out), the parent codes they all share,
+and no unit. On the demo this gives 98 groups, 196 codes a parent and 98 new rows (78 of the groups
+pair a unit with `…//UNK`). This shared stage replaced the package's own `mimic_iv_unit_metadata`
+(suMEDS 0.6.6); the spec gives it the options below, and the suMEDS defaults otherwise
+(`link_unknown_units: true`, `stem_description: without_unit`):
+
+| Option                     | Value                                                                         |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| `description_unit_pattern` | `\s[(\[]([^()\[\]]+)[)\]]\s*$`, a bracketed unit at the end of a label        |
+| `description_units`        | the bracketed units `icu/d_items` labels use (listed in `event_configs.yaml`) |
+| `fill_units`               | `unknown_component`: only `…//UNK` codes get a unit from their label          |
+
+| Codes                                                  | unit as recorded from                                                                                                                  |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `LAB//RESULT`, `LAB//<itemid>`, `SUBJECT_FLUID_OUTPUT` | `valueuom`, the code's last component, so one unit per code (none for `…//UNK`)                                                        |
+| OMR `BMI (kg/m2)`, `Weight (Lbs)`, `Height (Inches)`   | the unit in parentheses in `result_name`                                                                                               |
+| `INFUSION_START//<itemid>`, `INFUSION_END//<itemid>`   | `rateuom` and `amountuom` of the code's rows; the code's last component where the itemid mixes units (see below)                       |
+| `SUBJECT_WEIGHT_AT_INFUSION//KG`                       | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT) |
+
+Where a charted item has no unit in the data (`LAB//<itemid>//UNK`), the unit its MIMIC-IV label
+states is used instead: a label ending in a bracketed unit, such as `Admission Weight (lbs.)`. The
+same post-stage does this, after the data and the code, which always win, and only for the
+bracketed units that `icu/d_items` labels use (`description_units` in `event_configs.yaml`, read off the public
+demo); other bracketed endings such as `(serum)` or a bag size `(500ml)` are not units, and no
+`hosp/d_labitems` label states one. The code is not changed, since the label gives the item one
+unit. Codes without a recorded unit (scores such as the GCS, the OMR blood pressures, `eGFR`) get
+none. On the full 3.1 release, 77% of numeric events have a code with a unit.
+
+**Infusion codes that mix units get the unit in the code.** An infusion start is
+`INFUSION_START//<itemid>`, valued by its rate in `rateuom`, and an end is `INFUSION_END//<itemid>`,
+valued by its amount in `amountuom`. Most itemids record one unit, but some record their rate or
+amount in several, which would give their code several units. Only those codes get the unit as their
+last component, decided separately for starts and ends: `INFUSION_START//<itemid>//<rateuom>` and
+`INFUSION_END//<itemid>//<amountuom>`, written like the `LAB` and `SUBJECT_FLUID_OUTPUT` codes. Every
+other infusion code is unchanged, because renaming codes that already have one unit would break
+references to them for nothing. Which itemids mix units depends on the data, so no itemid is named
+in the config: the pre-stage `mimic_iv_unit_keys` (`src/MIMIC_IV_MEDS/unit_keys.py`) reads
+`icu/inputevents`, compares the units as MEDS-Extract does (stripped, blanks and nulls left out),
+and stages the side table `inputevents_unit_in_code` that the `icu/inputevents` block joins on the
+itemid.
+
+Within such an itemid, a start without a unit is `INFUSION_START//<itemid>//UNK`, as in the other
+families. `rateuom` is null exactly when `rate` is, so these are the starts without a rate, and they
+have no unit. They do not keep the unsplit `INFUSION_START//<itemid>`: that code is the parent of the
+itemid's per-unit codes, with a row but no events, and a code list naming it then finds no events
+rather than silently only the starts without a rate. `amountuom` is never null.
+
+On the full 3.1 release, 173 of the 654 infusion codes mix units (56 `INFUSION_START`, 21 of them
+with starts without a rate, and 117 `INFUSION_END`); they become 444 codes (159 and 285), so there
+are 925 infusion codes, and the other 481 are unchanged. On the demo, 14 `INFUSION_END` codes become
+28, and none of its starts mixes rate units (318 infusion codes become 332). Events, values and times
+are unchanged, and each event's unit is its code's (see above). Code lists that name the codes of
+an itemid that mixes units need the unit added; its unsplit code is now their parent (see above).
 
 ## Enriching code metadata with suMEDS
 

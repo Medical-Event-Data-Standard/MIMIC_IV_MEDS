@@ -30,15 +30,58 @@ etl:
   # other extension column is listed under `other_extension_columns` automatically. There is
   # no `license` or `description_uri`: this one spec builds both the credentialed release
   # and the open demo (`dataset_key=demo`), whose licenses and PhysioNet pages differ.
+  # There are no code modifier columns, and events have no `unit` column: every code has one
+  # unit (in the code where an item mixes units), which is in metadata/codes.parquet `unit`, so
+  # code metadata is keyed on the code alone (see "Units" in the README).
   raw_source_id_columns:
     [hadm_id, icustay_id, emar_id, poe_id, order_id, link_order_id]
-  code_modifier_columns: [unit]
   # After the canonical pipeline, suMEDS (a dependency of this package) enriches
   # metadata/codes.parquet with the rules registered as MIMIC-IV (sumeds_rules.yaml) and
   # records it in metadata/dataset.json. A failed enrichment (e.g. without internet access)
   # keeps codes.parquet as the ETL wrote it and does not fail the run; `suMEDS-enrich
   # OUTPUT_DIR` finishes it later. `skip_stages=[sumeds_enrich]` leaves it out of a run.
+  #
+  # Before that, suMEDS's `sumeds_link_unit_siblings` stage (see suMEDS's docs/unit_siblings.md)
+  # finishes the `unit` code metadata, which MEDS-Extract writes as one String per code (it fails
+  # if a code has more than one unit). Codes that differ only in their last, unit component get
+  # the code without it (the stem) as a parent, and the stem a row of its own; a code whose unit
+  # was not recorded (`…//UNK`) joins its item's siblings. A charted item without a recorded unit
+  # (`…//UNK`) gets the unit its label states, only from the list below (read off the public
+  # demo's `icu/d_items` labels; other bracketed endings such as `(serum)`, `(500ml)` or
+  # `(cm at teeth)` are not units). It runs first so that unit normalisation and the enrichment,
+  # now or retried later with `suMEDS-enrich`, always read the same `codes.parquet`.
+  #
+  # Before the canonical pipeline, `mimic_iv_unit_keys` (unit_keys.py) stages the side table
+  # `inputevents_unit_in_code`: the itemids whose infusion starts or ends are recorded in more
+  # than one unit, whose codes therefore end in the unit (see icu/inputevents below).
+  pre_stages:
+    - mimic_iv_unit_keys
   post_stages:
+    - sumeds_link_unit_siblings:
+        description_unit_pattern: '\s[(\[]([^()\[\]]+)[)\]]\s*$'
+        description_units:
+          [
+            "%",
+            C,
+            CM,
+            cm,
+            Kg,
+            L/min,
+            lbs.,
+            min,
+            Minutes,
+            mL,
+            mL/hour,
+            mL/hr,
+            ml/min,
+            mm,
+            RPM,
+            units/mL,
+          ]
+        fill_units: unknown_component
+    # One UCUM spelling for every `unit` (suMEDS's shared table, e.g. `Cel`, `mm[Hg]`, `mg/dL`); the
+    # spelling as recorded stays in `unit_source_value`, and an unknown spelling is kept as it is.
+    - sumeds_normalize_units
     - sumeds_enrich: { rules: MIMIC-IV }
 
 hosp/admissions:
@@ -288,6 +331,10 @@ hosp/labevents:
         # candidate row that the unit would have disambiguated.
         description: coalesce($omop_concept_name, $label)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # The unit is a component of the code, so each code has exactly one; null (`UNK` in the
+      # code) gives none. See "Units" in the README.
+      _self:
+        unit: $valueuom
 
 hosp/omr:
   # Three blocks partition the rows through null codes: a blood-pressure string goes only to
@@ -314,6 +361,10 @@ hosp/omr:
         description: >-
           f"Online Medical Record (OMR) observation, mostly outpatient: {$result_name} (hosp/omr.result_name);
           a numeric result is in numeric_value, any other in text_value"
+        # The unit MIMIC writes in parentheses after the measurement's name (`BMI (kg/m2)`,
+        # `Weight (Lbs)`, `Height (Inches)`), so constant per code. Other names have none (the
+        # parentheses of `Blood Pressure Standing (1 min)` are not a unit).
+        unit: 'extract group 1 of /^(?:BMI|Weight|Height) \(([^)]+)\)$/ from $result_name'
   omr_systolic:
     code: 'f"{$result_name}//SYSTOLIC" if ($bp_systolic ?? "") != ""'
     numeric_value: "$bp_systolic::?float"
@@ -560,6 +611,10 @@ icu/chartevents:
         itemid:
           column: itemid (omop_source_code)
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # The charted unit, a component of the code (not `d_items.unitname`, which disagrees with
+      # it for 10% of pairs; see above).
+      _self:
+        unit: $valueuom
 
 icu/procedureevents:
   start:
@@ -619,18 +674,31 @@ icu/procedureevents:
 
 icu/inputevents:
   _table:
+    joins:
+      # Staged by the `mimic_iv_unit_keys` pre-stage (unit_keys.py): `start_unit_in_code` is true
+      # for the itemids whose starts are recorded in more than one `rateuom`, `end_unit_in_code`
+      # for those whose ends are recorded in more than one `amountuom`; null otherwise.
+      inputevents_unit_in_code:
+        left_on: itemid
+        right_on: itemid
+        cols: [start_unit_in_code, end_unit_in_code]
     cols:
       # Constant rendering a literal code; see `ed_registration_code` in hosp/admissions.
       subject_weight_code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'"
+      # A code holds one unit: only where an itemid's starts (ends) mix units does the unit become
+      # the code's last component; every other code is unchanged. Within such an itemid, `UNK`
+      # marks the rows without a unit, which for starts are exactly those without a rate
+      # (`rateuom` is null if and only if `rate` is); `amountuom` is never null.
+      _start_unit_suffix: '(f"//{$rateuom ?? ''UNK''}" if $start_unit_in_code else "")'
+      _end_unit_suffix: '(f"//{$amountuom ?? ''UNK''}" if $end_unit_in_code else "")'
   input_start:
-    code: 'f"INFUSION_START//{$itemid}"'
+    code: 'f"INFUSION_START//{$itemid}{$_start_unit_suffix}"'
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
     order_id: $orderid
     link_order_id: $linkorderid
     numeric_value: $rate
-    unit: $rateuom
     ordercategorydescription: $ordercategorydescription
     _metadata:
       icu/d_items:
@@ -645,8 +713,11 @@ icu/inputevents:
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # The rate's unit: one per code, as the itemids that mix units have it in the code.
+      _self:
+        unit: $rateuom
   input_end:
-    code: 'f"INFUSION_END//{$itemid}"'
+    code: 'f"INFUSION_END//{$itemid}{$_end_unit_suffix}"'
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
@@ -655,7 +726,6 @@ icu/inputevents:
     numeric_value: $amount
     ordercategorydescription: $ordercategorydescription
     statusdescription: $statusdescription
-    unit: $amountuom
     _metadata:
       icu/d_items:
         itemid: $itemid
@@ -669,6 +739,9 @@ icu/inputevents:
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # The amount's unit, as for `input_start`.
+      _self:
+        unit: $amountuom
   subject_weight:
     code: $subject_weight_code
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
@@ -676,6 +749,10 @@ icu/inputevents:
     _metadata:
       _self:
         description: "'Patient weight in kilograms, recorded with an ICU infusion (icu/inputevents.patientweight)'"
+        # Not in the data: the MIMIC-IV documentation of inputevents.patientweight states "The
+        # patient weight in kilograms" (https://mimic.mit.edu/docs/iv/modules/icu/inputevents/;
+        # MIT-LCP/mimic-website at 8182227, MIT), written as the UCUM code `kg`.
+        unit: "'kg'"
 
 icu/outputevents:
   output:
@@ -695,6 +772,9 @@ icu/outputevents:
         # labevents. Only one itemid in this file has duplicate rows and they agree on both
         # label and concept code, so the unit never disambiguated anything.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+      # The unit is a component of the code, as in labevents.
+      _self:
+        unit: $valueuom
 
 # Where the raw data lives. This block is consumed by `meds-extract-download` (which
 # `meds-extract-run` spawns) and is a reserved key stripped before event conversion, so
