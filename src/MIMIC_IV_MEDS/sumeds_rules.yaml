@@ -6,7 +6,7 @@
 # LOINC), fetched on demand. Here they add
 #   - `Gender//F` and `Gender//M` (OMOP Gender vocabulary) to `GENDER//F` and `GENDER//M`;
 #   - for ICD diagnosis and procedure codes, the dotted vocabulary code as `vocabulary_id` and
-#     `concept_code`, and every pack ancestor after the ETL's own reference (`ICD10CM/I50.23`,
+#     `concept_code`, and every pack ancestor after the ETL's own reference (`ICD10CM//I50.23`,
 #     then `ICD10CM//I50.2`, `ICD10CM//I50`);
 #   - same-dataset parents: an ICD code of this table whose vocabulary code is an ancestor
 #     (`DIAGNOSIS//ICD//10//I5023` gets `DIAGNOSIS//ICD//10//I502` when both occur).

@@ -209,7 +209,7 @@ def test_icd_codes_get_their_pack_ancestors(
     plain_codes, enriched_codes, code, vocabulary, concept_code, ancestors
 ):
     """The ETL's own vocabulary reference stays first and is not repeated; the pack ancestors follow."""
-    reference = f"{vocabulary}/{concept_code}"
+    reference = f"{vocabulary}//{concept_code}"
     assert plain_codes[code]["parent_codes"] == [reference]
     enriched = enriched_codes[code]
     added = [f"{vocabulary}//{ancestor}" for ancestor in ancestors]
@@ -225,7 +225,7 @@ def test_icd_codes_get_parents_from_the_same_dataset(enriched_codes):
     """`I2720` gets `I272`, the demo code whose vocabulary code `I27.2` is its nearest pack ancestor."""
     enriched = enriched_codes["DIAGNOSIS//ICD//10//I2720"]
     assert enriched["parent_codes"] == [
-        "ICD10CM/I27.20",
+        "ICD10CM//I27.20",
         "ICD10CM//I27.2",
         "ICD10CM//I27",
         "DIAGNOSIS//ICD//10//I272",
@@ -236,7 +236,7 @@ def test_icd_codes_get_parents_from_the_same_dataset(enriched_codes):
 
 def test_codes_missing_from_the_packs_are_left_alone(plain_codes, enriched_codes):
     plain, enriched = plain_codes["DIAGNOSIS//ICD//10//I10"], enriched_codes["DIAGNOSIS//ICD//10//I10"]
-    assert enriched["parent_codes"] == plain["parent_codes"] == ["ICD10CM/I10"]
+    assert enriched["parent_codes"] == plain["parent_codes"] == ["ICD10CM//I10"]
     assert enriched["vocabulary_id"] is None and not enriched["parent_names"]
 
 

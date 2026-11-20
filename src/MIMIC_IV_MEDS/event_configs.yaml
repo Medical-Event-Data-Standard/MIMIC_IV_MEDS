@@ -187,13 +187,13 @@ hosp/diagnoses_icd:
         icd_code: $icd_code
         description: $long_title
         parent_codes: >-
-          f"ICD{$icd_version}CM/{$icd_code[0:4]}.{$icd_code[4:]}"
+          f"ICD{$icd_version}CM//{$icd_code[0:4]}.{$icd_code[4:]}"
           if $icd_version == "9" and $icd_code[0:1] == "E" and len_chars($icd_code) > 4
-          else f"ICD{$icd_version}CM/{$icd_code}"
+          else f"ICD{$icd_version}CM//{$icd_code}"
           if $icd_version == "9" and $icd_code[0:1] == "E"
-          else f"ICD{$icd_version}CM/{$icd_code[0:3]}.{$icd_code[3:]}"
+          else f"ICD{$icd_version}CM//{$icd_code[0:3]}.{$icd_code[3:]}"
           if len_chars($icd_code) > 3
-          else f"ICD{$icd_version}CM/{$icd_code}"
+          else f"ICD{$icd_version}CM//{$icd_code}"
 
 hosp/drgcodes:
   _table:
@@ -214,7 +214,7 @@ hosp/drgcodes:
         # `003`. dftly has no format specifiers and `len_chars` rejects an integer, hence the
         # prefix-and-slice. `HCFA` denotes MS-DRG; see "DRG" in the README.
         parent_codes: >-
-          f"{'MS-DRG' if $drg_type == 'HCFA' else 'APR-DRG'}/{f'000{$drg_code}'[-3:]}"
+          f"{'MS-DRG' if $drg_type == 'HCFA' else 'APR-DRG'}//{f'000{$drg_code}'[-3:]}"
         # The DRG title is not used: it varies in spelling across rows of one DRG (see "DRG" in
         # the README), and `_self` would join the variants into one multi-line description.
         description: >-
@@ -270,12 +270,12 @@ hosp/emar:
         # The conditional deliberately has no `else`: an else-less dftly conditional yields
         # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
         # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
-        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # than emitting a meaningless `NDC//0`. This reproduces the old external join, where a
         # code whose segment rendered 'UNK' matched no metadata row.
         #
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
-        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
+        parent_codes: 'f"NDC//{$ndc}" if ($ndc ?? "0") != "0"'
         description: >-
           f"Medication administration recorded in the eMAR: {$medication ?? 'UNK'} (hosp/emar.medication);
           administration event: {$event_txt ?? 'UNK'} (emar.event_txt); NDC dispensed for the order:
@@ -312,7 +312,7 @@ hosp/labevents:
         itemid:
           column: itemid (omop_source_code)
         description: coalesce($omop_concept_name, $label)
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
   lab_result:
     code: f"LAB//RESULT//{$itemid}//{$valueuom ?? 'UNK'}"
     hadm_id: $hadm_id
@@ -330,7 +330,7 @@ hosp/labevents:
         # unique in this file (1630 rows / 1630 distinct), so there is never a second
         # candidate row that the unit would have disambiguated.
         description: coalesce($omop_concept_name, $label)
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The unit is a component of the code, so each code has exactly one; null (`UNK` in the
       # code) gives none. See "Units" in the README.
       _self:
@@ -481,12 +481,12 @@ hosp/pharmacy:
         # The conditional deliberately has no `else`: an else-less dftly conditional yields
         # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
         # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
-        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # than emitting a meaningless `NDC//0`. This reproduces the old external join, where a
         # code whose segment rendered 'UNK' matched no metadata row.
         #
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
-        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
+        parent_codes: 'f"NDC//{$ndc}" if ($ndc ?? "0") != "0"'
         description: >-
           f"Start of a pharmacy medication order: {$medication ?? 'UNK'} (hosp/pharmacy.medication,
           starttime); NDC dispensed for the order: {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
@@ -509,12 +509,12 @@ hosp/pharmacy:
         # The conditional deliberately has no `else`: an else-less dftly conditional yields
         # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
         # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
-        # than emitting a meaningless `NDC/0`. This reproduces the old external join, where a
+        # than emitting a meaningless `NDC//0`. This reproduces the old external join, where a
         # code whose segment rendered 'UNK' matched no metadata row.
         #
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
-        parent_codes: 'f"NDC/{$ndc}" if ($ndc ?? "0") != "0"'
+        parent_codes: 'f"NDC//{$ndc}" if ($ndc ?? "0") != "0"'
         description: >-
           f"End of a pharmacy medication order: {$medication ?? 'UNK'} (hosp/pharmacy.medication,
           stoptime); NDC dispensed for the order: {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
@@ -538,11 +538,11 @@ hosp/procedures_icd:
         icd_code: $icd_code
         description: $long_title
         parent_codes: >-
-          f"ICD9Proc/{$icd_code[0:2]}.{$icd_code[2:]}"
+          f"ICD9Proc//{$icd_code[0:2]}.{$icd_code[2:]}"
           if $icd_version == "9" and len_chars($icd_code) > 2
-          else f"ICD9Proc/{$icd_code}"
+          else f"ICD9Proc//{$icd_code}"
           if $icd_version == "9"
-          else f"ICD10PCS/{$icd_code}"
+          else f"ICD10PCS//{$icd_code}"
           if $icd_version == "10"
 
 hosp/transfers:
@@ -615,7 +615,7 @@ icu/chartevents:
       meas_chartevents_main:
         itemid:
           column: itemid (omop_source_code)
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The charted unit, a component of the code (not `d_items.unitname`, which disagrees with
       # it for 10% of pairs; see above).
       _self:
@@ -639,7 +639,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       proc_itemid:
         itemid:
           column: itemid (omop_source_code)
@@ -648,7 +648,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
   end:
     code: 'f"PROCEDURE//END//{$itemid}"'
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
@@ -666,7 +666,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       proc_itemid:
         itemid:
           column: itemid (omop_source_code)
@@ -675,7 +675,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
 
 icu/inputevents:
   _table:
@@ -717,7 +717,7 @@ icu/inputevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The rate's unit: one per code, as the itemids that mix units have it in the code.
       _self:
         unit: $rateuom
@@ -743,7 +743,7 @@ icu/inputevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The amount's unit, as for `input_start`.
       _self:
         unit: $amountuom
@@ -776,7 +776,7 @@ icu/outputevents:
         # `valueuom: $unitname` was a second join key; dropped for the same reason as in
         # labevents. Only one itemid in this file has duplicate rows and they agree on both
         # label and concept code, so the unit never disambiguated anything.
-        parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The unit is a component of the code, as in labevents.
       _self:
         unit: $valueuom
