@@ -2,13 +2,14 @@
 
 The spec declares suMEDS's `sumeds_enrich` stage in `etl.post_stages`, with the rules this package
 registers in suMEDS's `sumeds.rules` entry-point group under the same name. The ETL runs from the raw demo
-files that the `demo_cohort` build of `conftest.py` downloaded (`do_download=false`), and that build, which
-skips the stage, is the plain-ETL baseline the enriched output is compared with. The ontology source is a
-tiny pack repository in suMEDS's `sumeds-ontologies/0.1` layout, built here with made-up titles for a few
-ICD codes of the demo and their ancestors, and passed to the stage as a run-time override, so the test
+files that the `demo_cohort` build of `conftest.py` downloaded (`do_download=false`). The ontology source
+is a tiny pack repository in suMEDS's `sumeds-ontologies/0.1` layout, built here with made-up titles for a
+few ICD codes of the demo and their ancestors, and passed to the stage as a run-time override, so the test
 reads nothing over the network and does not depend on the published packs. With an empty pack source
 instead, the enrichment fails without failing the ETL: the plain `codes.parquet` is kept, the failure is
-recorded in `metadata/dataset.json`, and `suMEDS-enrich` on the output enriches it later.
+recorded in `metadata/dataset.json`, and `suMEDS-enrich` on the output enriches it later. That run is the
+plain-ETL reference both enriched outputs are compared with: this one, and the `demo_cohort` itself,
+which the spec enriched with the published packs.
 """
 
 import csv
@@ -149,8 +150,9 @@ def _codes(cohort: Path) -> dict[str, dict]:
 
 
 @pytest.fixture(scope="module")
-def plain_codes(demo_cohort: Path) -> dict[str, dict]:
-    return _codes(demo_cohort)
+def plain_codes(soft_failed_cohort: Path) -> dict[str, dict]:
+    """The ETL's own code metadata, which the failed enrichment kept."""
+    return _codes(soft_failed_cohort)
 
 
 @pytest.fixture(scope="module")
@@ -158,32 +160,35 @@ def enriched_codes(enriched_cohort: Path) -> dict[str, dict]:
     return _codes(enriched_cohort)
 
 
-def test_the_plain_build_records_no_enrichment(demo_cohort: Path):
-    """`skip_stages=[sumeds_enrich]` leaves the stage out, so the plain build records no enrichment.
-
-    Its codes are the ones a failed enrichment keeps (`test_failed_enrichment_keeps_the_plain_etl_output`).
-    """
-    assert "sumeds_enrichment" not in json.loads((demo_cohort / "metadata" / "dataset.json").read_text())
+#: The two enriched runs: with the synthetic packs here, and the demo build with the published packs.
+ENRICHED_COHORTS = ["enriched_cohort", "demo_cohort"]
 
 
-def test_codes_parquet_is_replaced_by_valid_meds_metadata(demo_cohort: Path, enriched_cohort: Path):
-    metadata = enriched_cohort / "metadata"
+@pytest.mark.parametrize("cohort", ENRICHED_COHORTS)
+def test_codes_parquet_is_replaced_by_valid_meds_metadata(
+    request: pytest.FixtureRequest, cohort: str, soft_failed_cohort: Path
+):
+    metadata = request.getfixturevalue(cohort) / "metadata"
     CodeMetadataSchema.validate(pq.read_table(metadata / "codes.parquet"))
     files = {fp.name for fp in metadata.iterdir()}
-    assert files == {fp.name for fp in (demo_cohort / "metadata").iterdir()}, "enrichment left a file behind"
+    plain_files = {fp.name for fp in (soft_failed_cohort / "metadata").iterdir()}
+    assert files == plain_files, "enrichment left a file behind"
 
 
-def test_data_matches_the_plain_etl(demo_cohort: Path, enriched_cohort: Path):
+@pytest.mark.parametrize("cohort", ENRICHED_COHORTS)
+def test_data_matches_the_plain_etl(request: pytest.FixtureRequest, cohort: str, soft_failed_cohort: Path):
     key = ["subject_id", "time", "code"]
 
     def events(cohort: Path) -> pl.DataFrame:
         return pl.concat([pl.read_parquet(fp, columns=key) for fp in (cohort / "data").rglob("*.parquet")])
 
-    assert events(enriched_cohort).sort(key).equals(events(demo_cohort).sort(key))
+    assert events(request.getfixturevalue(cohort)).sort(key).equals(events(soft_failed_cohort).sort(key))
 
 
-def test_enrichment_is_non_destructive(plain_codes: dict, enriched_codes: dict):
+@pytest.mark.parametrize("cohort", ENRICHED_COHORTS)
+def test_enrichment_is_non_destructive(request: pytest.FixtureRequest, cohort: str, plain_codes: dict):
     """Every code keeps its description, and its parents stay at the head of the enriched list."""
+    enriched_codes = _codes(request.getfixturevalue(cohort))
     assert set(enriched_codes) == set(plain_codes)
     changed = []
     for code, plain in plain_codes.items():
@@ -246,8 +251,9 @@ def test_gender_is_tagged_with_the_omop_gender_code(plain_codes, enriched_codes,
     assert enriched_codes[f"GENDER//{gender}"]["parent_codes"] == [f"Gender//{gender}"]
 
 
-def test_dataset_json_records_the_enrichment(enriched_cohort: Path):
-    record = _enrichment_record(enriched_cohort)
+@pytest.mark.parametrize("cohort", ENRICHED_COHORTS)
+def test_dataset_json_records_the_enrichment(request: pytest.FixtureRequest, cohort: str):
+    record = _enrichment_record(request.getfixturevalue(cohort))
     assert record["enriched"] is True
     assert record["rules"] == SPEC
     coverage = record["coverage"]
@@ -255,8 +261,15 @@ def test_dataset_json_records_the_enrichment(enriched_cohort: Path):
 
 
 def test_failed_enrichment_keeps_the_plain_etl_output(demo_cohort: Path, soft_failed_cohort: Path):
+    """The failed run keeps `codes.parquet` as the ETL wrote it: none of the columns enrichment adds.
+
+    `test_enrichment_is_non_destructive` checks its rows against both enriched runs.
+    """
     codes = Path("metadata", "codes.parquet")
-    assert (soft_failed_cohort / codes).read_bytes() == (demo_cohort / codes).read_bytes()
+    plain = set(pq.read_schema(soft_failed_cohort / codes).names)
+    enriched = set(pq.read_schema(demo_cohort / codes).names)
+    assert plain < enriched
+    assert {"vocabulary_id", "concept_code", "parent_names"} <= enriched - plain
     record = _enrichment_record(soft_failed_cohort)
     assert record["enriched"] is False
     # The pack directory is not recorded, so the retry asks for it again.
