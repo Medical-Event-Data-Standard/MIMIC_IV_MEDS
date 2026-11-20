@@ -1,8 +1,7 @@
 """End-to-end run of the shipped ETL over the public MIMIC-IV demo release.
 
 This distribution is `event_configs.yaml` plus the entry-point registration that names it
-`MIMIC-IV` (and one small pre-stage, tested in `unit_keys_test.py`). So the main thing worth
-testing is that
+`MIMIC-IV`. So the main thing worth testing is that
 `meds-extract-run spec=MIMIC-IV` resolves that registration, downloads the demo bucket from
 PhysioNet (no credentials needed), runs the pipeline, and leaves a well-formed MEDS cohort
 behind. That build is the `demo_cohort` fixture of `conftest.py`, shared with
@@ -97,12 +96,12 @@ def test_e2e_demo(demo_cohort: Path):
     unit_coded = [c for c in units if c in data_codes and c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
     unit_coded = [c for c in unit_coded if not c.startswith("LAB//SPECIMEN_COLLECTED//")]
     assert unit_coded, "no unit-coded codes in the demo"
-    # Infusion codes end in their unit only where the itemid mixes units (`…//<itemid>//<unit>`).
+    # Every infusion code ends in its unit (`…//<itemid>//<unit>`, `…//UNK` without one).
     infusion_codes = [c for c in units if c in data_codes and c.startswith(infusions)]
-    split = [c for c in infusion_codes if c.count("//") == 3]
-    assert split, "no infusion itemid recorded in several units in the demo"
-    assert len(split) < len(infusion_codes), "every infusion code has its unit in the code"
-    unit_coded += split
+    assert infusion_codes, "no infusion codes in the demo"
+    no_unit_part = sorted(c for c in infusion_codes if c.count("//") != 3)
+    assert not no_unit_part, f"infusion codes without a unit component: {no_unit_part[:10]}"
+    unit_coded += infusion_codes
     # Split from the left: a unit may itself contain a slash (`/hpf`).
     unit_part = {
         c: c.split("//", 3 if c.startswith(("LAB//RESULT//", *infusions)) else 2)[-1] for c in unit_coded

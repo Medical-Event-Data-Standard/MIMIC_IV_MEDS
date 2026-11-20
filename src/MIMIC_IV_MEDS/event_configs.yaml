@@ -31,7 +31,7 @@ etl:
   # no `license` or `description_uri`: this one spec builds both the credentialed release
   # and the open demo (`dataset_key=demo`), whose licenses and PhysioNet pages differ.
   # There are no code modifier columns, and events have no `unit` column: every code has one
-  # unit (in the code where an item mixes units), which is in metadata/codes.parquet `unit`, so
+  # unit (or none), which is in metadata/codes.parquet `unit`, so
   # code metadata is keyed on the code alone (see "Units" in the README).
   raw_source_id_columns:
     [hadm_id, icustay_id, emar_id, poe_id, order_id, link_order_id]
@@ -50,12 +50,6 @@ etl:
   # demo's `icu/d_items` labels; other bracketed endings such as `(serum)`, `(500ml)` or
   # `(cm at teeth)` are not units). It runs first so that unit normalisation and the enrichment,
   # now or retried later with `suMEDS-enrich`, always read the same `codes.parquet`.
-  #
-  # Before the canonical pipeline, `mimic_iv_unit_keys` (unit_keys.py) stages the side table
-  # `inputevents_unit_in_code`: the itemids whose infusion starts or ends are recorded in more
-  # than one unit, whose codes therefore end in the unit (see icu/inputevents below).
-  pre_stages:
-    - mimic_iv_unit_keys
   post_stages:
     - sumeds_link_unit_siblings:
         description_unit_pattern: '\s[(\[]([^()\[\]]+)[)\]]\s*$'
@@ -677,26 +671,18 @@ icu/procedureevents:
 
 icu/inputevents:
   _table:
-    joins:
-      # Staged by the `mimic_iv_unit_keys` pre-stage (unit_keys.py): `start_unit_in_code` is true
-      # for the itemids whose starts are recorded in more than one `rateuom`, `end_unit_in_code`
-      # for those whose ends are recorded in more than one `amountuom`; null otherwise.
-      inputevents_unit_in_code:
-        left_on: itemid
-        right_on: itemid
-        cols: [start_unit_in_code, end_unit_in_code]
     cols:
       # Constant rendering a literal code; see `ed_registration_code` in hosp/admissions.
       subject_weight_code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'"
-      # An infusion is two codes, `INFUSION//START//<itemid>` and `INFUSION//END//<itemid>` (alignEHR#53).
-      # A code holds one unit: only where an itemid's starts (ends) mix units does the unit become
-      # the code's last component; every other code is unchanged. Within such an itemid, `UNK`
-      # marks the rows without a unit, which for starts are exactly those without a rate
-      # (`rateuom` is null if and only if `rate` is); `amountuom` is never null.
-      _start_unit_suffix: '(f"//{$rateuom ?? ''UNK''}" if $start_unit_in_code else "")'
-      _end_unit_suffix: '(f"//{$amountuom ?? ''UNK''}" if $end_unit_in_code else "")'
+  # An infusion is two codes, `INFUSION//START//<itemid>//<rateuom>` and
+  # `INFUSION//END//<itemid>//<amountuom>` (alignEHR#53). The unit is always the code's last
+  # component, as in the `LAB` codes, so every code has one unit by construction; suMEDS's
+  # `sumeds_link_unit_siblings` gives the codes of an itemid recorded in several units (or also
+  # without one) the code without the unit as a parent. `UNK` marks the rows without a unit, which
+  # for starts are exactly those without a rate (`rateuom` is null if and only if `rate` is);
+  # `amountuom` is never null.
   input_start:
-    code: 'f"INFUSION//START//{$itemid}{$_start_unit_suffix}"'
+    code: f"INFUSION//START//{$itemid}//{$rateuom ?? 'UNK'}"
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
@@ -717,11 +703,11 @@ icu/inputevents:
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
         parent_codes: f"{$omop_vocabulary_id}/{$omop_concept_code}"
-      # The rate's unit: one per code, as the itemids that mix units have it in the code.
+      # The rate's unit, the code's last component.
       _self:
         unit: $rateuom
   input_end:
-    code: 'f"INFUSION//END//{$itemid}{$_end_unit_suffix}"'
+    code: f"INFUSION//END//{$itemid}//{$amountuom ?? 'UNK'}"
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
