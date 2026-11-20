@@ -533,26 +533,28 @@ the MEDS dataset this ETL builds from the open MIMIC-IV demo: subject, event and
 digests of the code vocabulary, per-subject, value and time distributions, code-metadata coverage, the
 splits and the schema. It names no code and reports no cell of fewer than 20 subjects and no minimum or
 maximum, which is what makes it safe to publish. The Tests workflow rebuilds the demo on every pull
-request and fails when the result no longer matches the baseline, as decided by
-[`tests/regression/policy.yaml`](tests/regression/policy.yaml).
+request and fails when the result no longer matches the baseline, as decided by meds_summary_stats's
+built-in [`etl-regression` policy](https://github.com/Medical-Event-Data-Standard/meds_summary_stats/blob/main/docs/etl-baselines.md).
 
-`scripts/summary_stats.sh` regenerates a baseline from a build of this checkout. It prints how the
-statistics changed against the committed baseline before overwriting it, and `--compare` checks a build
-without writing anything:
+`baseline_MEDS_summary_stats` (from meds_summary_stats) regenerates a baseline from a build of this
+checkout, as `[tool.meds_summary_stats.baselines]` in [`pyproject.toml`](pyproject.toml) describes it. It
+prints how the statistics changed against the committed baseline before overwriting it, and `--compare`
+checks a build without writing anything. Pin the version the Tests workflow uses:
 
 ```bash
 # The demo: downloaded and built with this checkout
-scripts/summary_stats.sh demo
+uvx --from meds_summary_stats==X.Y.Z baseline_MEDS_summary_stats demo
 # The full release, built from a copy on disk, or summarized from an existing build
-scripts/summary_stats.sh full --input-dir $RAW_INPUT_DIR
-scripts/summary_stats.sh full --meds-dir $MEDS_OUTPUT_DIR
+uvx --from meds_summary_stats==X.Y.Z baseline_MEDS_summary_stats full --input-dir $RAW_INPUT_DIR
+uvx --from meds_summary_stats==X.Y.Z baseline_MEDS_summary_stats full --meds-dir $MEDS_OUTPUT_DIR
 ```
 
 [`tests/regression/full_summary_stats.json`](tests/regression/full_summary_stats.json) is the same
 fingerprint of the full MIMIC-IV 3.1 release. Because it is committed next to the ETL, its diff shows
 what an ETL change did to the whole credentialed release, and two ETL versions can be compared without
 access to the data. CI cannot rebuild the credentialed release, so regenerate it with
-`scripts/summary_stats.sh full` in every pull request that changes the output.
+`baseline_MEDS_summary_stats full` in every pull request that changes the output; the Summary stats
+workflow reminds a pull request that changes `src/` without it.
 
 Both baselines are built with `skip_stages=[sumeds_enrich]`: they fingerprint what the ETL writes, which
 does not depend on network access or on the suMEDS pack release. Summarize a build made the same way.

@@ -79,6 +79,20 @@ MIMIC-IV = "MIMIC_IV_MEDS:sumeds_rules.yaml"
 [project.entry-points."MEDS_transforms.stages"]
 mimic_iv_unit_keys = "MIMIC_IV_MEDS.unit_keys:main"
 
+# The summary-stats baselines in tests/regression/, which `baseline_MEDS_summary_stats` (from
+# meds_summary_stats) regenerates and checks: `<kind>_summary_stats.json` for each kind below, compared
+# under meds_summary_stats's built-in `etl-regression` policy. Both kinds skip the spec's sumeds_enrich
+# post-stage: the baselines fingerprint what the ETL writes, which does not depend on network access or
+# on the suMEDS ontology pack release. The demo is the cohort CI builds (tests/conftest.py), which skips
+# it too. See "Summary statistics" in the README.
+[tool.meds_summary_stats.baselines.kinds.full]
+build = "uv run --frozen meds-extract-run spec=MIMIC-IV do_download=false input_dir={input_dir} output_dir={output_dir} 'skip_stages=[sumeds_enrich]'"
+
+[tool.meds_summary_stats.baselines.kinds.demo]
+build = "uv run --frozen meds-extract-run spec=MIMIC-IV dataset_key=demo do_download=false input_dir={input_dir} output_dir={output_dir} 'skip_stages=[sumeds_enrich]'"
+# The demo is open, so the ETL downloads it when no --input-dir is given.
+build_without_input = "uv run --frozen meds-extract-run spec=MIMIC-IV dataset_key=demo output_dir={output_dir} 'skip_stages=[sumeds_enrich]'"
+
 [project.urls]
 Homepage = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS"
 Issues = "https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues"

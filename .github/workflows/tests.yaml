@@ -100,29 +100,31 @@ jobs:
         # fingerprint is a change this repo made. That is what makes a committed baseline
         # meaningful here, and what lets the policy treat cohort content as an error.
         #
-        # Which drift errors and which only warns is decided in tests/regression/policy.yaml.
-        # When a PR changes the output on purpose, regenerate the baseline in that same PR:
+        # Which drift errors and which only warns is decided by meds_summary_stats's built-in
+        # `etl-regression` policy. When a PR changes the output on purpose, regenerate the
+        # baseline in that same PR (see "Summary statistics" in the README):
         #
-        #   scripts/summary_stats.sh demo
+        #   uvx --from meds_summary_stats==X.Y.Z baseline_MEDS_summary_stats demo
         #
         # which builds the demo with this checkout, prints how the statistics moved, and
         # overwrites the baseline. The job below also uploads the new statistics as the
         # `mimic-demo-summary-stats` artifact.
         #
-        # The action, the package-spec, and the committed baseline are pinned together on
-        # meds_summary_stats 0.0.4 (stats_schema_version 2) and must move together:
-        # comparison refuses to diff across schema versions, so bumping one without the
-        # others fails the job with a precondition error rather than a useful diff.
-        uses: Medical-Event-Data-Standard/meds_summary_stats@0.0.4
+        # The action, the package-spec, and the committed baseline are pinned together on one
+        # meds_summary_stats version and must move together: comparison refuses to diff
+        # across stats_schema_versions, so bumping one without the others fails the job with a
+        # precondition error rather than a useful diff.
+        # DRAFT: pinned to the branch of Medical-Event-Data-Standard/meds_summary_stats#29, which
+        # adds the `etl-regression` policy; pin the release that ships it before merging.
+        uses: Medical-Event-Data-Standard/meds_summary_stats@feat/etl-baselines
         with:
           meds-dir: ${{ env.MEDS_DEMO_OUTPUT_DIR }}/MEDS_cohort
           baseline: tests/regression/demo_summary_stats.json
-          policy: tests/regression/policy.yaml
-          package-spec: meds_summary_stats==0.0.4
+          policy: etl-regression
+          package-spec: git+https://github.com/Medical-Event-Data-Standard/meds_summary_stats@feat/etl-baselines
           # Passed explicitly because the action sends `--fail-on` on every invocation and
-          # the CLI flag overrides the policy file. Leaving it unset does not defer to the
-          # policy, it silently applies the action's own default; this must match the
-          # `fail_on:` in tests/regression/policy.yaml.
+          # the CLI flag overrides the policy. Leaving it unset does not defer to the policy,
+          # it silently applies the action's own default; `etl-regression` fails on `error`.
           fail-on: error
           upload-artifacts: "true"
           artifact-name: mimic-demo-summary-stats
