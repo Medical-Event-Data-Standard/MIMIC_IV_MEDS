@@ -1,8 +1,8 @@
 """End-to-end run of the shipped ETL over the public MIMIC-IV demo release.
 
 This distribution is `event_configs.yaml` plus the entry-point registration that names it
-`MIMIC-IV` (and one small post-stage, tested in `unit_metadata_stage_test.py`). So the main
-thing worth testing is that
+`MIMIC-IV` (and one small pre-stage, tested in `unit_keys_test.py`). So the main thing worth
+testing is that
 `meds-extract-run spec=MIMIC-IV` resolves that registration, downloads the demo bucket from
 PhysioNet (no credentials needed), runs the pipeline, and leaves a well-formed MEDS cohort
 behind. That build is the `demo_cohort` fixture of `conftest.py`, shared with
@@ -15,18 +15,35 @@ CI does it exactly once, on one Python version, and both checks read the result.
 """
 
 import json
+import re
+from importlib.resources import files
 from pathlib import Path
 
 import polars as pl
 import pyarrow.parquet as pq
+import yaml
 from conftest import SPEC
 from meds import CodeMetadataSchema
 from sumeds.units import to_ucum
 
-from MIMIC_IV_MEDS.unit_metadata import description_unit
-
 #: The demo release the spec pins, as it appears in `dataset_version`'s `<release>:<pkg>` stamp.
 DEMO_RELEASE = "2.2"
+
+
+def _unit_sibling_options() -> dict:
+    """The options the spec gives suMEDS's `sumeds_link_unit_siblings` post-stage."""
+    spec = yaml.safe_load(files("MIMIC_IV_MEDS").joinpath("event_configs.yaml").read_text())
+    for stage in spec["etl"]["post_stages"]:
+        if isinstance(stage, dict) and "sumeds_link_unit_siblings" in stage:
+            return stage["sumeds_link_unit_siblings"]
+    raise AssertionError("the spec does not run sumeds_link_unit_siblings")
+
+
+def description_unit(description: str | None) -> re.Match | None:
+    """The unit an item label states at its end, if it is one the spec accepts (group 1)."""
+    options = _unit_sibling_options()
+    match = re.search(options["description_unit_pattern"], description or "")
+    return match if match and match.group(1) in options["description_units"] else None
 
 
 def test_e2e_demo(demo_cohort: Path):
@@ -65,7 +82,8 @@ def test_e2e_demo(demo_cohort: Path):
     assert len(set(codes["code"].to_pylist())) == codes.num_rows, "codes.parquet repeats a code"
     # `unit` is the UCUM code of the unit as recorded, which suMEDS's `sumeds_normalize_units` keeps in
     # `unit_source_value`; a spelling suMEDS does not know is kept as it is.
-    assert codes.schema.field("unit").type == "string"
+    # One String per code (`large_string` as MEDS-Extract writes it; suMEDS keeps the Arrow type).
+    assert codes.schema.field("unit").type in ("string", "large_string")
     units = dict(zip(codes["code"].to_pylist(), codes["unit_source_value"].to_pylist(), strict=True))
     ucum = dict(zip(codes["code"].to_pylist(), codes["unit"].to_pylist(), strict=True))
     not_ucum = sorted(c for c, u in units.items() if ucum[c] != (u if u is None else to_ucum(u) or u))
@@ -98,12 +116,18 @@ def test_e2e_demo(demo_cohort: Path):
     assert not wrong, f"codes whose unit metadata is not their unit component: {wrong[:10]}"
 
     # Codes that differ only in their unit component have the code without it as a parent, which
-    # has a row of its own without a unit.
+    # has a row of its own without a unit. A code whose unit was not recorded (`…//UNK`) joins its
+    # item's siblings, if one of them has a unit in the code.
     stems: dict[str, list[str]] = {}
+    real: set[str] = set()
     for c in unit_coded:
-        if expected[c] is not None and c not in from_label:
+        if unit_part[c] == "UNK":
+            stems.setdefault(c.removesuffix("//UNK"), []).append(c)
+        elif expected[c] is not None:
             stems.setdefault(c.removesuffix(f"//{expected[c]}"), []).append(c)
-    siblings = {stem: group for stem, group in stems.items() if len(group) > 1}
+            real.add(c)
+    siblings = {stem: group for stem, group in stems.items() if len(group) > 1 and real & set(group)}
+    assert any(c.endswith("//UNK") for group in siblings.values() for c in group), "no `…//UNK` sibling"
     assert siblings, "no unit siblings in the demo"
     parents = dict(zip(codes["code"].to_pylist(), codes["parent_codes"].to_pylist(), strict=True))
     unlinked = sorted(c for stem, group in siblings.items() for c in group if stem not in (parents[c] or []))

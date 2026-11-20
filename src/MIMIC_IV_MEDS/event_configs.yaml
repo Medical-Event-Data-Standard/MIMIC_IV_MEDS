@@ -41,12 +41,15 @@ etl:
   # keeps codes.parquet as the ETL wrote it and does not fail the run; `suMEDS-enrich
   # OUTPUT_DIR` finishes it later. `skip_stages=[sumeds_enrich]` leaves it out of a run.
   #
-  # Before that, this package's own stage (unit_metadata.py) makes the `unit` code metadata, which
-  # MEDS-Extract writes as a list per code, one String per code; it fails if a code has more than
-  # one unit. A charted item without a unit gets the one its label states, and codes that differ
-  # only in their last, unit component get the code without it as a parent, with a row of its
-  # own. It runs first so that the enrichment, now or retried later with `suMEDS-enrich`, always
-  # reads the same `codes.parquet`.
+  # Before that, suMEDS's `sumeds_link_unit_siblings` stage (see suMEDS's docs/unit_siblings.md)
+  # finishes the `unit` code metadata, which MEDS-Extract writes as one String per code (it fails
+  # if a code has more than one unit). Codes that differ only in their last, unit component get
+  # the code without it (the stem) as a parent, and the stem a row of its own; a code whose unit
+  # was not recorded (`…//UNK`) joins its item's siblings. A charted item without a recorded unit
+  # (`…//UNK`) gets the unit its label states, only from the list below (read off the public
+  # demo's `icu/d_items` labels; other bracketed endings such as `(serum)`, `(500ml)` or
+  # `(cm at teeth)` are not units). It runs first so that unit normalisation and the enrichment,
+  # now or retried later with `suMEDS-enrich`, always read the same `codes.parquet`.
   #
   # Before the canonical pipeline, `mimic_iv_unit_keys` (unit_keys.py) stages the side table
   # `inputevents_unit_in_code`: the itemids whose infusion starts or ends are recorded in more
@@ -54,7 +57,28 @@ etl:
   pre_stages:
     - mimic_iv_unit_keys
   post_stages:
-    - mimic_iv_unit_metadata
+    - sumeds_link_unit_siblings:
+        description_unit_pattern: '\s[(\[]([^()\[\]]+)[)\]]\s*$'
+        description_units:
+          [
+            "%",
+            C,
+            CM,
+            cm,
+            Kg,
+            L/min,
+            lbs.,
+            min,
+            Minutes,
+            mL,
+            mL/hour,
+            mL/hr,
+            ml/min,
+            mm,
+            RPM,
+            units/mL,
+          ]
+        fill_units: unknown_component
     # One UCUM spelling for every `unit` (suMEDS's shared table, e.g. `Cel`, `mm[Hg]`, `mg/dL`); the
     # spelling as recorded stays in `unit_source_value`, and an unknown spelling is kept as it is.
     - sumeds_normalize_units

@@ -186,9 +186,10 @@ def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFra
         assert parents[code] == ["RxNorm/7512", "INFUSION_END//221906"]
     for code in ["INFUSION_START//225158//mL/hour", "INFUSION_START//225158//mL/min"]:
         assert parents[code] == ["RxNorm/9863", "INFUSION_START//225158"]
-    # Codes without unit siblings get no extra parent, nor does the `UNK` start, which has no unit.
+    # A start whose unit was not recorded (`UNK`) joins its item's siblings; codes without unit
+    # siblings get no extra parent.
+    assert parents["INFUSION_START//225158//UNK"] == ["RxNorm/9863", "INFUSION_START//225158"]
     assert parents["INFUSION_START//221906"] == ["RxNorm/7512"]
-    assert parents["INFUSION_START//225158//UNK"] == ["RxNorm/9863"]
     # The stem has a row of its own, with what both siblings share and no unit.
     stem = codes.filter(pl.col("code") == "INFUSION_END//221906").to_dicts()
     assert [{k: row[k] for k in ("description", "parent_codes", "unit")} for row in stem] == [

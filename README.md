@@ -70,9 +70,9 @@ The entire ETL is one file —
     [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps);
 - an `etl:` block with the run's few knobs, the roles of the extension columns for
     `metadata/dataset.json`, the stage that runs before the pipeline, `mimic_iv_unit_keys`, and the
-    three that run after it, `mimic_iv_unit_metadata`, suMEDS's `sumeds_normalize_units` and the
-    suMEDS enrichment (the package's own two unit stages, its only Python, and the UCUM stage are
-    described under [Units](#units));
+    three suMEDS stages that run after it, in this order: `sumeds_link_unit_siblings`,
+    `sumeds_normalize_units` and the suMEDS enrichment (the package's own unit stage, its only
+    Python, and the two suMEDS unit stages are described under [Units](#units));
 - one block per raw table describing the events extracted from it, including joins,
     derived columns, and the code-metadata programs that attach descriptions and parent
     vocabulary codes.
@@ -266,8 +266,10 @@ as in the sibling MEDS ETLs (eICU, HiRID, AUMCdb, SICdb and others), none of whi
 MEDS does not standardise these columns. MEDS-Extract (0.9 and later) writes `unit` from the
 config's `_metadata` `unit:` fields: the code's one unit, stripped of surrounding whitespace (a blank
 unit gives none), and it fails the run, naming the codes, if a code has more than one. The spec's
-first post-stage, `mimic_iv_unit_metadata` (`src/MIMIC_IV_MEDS/unit_metadata.py`), then fills units
-from item labels and links unit siblings (both below), still in the spelling as recorded. Next,
+first post-stage, suMEDS's
+[`sumeds_link_unit_siblings`](https://github.com/rvandewater/suMEDS/blob/main/docs/unit_siblings.md),
+then fills units from item labels and links unit siblings (both below), still in the spelling as
+recorded. Next,
 suMEDS's `sumeds_normalize_units` writes `unit` as UCUM and keeps the recorded spelling in
 `unit_source_value`. Both run before the suMEDS enrichment, so a retried enrichment reads the same
 file.
@@ -278,15 +280,24 @@ that join code metadata on the code and its modifiers, such as suMEDS's summary,
 every code whose events have no `unit` (on the demo, 241 of the 1,129 codes the summary released lost
 their description; none does without the modifier).
 
-`mimic_iv_unit_metadata` also links codes that differ only in their unit component: where two or more codes are
-the same code followed by `//<unit>` (an item recorded in several units, such as
+`sumeds_link_unit_siblings` also links codes that differ only in their unit component: where two or
+more codes are the same code followed by `//<unit>` (an item recorded in several units, such as
 `INFUSION_END//225150//mcg` and `INFUSION_END//225150//mg` on the demo), each gets that code without
-the unit (`INFUSION_END//225150`) appended to its `parent_codes`. The parent gets a row of its own in
-`codes.parquet`, which has no events: the siblings' description if they all have the same one, the
-parent codes they all share, and no unit. On the full 3.1 release this gives 192 such groups, 462
-codes a parent and 192 new rows (the demo: 20 groups, 40 codes, 20 rows). Where the siblings'
-descriptions differ only in the bracketed unit they state, the stem's description leaves it out. A
-`…//UNK` code has no unit, so it is not one of the siblings and gets no such parent.
+the unit (`INFUSION_END//225150`) appended to its `parent_codes`. A code whose unit was not recorded
+(`…//UNK`) joins its item's siblings if one of them has a unit (`LAB//220545//%` and
+`LAB//220545//UNK`), but two `…//UNK`-style codes alone are never a group. The parent gets a row of its
+own in `codes.parquet`, which has no events: the siblings' description if they all have the same one
+(or the same one but for the unit each states, which is left out), the parent codes they all share,
+and no unit. On the demo this gives 98 groups, 196 codes a parent and 98 new rows (78 of the groups
+pair a unit with `…//UNK`). This shared stage replaced the package's own `mimic_iv_unit_metadata`
+(suMEDS 0.6.6); the spec gives it the options below, and the suMEDS defaults otherwise
+(`link_unknown_units: true`, `stem_description: without_unit`):
+
+| Option                     | Value                                                                         |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| `description_unit_pattern` | `\s[(\[]([^()\[\]]+)[)\]]\s*$`, a bracketed unit at the end of a label        |
+| `description_units`        | the bracketed units `icu/d_items` labels use (listed in `event_configs.yaml`) |
+| `fill_units`               | `unknown_component`: only `…//UNK` codes get a unit from their label          |
 
 | Codes                                                  | unit as recorded from                                                                                                                  |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -298,7 +309,7 @@ descriptions differ only in the bracketed unit they state, the stem's descriptio
 Where a charted item has no unit in the data (`LAB//<itemid>//UNK`), the unit its MIMIC-IV label
 states is used instead: a label ending in a bracketed unit, such as `Admission Weight (lbs.)`. The
 same post-stage does this, after the data and the code, which always win, and only for the
-bracketed units that `icu/d_items` labels use (listed in `unit_metadata.py`, read off the public
+bracketed units that `icu/d_items` labels use (`description_units` in `event_configs.yaml`, read off the public
 demo); other bracketed endings such as `(serum)` or a bag size `(500ml)` are not units, and no
 `hosp/d_labitems` label states one. The code is not changed, since the label gives the item one
 unit. Codes without a recorded unit (scores such as the GCS, the OMR blood pressures, `eGFR`) get
