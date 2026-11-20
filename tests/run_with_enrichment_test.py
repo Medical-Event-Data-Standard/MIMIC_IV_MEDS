@@ -199,10 +199,10 @@ def test_enrichment_is_non_destructive(plain_codes: dict, enriched_codes: dict):
 @pytest.mark.parametrize(
     "code,vocabulary,concept_code,ancestors",
     [
-        ("DIAGNOSIS//ICD//10//I5023", "ICD10CM", "I50.23", ["I50.2", "I50"]),
-        ("DIAGNOSIS//ICD//9//4019", "ICD9CM", "401.9", ["401"]),
-        ("PROCEDURE//ICD//10//02HV33Z", "ICD10PCS", "02HV33Z", []),
-        ("PROCEDURE//ICD//9//9604", "ICD9Proc", "96.04", ["96.0", "96"]),
+        ("DIAGNOSIS//ICD//10CM//I5023", "ICD10CM", "I50.23", ["I50.2", "I50"]),
+        ("DIAGNOSIS//ICD//9CM//4019", "ICD9CM", "401.9", ["401"]),
+        ("PROCEDURE//ICD//10PCS//02HV33Z", "ICD10PCS", "02HV33Z", []),
+        ("PROCEDURE//ICD//9CM//9604", "ICD9Proc", "96.04", ["96.0", "96"]),
     ],
 )
 def test_icd_codes_get_their_pack_ancestors(
@@ -223,19 +223,19 @@ def test_icd_codes_get_their_pack_ancestors(
 
 def test_icd_codes_get_parents_from_the_same_dataset(enriched_codes):
     """`I2720` gets `I272`, the demo code whose vocabulary code `I27.2` is its nearest pack ancestor."""
-    enriched = enriched_codes["DIAGNOSIS//ICD//10//I2720"]
+    enriched = enriched_codes["DIAGNOSIS//ICD//10CM//I2720"]
     assert enriched["parent_codes"] == [
         "ICD10CM//I27.20",
         "ICD10CM//I27.2",
         "ICD10CM//I27",
-        "DIAGNOSIS//ICD//10//I272",
+        "DIAGNOSIS//ICD//10CM//I272",
     ]
     # A same-dataset parent is described in its own row, so it has no entry in the names map.
-    assert "DIAGNOSIS//ICD//10//I272" not in enriched["parent_names"]
+    assert "DIAGNOSIS//ICD//10CM//I272" not in enriched["parent_names"]
 
 
 def test_codes_missing_from_the_packs_are_left_alone(plain_codes, enriched_codes):
-    plain, enriched = plain_codes["DIAGNOSIS//ICD//10//I10"], enriched_codes["DIAGNOSIS//ICD//10//I10"]
+    plain, enriched = plain_codes["DIAGNOSIS//ICD//10CM//I10"], enriched_codes["DIAGNOSIS//ICD//10CM//I10"]
     assert enriched["parent_codes"] == plain["parent_codes"] == ["ICD10CM//I10"]
     assert enriched["vocabulary_id"] is None and not enriched["parent_names"]
 
