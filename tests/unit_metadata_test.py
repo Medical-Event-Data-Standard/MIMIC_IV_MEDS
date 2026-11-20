@@ -177,7 +177,8 @@ def test_every_infusion_code_ends_in_its_unit(cohort: Path, codes: pl.DataFrame)
         "INFUSION//END//221906",  # the stem row of the two ends below, without events
         "INFUSION//END//221906//mcg",
         "INFUSION//END//221906//mg",
-        "INFUSION//END//225158//mL",  # one unit, no siblings, so no stem
+        "INFUSION//END//225158",  # a stem row also for one unit (`link_single_units`)
+        "INFUSION//END//225158//mL",
         "INFUSION//START//221906",  # the stem row
         "INFUSION//START//221906//UNK",
         "INFUSION//START//221906//mcg/kg/min",
@@ -189,6 +190,11 @@ def test_every_infusion_code_ends_in_its_unit(cohort: Path, codes: pl.DataFrame)
     events = pl.read_parquet(sorted((cohort / "data").rglob("*.parquet")))
     in_data = set(events.filter(pl.col("code").str.starts_with("INFUSION//"))["code"].to_list())
     assert in_data == {c for c in infusions if c.count("//") == 3}
+    # Every start pairs with its end by stem, swapping START for END (alignEHR#53).
+    stems = {c for c in infusions if c.count("//") == 2}
+    assert {c.replace("//START//", "//END//") for c in stems if "//START//" in c} == {
+        c for c in stems if "//END//" in c
+    }
 
 
 @pytest.mark.parametrize("code", EXPECTED)
@@ -204,12 +210,12 @@ def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFra
         assert parents[code] == ["RxNorm//7512", "INFUSION//END//221906"]
     for code in ["INFUSION//START//225158//mL/hour", "INFUSION//START//225158//mL/min"]:
         assert parents[code] == ["RxNorm//9863", "INFUSION//START//225158"]
-    # A start whose unit was not recorded (`UNK`) joins its item's siblings; codes without unit
-    # siblings get no extra parent.
+    # A start whose unit was not recorded (`UNK`) joins its item's siblings, and with
+    # `link_single_units` a code with one unit gets its stem too.
     assert parents["INFUSION//START//225158//UNK"] == ["RxNorm//9863", "INFUSION//START//225158"]
     for code in ["INFUSION//START//221906//mcg/kg/min", "INFUSION//START//221906//UNK"]:
         assert parents[code] == ["RxNorm//7512", "INFUSION//START//221906"]
-    assert parents["INFUSION//END//225158//mL"] == ["RxNorm//9863"]
+    assert parents["INFUSION//END//225158//mL"] == ["RxNorm//9863", "INFUSION//END//225158"]
     # The stem has a row of its own, with what both siblings share and no unit.
     stem = codes.filter(pl.col("code") == "INFUSION//END//221906").to_dicts()
     assert [{k: row[k] for k in ("description", "parent_codes", "unit")} for row in stem] == [

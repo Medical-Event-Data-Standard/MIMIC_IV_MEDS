@@ -330,14 +330,16 @@ With the last two, every infusion start pairs with its end by stem, swapping `ST
 (`INFUSION//START//225158//mL/hour` and `INFUSION//END//225158//mL` both get `…//225158`;
 alignEHR#53), and every other code that ends in its unit (`ICU_CHART//<itemid>//<unit>`,
 `LAB//RESULT//…//<unit>`, `SUBJECT_FLUID_OUTPUT//…//<unit>`) gets its unit-free stem as well; `…//UNK` outside the infusion codes
-gets none, as there it is no unit.
+gets none, as there it is no unit. On the demo the two options add 890 codes of a single unit to the
+232 above, so 1,122 codes get a stem parent and 1,006 stem rows are added (159 `INFUSION//START`, 159
+`INFUSION//END`, 298 `ICU_CHART`, 351 `LAB//RESULT` and 39 `SUBJECT_FLUID_OUTPUT`).
 
 | Codes                                                                          | unit as recorded from                                                                                                                  |
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `LAB//RESULT`, `ICU_CHART//<itemid>`, `SUBJECT_FLUID_OUTPUT`                         | `valueuom`, the code's last component (stripped; missing or blank is `UNK`), so one unit per code (none for `…//UNK`)                  |
+| `LAB//RESULT`, `ICU_CHART//<itemid>`, `SUBJECT_FLUID_OUTPUT`                   | `valueuom`, the code's last component (stripped; missing or blank is `UNK`), so one unit per code (none for `…//UNK`)                  |
 | OMR `BMI (kg/m2)`, `Weight (Lbs)`, `Height (Inches)`                           | the unit in parentheses in `result_name`                                                                                               |
 | `INFUSION//START//<itemid>//<rateuom>`, `INFUSION//END//<itemid>//<amountuom>` | `rateuom` and `amountuom`, the code's last component, so one unit per code (none for `…//UNK`)                                         |
-| `SUBJECT_WEIGHT_AT_INFUSION`                                               | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT) |
+| `SUBJECT_WEIGHT_AT_INFUSION`                                                   | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT) |
 
 The unit in a lab, chart or output code is `valueuom` stripped of surrounding whitespace; missing or
 blank is `UNK`. MEDS-Extract compares units the same way when it writes `unit` (stripped, blanks
@@ -365,24 +367,24 @@ give one code. A start without a unit is `INFUSION//START//<itemid>//UNK`: `rate
 when `rate` is, so these are the starts without a rate, and they have no unit. `amountuom` is never
 null. On the demo no `rateuom` or `amountuom` is blank or padded with whitespace.
 
-Where an itemid's starts (ends) are recorded in several units, or also without one, the unit-free
-code `INFUSION//START//<itemid>` (`INFUSION//END//<itemid>`) is the parent `sumeds_link_unit_siblings`
-gives them (see above), with a row in `codes.parquet` but no events; a code list naming it then finds
-no events rather than silently only some of the itemid's units. To select every infusion of an
-itemid, match the code without its last component, or the parent.
+Every infusion code, `…//UNK` included, gets the unit-free code `INFUSION//START//<itemid>`
+(`INFUSION//END//<itemid>`) as its last parent from `sumeds_link_unit_siblings` (`link_single_units`
+and `unknown_unit_prefixes`, see above), with a row in `codes.parquet` but no events; a code list
+naming it then finds no events rather than silently only some of the itemid's units. To select every
+infusion of an itemid, match the code without its last component, or the parent.
 
-On the demo there are 350 infusion codes (177 starts, 101 of them `…//UNK`, and 173 ends) and 18
-unit-free parents more than with codes that ended in their unit only where an itemid mixed units
-(332 codes, see [Breaking changes](#breaking-changes)). Events, values and times are unchanged, and
-each event's unit is its code's (see above).
+On the demo there are 350 infusion codes (177 starts, 101 of them `…//UNK`, and 173 ends) and 318
+unit-free parents (159 starts, 159 ends), against 332 codes and 14 parents when codes ended in their
+unit only where an itemid mixed units (see [Breaking changes](#breaking-changes)). Events, values and
+times are unchanged, and each event's unit is its code's (see above).
 
 **Pairing a start with its end.** Every interval is two codes, `<FAMILY>//START//…` and
 `<FAMILY>//END//…` (pharmacy orders `MEDICATION//START|END//<drug>//<ndc>`, procedures
 `PROCEDURE//START|END//<itemid>`, infusions `INFUSION//START|END//<itemid>//<unit>`), the spelling the
 MEDS ETLs move to ([alignEHR#53](https://github.com/rvandewater/alignEHR/issues/53)). Both codes carry
 what says which interval it is; only the unit, that of the value recorded at that event, may differ. To
-pair them, take the code without its unit (for an item recorded in several units, the parent
-`sumeds_link_unit_siblings` gives it) and swap `START` for `END`: `INFUSION//START//225150//mcg/kg/hour`
+pair them, take the code without its unit (the parent `sumeds_link_unit_siblings` gives every
+infusion code) and swap `START` for `END`: `INFUSION//START//225150//mcg/kg/hour`
 pairs with `INFUSION//END//225150//mcg` and `INFUSION//END//225150//mg` on the demo, whose parent is
 `INFUSION//END//225150`.
 
@@ -621,26 +623,17 @@ mappings may depend on, newest release first.
 
 ### Unreleased (next release, 0.4.0)
 
-- **ICU chart events are `ICU_CHART//…`.** `icu/chartevents` was coded `LAB//{itemid}//{valueuom}` up
-    to 0.3.0 and is now `ICU_CHART//{itemid}//{valueuom}`; `LAB//…` is hospital labs only. Migrate by
-    replacing `^LAB//(?=\d)` with `ICU_CHART//` (see [ICU chart events](#icu-chart-events), #64).
-- **The events have no `unit` column.** Every code has one unit, which is in `metadata/codes.parquet`
-    only; join the events to it on `code` (see [Units](#units)). `unit` is no longer a code modifier
-    (`code_modifier_columns` is empty).
-- **`codes.parquet` `unit` is a UCUM code** (`mcg` → `ug`, `mL/hour` → `mL/h`); the unit as recorded
-    is in the new column `unit_source_value`. Code strings keep the recorded spelling.
-- **New rows in `codes.parquet` without events:** codes that differ only in their unit component get
-    the code without the unit as a parent, which has a row of its own (98 on the demo).
-- **Infusion codes** (`INFUSION//START//<itemid>`, `INFUSION//END//<itemid>`) end in their unit
-    (`//<unit>`, `//UNK` for a start without a rate) where the itemid is recorded in more than one
-    unit, and only there.
-- **Vocabulary parents are spelled `VOCABULARY//CODE`.** The `parent_codes` the ETL writes itself
-    (`ICD9CM`, `ICD10CM`, `ICD9Proc`, `ICD10PCS`, `NDC`, `MS-DRG`, `APR-DRG`, and the LOINC, SNOMED
-    and RxNorm parents from the mimic-code maps) used one slash, `ICD10CM/I50.23`; they now use two,
-    `ICD10CM//I50.23`, the spelling suMEDS already writes for the ancestors it adds. Codes and events
-    are unchanged. To migrate, respell old parents with the regex `^([^/]+)/(?!/)` → `\1//` (only the
-    first slash changes; codes after it are kept as they are). suMEDS and alignEHR already read both
-    spellings as the same parent.
+Counts are from the public MIMIC-IV demo; the full-release counts need a credentialed rebuild. Every
+event keeps its subject, time, values and other columns: only codes, the code metadata and the run's
+leftovers change.
+
+**Codes**
+
+- **ICU chart events are `ICU_CHART//…`** ([#64](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/64)).
+    `icu/chartevents` was coded `LAB//{itemid}//{valueuom}` up to 0.3.0 and is now
+    `ICU_CHART//{itemid}//{valueuom}`; `LAB//…` is hospital labs only. Migrate by replacing
+    `^LAB//(?=\d)` with `ICU_CHART//` (see [ICU chart events](#icu-chart-events)).
+
 - **ICD codes name their edition, `ICD//<edition>//<code>`.** `DIAGNOSIS//ICD//9//<code>` and
     `DIAGNOSIS//ICD//10//<code>` are now `DIAGNOSIS//ICD//9CM//<code>` and
     `DIAGNOSIS//ICD//10CM//<code>`; `PROCEDURE//ICD//9//<code>` and `PROCEDURE//ICD//10//<code>` are
@@ -651,80 +644,79 @@ mappings may depend on, newest release first.
     the edition is unchanged (undotted, as MIMIC-IV records it). To migrate, rename with
     `^DIAGNOSIS//ICD//(9|10)//` → `DIAGNOSIS//ICD//\1CM//`, `^PROCEDURE//ICD//9//` →
     `PROCEDURE//ICD//9CM//` and `^PROCEDURE//ICD//10//` → `PROCEDURE//ICD//10PCS//`.
-- **`SUBJECT_WEIGHT_AT_INFUSION//KG` is `SUBJECT_WEIGHT_AT_INFUSION`**, eICU's code for the same
-    value; its unit, `kg`, is in `metadata/codes.parquet`. The events and values are unchanged.
-    Migrate by replacing `SUBJECT_WEIGHT_AT_INFUSION//KG` with `SUBJECT_WEIGHT_AT_INFUSION`.
+
 - **Interval ends are `<FAMILY>//START//…` and `<FAMILY>//END//…`**
     ([alignEHR#53](https://github.com/rvandewater/alignEHR/issues/53)): pharmacy order ends were
-    `MEDICATION//STOP//…` and infusions `INFUSION_START//…`/`INFUSION_END//…`. Item ids, units, events and
-    code metadata are otherwise unchanged; the unit-sibling parents of infusion codes are renamed with them
-    (`INFUSION_END//225150` → `INFUSION//END//225150`). See
-    [Pairing a start with its end](#units).
-
-    | Old                                  | New                                   |
-    | ------------------------------------ | ------------------------------------- |
-    | `MEDICATION//STOP//<drug>//<ndc>`    | `MEDICATION//END//<drug>//<ndc>`      |
-    | `INFUSION_START//<itemid>[//<unit>]` | `INFUSION//START//<itemid>[//<unit>]` |
-    | `INFUSION_END//<itemid>[//<unit>]`   | `INFUSION//END//<itemid>[//<unit>]`   |
-
-    Migrate with the regexes `^MEDICATION//STOP//` → `MEDICATION//END//` and `^INFUSION_(START|END)//` →
-    `INFUSION//\1//`.
+    `MEDICATION//STOP//…`, now `MEDICATION//END//…`, and infusions were `INFUSION_START//…` and
+    `INFUSION_END//…`, now `INFUSION//START//…` and `INFUSION//END//…` (see
+    [Pairing a start with its end](#units)). Migrate with `^MEDICATION//STOP//` → `MEDICATION//END//`;
+    for infusions, see the next entry.
 
 - **Every infusion code ends in its unit**: `INFUSION//START//<itemid>//<rateuom>` and
     `INFUSION//END//<itemid>//<amountuom>`, with the unit stripped of surrounding whitespace and
-    `//UNK` for a start without a rate (or any row whose unit is missing or blank). Before, only the
-    codes of an itemid whose starts (ends) mixed units ended in it, which took a package pre-stage
-    (`mimic_iv_unit_keys`, now removed) and a side table to decide; now every code has one unit by
-    construction, as the `LAB` codes do, and suMEDS's `sumeds_link_unit_siblings` still gives the
-    unit-free parent where an itemid has several units or also starts without a rate. See
-    [Units](#units). On the demo, 304 of the 332 infusion codes change name (all 159 starts and 145
-    of the 173 ends; the 28 ends of itemids that mixed units are unchanged) and become 322 codes:
-    18 itemids whose starts had a rate on some rows and none on others now have a
-    `…//<rateuom>` and a `…//UNK` start, and the 83 itemids whose starts never had a rate end in
-    `//UNK`. The unit-free codes of those 18 itemids become parents without events. Events, values, times and each
-    code's `unit`, `unit_source_value`, description and other parents are unchanged. The full-release
-    counts need a credentialed rebuild.
-
-    | Before (in this release, after the rename above) | Now                                                                           |
-    | ------------------------------------------------ | ----------------------------------------------------------------------------- |
-    | `INFUSION//START//<itemid>`                      | `INFUSION//START//<itemid>//<rateuom>`, or `…//UNK` for starts without a rate |
-    | `INFUSION//END//<itemid>`                        | `INFUSION//END//<itemid>//<amountuom>`                                        |
-    | `INFUSION//START//<itemid>//<unit>`              | unchanged                                                                     |
-    | `INFUSION//END//<itemid>//<unit>`                | unchanged                                                                     |
-
-    The unit cannot be derived from the old code, so migrate by comparing without it: strip the last
-    component of an infusion code (`^(INFUSION//(START|END)//\d+)//.*$` → `\1`) to compare with an
-    old single-unit code, or match every infusion code of an itemid in both spellings with
-    `^INFUSION(_|//)(START|END)//<itemid>(//.*)?$`. Code lists that named a unit-free infusion code
-    either add the units the itemid is recorded in or name its parent and follow `parent_codes`.
+    `//UNK` where it is missing or blank (for starts, exactly those without a rate). Up to 0.3.0 the
+    codes were `INFUSION_START//<itemid>` and `INFUSION_END//<itemid>`, with the unit in the events'
+    `unit` column. Every code now has one unit by construction, as the `LAB` codes do, and the package's
+    own `mimic_iv_unit_keys` pre-stage, which found the itemids that mix units, is gone. On the demo
+    the 318 infusion codes of 0.3.0 (159 itemids, each with a start and an end code) become 350: 177
+    starts, 101 of them `…//UNK` (18 itemids have starts with and without a rate, so both a
+    `…//<rateuom>` and a `…//UNK` start), and 173 ends (14 itemids record their amounts in two units). Each code's `unit`, `unit_source_value`, description and other parents are
+    unchanged. Migrate a 0.3.0 event with `^INFUSION_(START|END)//(\d+)$` → `INFUSION//\1//\2//<unit>`,
+    where `<unit>` is the event's `unit` stripped, or `UNK` if it is null or blank. To compare with
+    codes that name no unit, strip the last component (`^(INFUSION//(START|END)//\d+)//.*$` → `\1`),
+    or follow `parent_codes` to the unit-free stem (see below).
 
 - **The unit in a lab, chart or output code is stripped of surrounding whitespace, and a blank one is
-    `UNK`.** This covers `LAB//RESULT//{itemid}//{valueuom}`, `ICU_CHART//{itemid}//{valueuom}` (chart
-    events) and `SUBJECT_FLUID_OUTPUT//{itemid}//{valueuom}`. Before, the unit was copied as
-    recorded, so a padded unit gave a code of its own and a blank one a code ending in whitespace,
-    with no `unit`. On the demo, lab item 51498 records its unit as a single space (339
-    events), so its code was `LAB//RESULT//51498//` followed by a space; it is now
-    `LAB//RESULT//51498//UNK`, with its description, parents and (null) unit unchanged. No
-    other code changes. On the full release, codes change only where a unit was padded or blank. To
-    migrate, strip the last part of an old code and write `UNK` for an empty one:
+    `UNK`.** This covers `LAB//RESULT//{itemid}//{valueuom}`, `ICU_CHART//{itemid}//{valueuom}` and
+    `SUBJECT_FLUID_OUTPUT//{itemid}//{valueuom}`. Before, the unit was copied as recorded, so a padded
+    unit gave a code of its own and a blank one a code ending in whitespace, with no `unit`. On the
+    demo, lab item 51498 records its unit as a single space (339 events), so its code was
+    `LAB//RESULT//51498//` followed by a space; it is now `LAB//RESULT//51498//UNK`. No other demo code
+    changes. To migrate, strip the last part of an old code and write `UNK` for an empty one:
     `^(.*//)\s*(\S(?:.*\S)?)?\s*$` → `\1\2`, then `//$` → `//UNK`.
+
+- **`SUBJECT_WEIGHT_AT_INFUSION//KG` is `SUBJECT_WEIGHT_AT_INFUSION`**, eICU's code for the same
+    value; its unit, `kg`, is in `metadata/codes.parquet`. Migrate by replacing
+    `SUBJECT_WEIGHT_AT_INFUSION//KG` with `SUBJECT_WEIGHT_AT_INFUSION`.
+
+**Events and code metadata**
+
+- **The events have no `unit` column.** Every code has one unit, which is in `metadata/codes.parquet`
+    only; join the events to it on `code` (see [Units](#units)). `unit` is no longer a code modifier
+    (`code_modifier_columns` is empty).
+
+- **`codes.parquet` `unit` is a UCUM code** (`mcg` → `ug`, `mL/hour` → `mL/h`); the unit as recorded
+    is in the new column `unit_source_value`. Code strings keep the recorded spelling.
+
+- **Vocabulary parents are spelled `VOCABULARY//CODE`.** The `parent_codes` the ETL writes itself
+    (`ICD9CM`, `ICD10CM`, `ICD9Proc`, `ICD10PCS`, `NDC`, `MS-DRG`, `APR-DRG`, and the LOINC, SNOMED
+    and RxNorm parents from the mimic-code maps) used one slash, `ICD10CM/I50.23`; they now use two,
+    `ICD10CM//I50.23`, the spelling suMEDS already writes for the ancestors it adds. To migrate, respell
+    old parents with the regex `^([^/]+)/(?!/)` → `\1//` (only the first slash changes; codes after it
+    are kept as they are). suMEDS and alignEHR already read both spellings as the same parent.
+
+- **`codes.parquet` has unit-free stem rows, without events**
+    ([#114](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/pull/114)). suMEDS's
+    `sumeds_link_unit_siblings` gives every code that ends in its unit the code without the unit as its
+    last `parent_codes` entry, and that stem a row of its own (no unit, no events): where an item is
+    recorded in several units, with `link_single_units` also where it has one, and with
+    `unknown_unit_prefixes` also for an infusion code without a unit (see
+    [Code metadata](#code-metadata)). So every infusion start pairs with its end by stem. On the demo,
+    1,122 codes get a stem parent and 1,006 stem rows are added (159 `INFUSION//START`, 159
+    `INFUSION//END`, 298 `ICU_CHART`, 351 `LAB//RESULT`, 39 `SUBJECT_FLUID_OUTPUT`). Nothing needs
+    migrating unless a tool expects every `codes.parquet` row to have events or a unit: drop the stem
+    rows (`code_template` and `unit` null), or ignore a parent that is the code without its last `//`
+    component.
+
+**Running the ETL**
+
 - **Intermediate stage outputs are no longer kept.** Up to 0.3.0, a run left each stage's output in
-    `<output_dir>/<stage>/` (`convert_to_parquet/`, `convert_to_MEDS_events/`, `mimic_iv_unit_keys/`,
-    …, about 10 GB of the full release's 15 GB tree). The spec now sets MEDS-Extract's
-    `etl.cleanup_intermediates: true`, so a successful run deletes those directories and keeps only
+    `<output_dir>/<stage>/` (`convert_to_parquet/`, `convert_to_MEDS_events/`, …, about 10 GB of the
+    full release's 15 GB tree). The spec now sets MEDS-Extract's `etl.cleanup_intermediates: true`
+    (MEDS-Extract 0.9.2 or later), so a successful run deletes those directories and keeps only
     `data/`, `metadata/`, `.logs/` and `.meds_extract_run/`. The MEDS data and metadata are
     unchanged. To migrate, add `"overrides=['cleanup_intermediates=false']"` to `meds-extract-run`
     wherever you read a stage directory after the run.
-- **`codes.parquet` gains unit-free stem rows and stem parents for single-unit codes**
-    ([#114](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/pull/114)). suMEDS's
-    `sumeds_link_unit_siblings` now runs with `link_single_units` and `unknown_unit_prefixes` (see
-    [Code metadata](#code-metadata)): every code that ends in its unit gets the code without the unit
-    as its last `parent_codes` entry, and that stem gets a row of its own (no unit, no events), also
-    when the item has a single unit, and so does an infusion code without a recorded unit. Before,
-    only items with two or more units did. Events are unchanged. On the public MIMIC-IV demo, 604 codes gain a stem parent and 604 stem rows are added (290 `LAB//RESULT`, 275 `LAB`, 39 `SUBJECT_FLUID_OUTPUT`); a MESSY-synth build has none. Once every infusion code ends in its unit (#111, #112), the infusion starts and ends get stems as well (on the demo, 203 more single-unit infusion codes and 83 `INFUSION//START//<itemid>//UNK` starts).
-    To migrate, nothing is needed unless a tool expects every `codes.parquet` row to carry events or
-    a unit: drop the stem rows with `code_template` null and `unit` null, or ignore a parent that
-    is the code without its last `//` component.
 
 ## 📚 Citing this work
 
