@@ -6,6 +6,9 @@
 # schema. No code string, no cell of fewer than 20 subjects and no minimum or maximum is written, which
 # is what makes it safe to commit (https://github.com/Medical-Event-Data-Standard/meds_summary_stats).
 # Regenerate it in every pull request that changes the ETL's output, so the diff shows what changed.
+# Each baseline describes the dataset `meds-extract-run spec=MIMIC-IV` builds, suMEDS enrichment
+# included: the script builds with strict enrichment and refuses to summarize a build whose
+# metadata/dataset.json does not record `sumeds_enrichment.enriched: true`.
 #
 # Usage:
 #   scripts/summary_stats.sh KIND --input-dir RAW_DIR [--output-dir DIR]  build with this checkout, then update
@@ -31,19 +34,21 @@ die() {
 # repository root. Prints the root of the MEDS dataset it wrote (the directory holding data/ and
 # metadata/). The build uses this checkout and its locked dependencies.
 #
-# Both kinds skip the spec's sumeds_enrich post-stage: the baselines fingerprint what the ETL writes,
-# which does not depend on network access or on the suMEDS ontology pack release. The demo is the
-# cohort CI builds (tests/conftest.py), which skips it too.
+# Both kinds run the spec's sumeds_enrich post-stage, as `meds-extract-run spec=MIMIC-IV` does by
+# default, so the baselines fingerprint the enriched dataset users get. It fetches the suMEDS ontology
+# packs over the network; `strict` fails the build rather than soft-fails when the enrichment fails.
+# The demo is the cohort CI builds (tests/conftest.py), which is built the same way.
 build() {
   local kind=$1 input=$2 output=$3
+  local strict="overrides=['++stage_cfg.strict=true']"
   case $kind in
     full)
       uv run --frozen meds-extract-run spec=MIMIC-IV do_download=false input_dir="$input" output_dir="$output" \
-        "skip_stages=[sumeds_enrich]" >&2 && echo "$output"
+        "$strict" >&2 && echo "$output"
       ;;
     demo)
       uv run --frozen meds-extract-run spec=MIMIC-IV dataset_key=demo output_dir="$output" ${input:+do_download=false} ${input:+"input_dir=$input"} \
-        "skip_stages=[sumeds_enrich]" >&2 && echo "$output"
+        "$strict" >&2 && echo "$output"
       ;;
     *) die "unknown kind '$kind' (expected one of: $KINDS)" ;;
   esac
@@ -90,6 +95,10 @@ if [[ -z $meds_dir ]]; then
   meds_dir=$(build "$kind" "$input_dir" "$output_dir")
 fi
 [[ -f $meds_dir/metadata/dataset.json ]] || die "$meds_dir is not a MEDS dataset (no metadata/dataset.json)"
+# The baselines describe enriched builds, so refuse to summarize one whose enrichment was skipped or failed.
+enriched=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("sumeds_enrichment", {}).get("enriched"))' \
+  "$meds_dir/metadata/dataset.json")
+[[ $enriched == True ]] || die "$meds_dir is not enriched (sumeds_enrichment.enriched is $enriched); run suMEDS-enrich $meds_dir first"
 echo "Summarizing $meds_dir ($(tr -d '\n' <"$meds_dir/metadata/dataset.json"))" >&2
 
 current=$(mktemp "${TMPDIR:-/tmp}/summary_stats.XXXXXX")
