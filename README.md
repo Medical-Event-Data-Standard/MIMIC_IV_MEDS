@@ -60,7 +60,7 @@ Intermediate stage outputs are deleted after a successful run, by default: the s
 MEDS-Extract's `etl.cleanup_intermediates: true`, so a finished `$MEDS_OUTPUT_DIR` holds only `data/`,
 `metadata/`, `.logs/` and `.meds_extract_run/`. A failed run keeps them, so the same command resumes
 where it stopped, and the same command on a finished output still does nothing. To keep them (to look
-at a stage's output or at its own logs in `$MEDS_OUTPUT_DIR/<stage>/.logs/`), add
+at a stage's output; `$MEDS_OUTPUT_DIR/.logs/pipeline.log` keeps the stage logs either way), add
 `"overrides=['cleanup_intermediates=false']"`. Cleanup never deletes raw data: a download into the
 default `$MEDS_OUTPUT_DIR/.meds_extract_run/raw_input` stays, and `download_dest_dir=` elsewhere lets
 other output directories reuse it.
