@@ -72,13 +72,17 @@ def test_e2e_demo(demo_cohort: Path):
     assert all("unit" not in pl.read_parquet_schema(f) for f in data_files)
 
     # Code metadata, as read from disk, is valid MEDS code metadata, and every code is
-    # described except lab items absent from mimic-code's lab map, which have no other
-    # source (see "Code metadata" in the README). No description may hold a newline:
-    # that is MEDS-Extract joining the output of two `_metadata` blocks for one code.
+    # described except `hosp/labevents` items absent from mimic-code's lab map (the 53xxx
+    # itemids), which have no other source (see "Code metadata" in the README), and the
+    # unit-less stem suMEDS links their unit variants to (`LAB//RESULT//53153`). ICU chart
+    # codes (`ICU_CHART//…`) are described from `icu/d_items` and get no exemption. No
+    # description may hold a newline: that is MEDS-Extract joining the output of two
+    # `_metadata` blocks for one code.
     codes = pq.read_table(metadata / "codes.parquet")
     CodeMetadataSchema.validate(codes)
     described = dict(zip(codes["code"].to_pylist(), codes["description"].to_pylist(), strict=True))
-    undescribed = sorted(c for c, d in described.items() if d is None and not c.startswith("LAB//"))
+    unmapped_lab = re.compile(r"^LAB//(RESULT|SPECIMEN_COLLECTED)//53\d{3}(//|$)")
+    undescribed = sorted(c for c, d in described.items() if d is None and not unmapped_lab.match(c))
     assert not undescribed, f"codes without a description: {undescribed}"
     multi = sorted(c for c, d in described.items() if d is not None and "\n" in d)
     assert not multi, f"codes with several joined descriptions: {multi}"
@@ -99,7 +103,11 @@ def test_e2e_demo(demo_cohort: Path):
     # "Units" in the README); `UNK` there stands for a null unit, which gives none, as does a blank one.
     data_codes = set(pl.scan_parquet(data_files).select("code").unique().collect()["code"])
     infusions = ("INFUSION_START//", "INFUSION_END//")
-    unit_coded = [c for c in units if c in data_codes and c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
+    unit_coded = [
+        c
+        for c in units
+        if c in data_codes and c.startswith(("LAB//", "ICU_CHART//", "SUBJECT_FLUID_OUTPUT//"))
+    ]
     unit_coded = [c for c in unit_coded if not c.startswith("LAB//SPECIMEN_COLLECTED//")]
     assert unit_coded, "no unit-coded codes in the demo"
     # Infusion codes end in their unit only where the itemid mixes units (`…//<itemid>//<unit>`).

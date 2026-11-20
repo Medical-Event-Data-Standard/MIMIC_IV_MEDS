@@ -85,9 +85,9 @@ RAW = {
 #: spelling (`…//mcg`, `…//mL/hour`); only the `unit` column is UCUM.
 EXPECTED = {
     "LAB//RESULT//50912//mg/dL": ("mg/dL", "mg/dL"),
-    "LAB//220045//bpm": ("bpm", "{beats}/min"),
+    "ICU_CHART//220045//bpm": ("bpm", "{beats}/min"),
     # Charted without a unit; the item's label states it.
-    "LAB//226531//UNK": ("lbs.", "[lb_av]"),
+    "ICU_CHART//226531//UNK": ("lbs.", "[lb_av]"),
     "SUBJECT_FLUID_OUTPUT//226559//mL": ("mL", "mL"),
     "Weight (Lbs)": ("Lbs", "[lb_av]"),
     "BMI (kg/m2)": ("kg/m2", "kg/m2"),

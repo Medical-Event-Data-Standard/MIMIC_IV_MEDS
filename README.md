@@ -187,6 +187,22 @@ single `text_value` slot on `input_end` (100% of rows carry both). See
 (`rateuom`, `amountuom`) are the codes' `unit` in `metadata/codes.parquet`, and the code's last
 component where an itemid mixes units; the events have no `unit` column (see [Units](#units)).
 
+### ICU chart events
+
+`icu/chartevents` is coded `ICU_CHART//{itemid}//{valueuom}` (`UNK` when the unit is null), for
+example `ICU_CHART//220045//bpm`. These are values charted at the ICU bedside: vital signs, scores,
+assessments, device settings and point-of-care measurements, keyed on `icu/d_items`. Hospital
+laboratory results come from `hosp/labevents` and keep their own codes, `LAB//RESULT//…` and
+`LAB//SPECIMEN_COLLECTED//…`, so `^LAB//` selects hospital labs only and `^ICU_CHART//` selects
+ICU charting only. The prefix sits beside the other ICU tables' own prefixes (`ICU_ADMISSION`,
+`INFUSION_START`, `PROCEDURE//START`, `SUBJECT_FLUID_OUTPUT`).
+
+**This changes the chartevents vocabulary.** Up to 0.3.0 the same events were coded
+`LAB//{itemid}//{valueuom}`. Only the prefix changed (the itemid and unit segments are as before),
+so an old code maps to the new one by replacing a leading `LAB//` followed by a digit with
+`ICU_CHART//`. Cohorts, predicates and vocabularies built against the old codes need that rename
+([#64](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/64)).
+
 ## Code metadata
 
 `metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary
@@ -194,11 +210,11 @@ applies, `parent_codes` in OMOP form (`LOINC/2160-0`, `ICD10CM/I10`, `NDC/…`),
 that maps codes across datasets or resolves them through OHDSI Athena has something to work
 with. All of it is declared in `event_configs.yaml`, through three routes:
 
-| Codes                                                                                                                                                                                | Route                                                                     | Source                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DIAGNOSIS`, `PROCEDURE//ICD`, `HCPCS`, ICU itemid codes (`LAB//<itemid>`, `PROCEDURE//START`/`END`, `INFUSION_*`, `SUBJECT_FLUID_OUTPUT`), `LAB//RESULT`, `LAB//SPECIMEN_COLLECTED` | `_metadata` joins against dictionary tables at run time                   | MIMIC-IV's own `d_icd_diagnoses`, `d_icd_procedures`, `d_hcpcs` and `d_items`; the [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps (MIT, tag v2.4.0, checksum-pinned under `sources:`) for lab descriptions and the LOINC, SNOMED and RxNorm parents |
-| every other component-coded event (admissions, demographics, transfers, ICU stays, DRGs, medications, OMR)                                                                           | `_self` templates over the code's own components                          | the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) of the column each component comes from (MIT-LCP/mimic-website, MIT), paraphrased, with the column named in parentheses                                                                                  |
-| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION//KG`                                                                                            | `_self` templates, the code rendered from a constant `_table.cols` column | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                   |
+| Codes                                                                                                                                                                                      | Route                                                                     | Source                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DIAGNOSIS`, `PROCEDURE//ICD`, `HCPCS`, ICU itemid codes (`ICU_CHART//<itemid>`, `PROCEDURE//START`/`END`, `INFUSION_*`, `SUBJECT_FLUID_OUTPUT`), `LAB//RESULT`, `LAB//SPECIMEN_COLLECTED` | `_metadata` joins against dictionary tables at run time                   | MIMIC-IV's own `d_icd_diagnoses`, `d_icd_procedures`, `d_hcpcs` and `d_items`; the [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps (MIT, tag v2.4.0, checksum-pinned under `sources:`) for lab descriptions and the LOINC, SNOMED and RxNorm parents |
+| every other component-coded event (admissions, demographics, transfers, ICU stays, DRGs, medications, OMR)                                                                                 | `_self` templates over the code's own components                          | the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) of the column each component comes from (MIT-LCP/mimic-website, MIT), paraphrased, with the column named in parentheses                                                                                  |
+| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION//KG`                                                                                                  | `_self` templates, the code rendered from a constant `_table.cols` column | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                   |
 
 Literal codes take the detour through a constant column because MEDS-Extract attaches
 metadata only through a code's components and rejects a `_metadata` block on a code with
@@ -211,12 +227,13 @@ Every parent the ETL writes is read from MIMIC-IV's own tables or the mimic-code
 links that need an external ontology (the OMOP Gender tags, the ICD pack hierarchy) come from
 suMEDS instead (next section).
 
-On the demo (2.2), 10,250 of 10,254 codes are described and 7,899 have a parent code. What
+On the demo (2.2), 10,361 of 10,366 codes are described and 8,028 have a parent code. What
 is left uncovered, and why:
 
 - **Labs missing from mimic-code's lab map.** Lab descriptions come from
     `d_labitems_to_loinc.csv`, which lacks 28 of the demo's 1,622 `d_labitems` (all
-    `53xxx`; one occurs in the demo's lab events, giving the four undescribed codes). A second
+    `53xxx`; one occurs in the demo's lab events, giving four undescribed codes, plus the stem
+    `LAB//RESULT//53153` that two of them are linked to). A second
     description block over `hosp/d_labitems` would fill them, but MEDS-Extract has no
     precedence between blocks: it joins both strings, with a newline, into the description
     of every lab code.
@@ -284,8 +301,8 @@ their description; none does without the modifier).
 more codes are the same code followed by `//<unit>` (an item recorded in several units, such as
 `INFUSION_END//225150//mcg` and `INFUSION_END//225150//mg` on the demo), each gets that code without
 the unit (`INFUSION_END//225150`) appended to its `parent_codes`. A code whose unit was not recorded
-(`…//UNK`) joins its item's siblings if one of them has a unit (`LAB//220545//%` and
-`LAB//220545//UNK`), but two `…//UNK`-style codes alone are never a group. The parent gets a row of its
+(`…//UNK`) joins its item's siblings if one of them has a unit (`ICU_CHART//220545//%` and
+`ICU_CHART//220545//UNK`), but two `…//UNK`-style codes alone are never a group. The parent gets a row of its
 own in `codes.parquet`, which has no events: the siblings' description if they all have the same one
 (or the same one but for the unit each states, which is left out), the parent codes they all share,
 and no unit. On the demo this gives 98 groups, 196 codes a parent and 98 new rows (78 of the groups
@@ -299,14 +316,14 @@ pair a unit with `…//UNK`). This shared stage replaced the package's own `mimi
 | `description_units`        | the bracketed units `icu/d_items` labels use (listed in `event_configs.yaml`) |
 | `fill_units`               | `unknown_component`: only `…//UNK` codes get a unit from their label          |
 
-| Codes                                                  | unit as recorded from                                                                                                                  |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `LAB//RESULT`, `LAB//<itemid>`, `SUBJECT_FLUID_OUTPUT` | `valueuom`, the code's last component, so one unit per code (none for `…//UNK`)                                                        |
-| OMR `BMI (kg/m2)`, `Weight (Lbs)`, `Height (Inches)`   | the unit in parentheses in `result_name`                                                                                               |
-| `INFUSION_START//<itemid>`, `INFUSION_END//<itemid>`   | `rateuom` and `amountuom` of the code's rows; the code's last component where the itemid mixes units (see below)                       |
-| `SUBJECT_WEIGHT_AT_INFUSION//KG`                       | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT) |
+| Codes                                                        | unit as recorded from                                                                                                                  |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `LAB//RESULT`, `ICU_CHART//<itemid>`, `SUBJECT_FLUID_OUTPUT` | `valueuom`, the code's last component, so one unit per code (none for `…//UNK`)                                                        |
+| OMR `BMI (kg/m2)`, `Weight (Lbs)`, `Height (Inches)`         | the unit in parentheses in `result_name`                                                                                               |
+| `INFUSION_START//<itemid>`, `INFUSION_END//<itemid>`         | `rateuom` and `amountuom` of the code's rows; the code's last component where the itemid mixes units (see below)                       |
+| `SUBJECT_WEIGHT_AT_INFUSION//KG`                             | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT) |
 
-Where a charted item has no unit in the data (`LAB//<itemid>//UNK`), the unit its MIMIC-IV label
+Where a charted item has no unit in the data (`ICU_CHART//<itemid>//UNK`), the unit its MIMIC-IV label
 states is used instead: a label ending in a bracketed unit, such as `Admission Weight (lbs.)`. The
 same post-stage does this, after the data and the code, which always win, and only for the
 bracketed units that `icu/d_items` labels use (`description_units` in `event_configs.yaml`, read off the public
@@ -561,6 +578,27 @@ ontology packs over the network, and refuses to summarize a build whose `metadat
 record `sumeds_enrichment.enriched: true`; enrich such a build with `suMEDS-enrich $MEDS_OUTPUT_DIR`
 first. The demo cohort the Tests workflow builds is enriched the same way. A suMEDS upgrade can move the
 enrichment statistics too, so check it with `--compare`.
+
+## Breaking changes
+
+Changes that alter codes, columns or metadata that cohorts, predicates, tokenizers or downstream
+mappings may depend on, newest release first.
+
+### Unreleased (next release, 0.4.0)
+
+- **ICU chart events are `ICU_CHART//…`.** `icu/chartevents` was coded `LAB//{itemid}//{valueuom}` up
+    to 0.3.0 and is now `ICU_CHART//{itemid}//{valueuom}`; `LAB//…` is hospital labs only. Migrate by
+    replacing `^LAB//(?=\d)` with `ICU_CHART//` (see [ICU chart events](#icu-chart-events), #64).
+- **The events have no `unit` column.** Every code has one unit, which is in `metadata/codes.parquet`
+    only; join the events to it on `code` (see [Units](#units)). `unit` is no longer a code modifier
+    (`code_modifier_columns` is empty).
+- **`codes.parquet` `unit` is a UCUM code** (`mcg` → `ug`, `mL/hour` → `mL/h`); the unit as recorded
+    is in the new column `unit_source_value`. Code strings keep the recorded spelling.
+- **New rows in `codes.parquet` without events:** codes that differ only in their unit component get
+    the code without the unit as a parent, which has a row of its own (98 on the demo).
+- **Infusion codes** (`INFUSION_START//<itemid>`, `INFUSION_END//<itemid>`) end in their unit
+    (`//<unit>`, `//UNK` for a start without a rate) where the itemid is recorded in more than one
+    unit, and only there.
 
 ## 📚 Citing this work
 
