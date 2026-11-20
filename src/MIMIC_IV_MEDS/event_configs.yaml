@@ -490,8 +490,11 @@ hosp/pharmacy:
         description: >-
           f"Start of a pharmacy medication order: {$medication ?? 'UNK'} (hosp/pharmacy.medication,
           starttime); NDC dispensed for the order: {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
+  # An order is two codes, `MEDICATION//START//<drug>//<ndc>` and `MEDICATION//END//<drug>//<ndc>`,
+  # the spelling the MEDS ETLs move to for the two ends of an interval (alignEHR#53); both carry the
+  # drug and NDC, so swapping START for END pairs them.
   medication_stop:
-    code: f"MEDICATION//STOP//{$medication ?? 'UNK'}//{$ndc_clean}"
+    code: f"MEDICATION//END//{$medication ?? 'UNK'}//{$ndc_clean}"
     time: coalesce($stoptime::?"%Y-%m-%d %H:%M:%S", $stoptime::?"%Y-%m-%d")
     poe_id: $poe_id
     _metadata:
@@ -685,6 +688,7 @@ icu/inputevents:
     cols:
       # Constant rendering a literal code; see `ed_registration_code` in hosp/admissions.
       subject_weight_code: "'SUBJECT_WEIGHT_AT_INFUSION//KG'"
+      # An infusion is two codes, `INFUSION//START//<itemid>` and `INFUSION//END//<itemid>` (alignEHR#53).
       # A code holds one unit: only where an itemid's starts (ends) mix units does the unit become
       # the code's last component; every other code is unchanged. Within such an itemid, `UNK`
       # marks the rows without a unit, which for starts are exactly those without a rate
@@ -692,7 +696,7 @@ icu/inputevents:
       _start_unit_suffix: '(f"//{$rateuom ?? ''UNK''}" if $start_unit_in_code else "")'
       _end_unit_suffix: '(f"//{$amountuom ?? ''UNK''}" if $end_unit_in_code else "")'
   input_start:
-    code: 'f"INFUSION_START//{$itemid}{$_start_unit_suffix}"'
+    code: 'f"INFUSION//START//{$itemid}{$_start_unit_suffix}"'
     time: '$starttime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id
@@ -717,7 +721,7 @@ icu/inputevents:
       _self:
         unit: $rateuom
   input_end:
-    code: 'f"INFUSION_END//{$itemid}{$_end_unit_suffix}"'
+    code: 'f"INFUSION//END//{$itemid}{$_end_unit_suffix}"'
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     icustay_id: $stay_id

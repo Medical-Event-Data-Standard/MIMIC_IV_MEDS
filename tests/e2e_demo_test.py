@@ -93,18 +93,18 @@ def test_e2e_demo(demo_cohort: Path):
     # Codes whose last component is the unit carry exactly that unit as recorded, as one String (see
     # "Units" in the README); `UNK` there stands for a null unit, which gives none, as does a blank one.
     data_codes = set(pl.scan_parquet(data_files).select("code").unique().collect()["code"])
-    infusions = ("INFUSION_START//", "INFUSION_END//")
+    infusions = ("INFUSION//START//", "INFUSION//END//")
     unit_coded = [c for c in units if c in data_codes and c.startswith(("LAB//", "SUBJECT_FLUID_OUTPUT//"))]
     unit_coded = [c for c in unit_coded if not c.startswith("LAB//SPECIMEN_COLLECTED//")]
     assert unit_coded, "no unit-coded codes in the demo"
     # Infusion codes end in their unit only where the itemid mixes units (`…//<itemid>//<unit>`).
     infusion_codes = [c for c in units if c in data_codes and c.startswith(infusions)]
-    split = [c for c in infusion_codes if c.count("//") == 2]
+    split = [c for c in infusion_codes if c.count("//") == 3]
     assert split, "no infusion itemid recorded in several units in the demo"
     assert len(split) < len(infusion_codes), "every infusion code has its unit in the code"
     unit_coded += split
     # Split from the left: a unit may itself contain a slash (`/hpf`).
-    unit_part = {c: c.split("//", 3 if c.startswith("LAB//RESULT//") else 2)[-1] for c in unit_coded}
+    unit_part = {c: c.split("//", 3 if c.startswith(("LAB//RESULT//", *infusions)) else 2)[-1] for c in unit_coded}
     expected = {c: None if u == "UNK" or not u.strip() else u for c, u in unit_part.items()}
     # Except where the item's label states the unit, which then fills it.
     from_label = {
@@ -138,5 +138,5 @@ def test_e2e_demo(demo_cohort: Path):
     # Every infusion end has a unit, its rows' `amountuom` (never null): MEDS-Extract (0.9) accepts a
     # code's unit metadata only if the code has one, so no infusion code mixes units, and joining the
     # events to `codes.parquet` on `code` gives each infusion end its unit.
-    unitless = sorted(c for c in infusion_codes if c.startswith("INFUSION_END//") and units[c] is None)
+    unitless = sorted(c for c in infusion_codes if c.startswith("INFUSION//END//") and units[c] is None)
     assert not unitless, f"infusion ends without a unit: {unitless[:10]}"
