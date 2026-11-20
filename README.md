@@ -303,7 +303,7 @@ pair a unit with `…//UNK`). This shared stage replaced the package's own `mimi
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `LAB//RESULT`, `LAB//<itemid>`, `SUBJECT_FLUID_OUTPUT` | `valueuom`, the code's last component, so one unit per code (none for `…//UNK`)                                                        |
 | OMR `BMI (kg/m2)`, `Weight (Lbs)`, `Height (Inches)`   | the unit in parentheses in `result_name`                                                                                               |
-| `INFUSION//START//<itemid>`, `INFUSION//END//<itemid>`   | `rateuom` and `amountuom` of the code's rows; the code's last component where the itemid mixes units (see below)                       |
+| `INFUSION//START//<itemid>`, `INFUSION//END//<itemid>` | `rateuom` and `amountuom` of the code's rows; the code's last component where the itemid mixes units (see below)                       |
 | `SUBJECT_WEIGHT_AT_INFUSION//KG`                       | `kg`, from the [documentation of `patientweight`](https://mimic.mit.edu/docs/iv/modules/icu/inputevents/) (MIT-LCP/mimic-website, MIT) |
 
 Where a charted item has no unit in the data (`LAB//<itemid>//UNK`), the unit its MIMIC-IV label

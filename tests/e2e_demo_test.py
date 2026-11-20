@@ -104,7 +104,9 @@ def test_e2e_demo(demo_cohort: Path):
     assert len(split) < len(infusion_codes), "every infusion code has its unit in the code"
     unit_coded += split
     # Split from the left: a unit may itself contain a slash (`/hpf`).
-    unit_part = {c: c.split("//", 3 if c.startswith(("LAB//RESULT//", *infusions)) else 2)[-1] for c in unit_coded}
+    unit_part = {
+        c: c.split("//", 3 if c.startswith(("LAB//RESULT//", *infusions)) else 2)[-1] for c in unit_coded
+    }
     expected = {c: None if u == "UNK" or not u.strip() else u for c, u in unit_part.items()}
     # Except where the item's label states the unit, which then fills it.
     from_label = {
