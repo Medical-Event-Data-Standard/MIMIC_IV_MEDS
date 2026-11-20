@@ -5,6 +5,12 @@
 # did, which is what makes a committed baseline meaningful and what justifies a strict
 # posture: the cohort's content is an *error*, and a clean run reports nothing at all.
 #
+# The cohort is enriched by the spec's `sumeds_enrich` stage, as every `meds-extract-run
+# spec=MIMIC-IV` build is (built with strict enrichment; `scripts/summary_stats.sh` refuses an
+# unenriched build). Its parents and the `code_metadata.ontology` statistics therefore also
+# depend on the suMEDS rules in this repo and on the ontology pack release that the locked suMEDS
+# version pins, so a suMEDS upgrade can move them too; regenerate the baseline when it does.
+#
 # When a PR changes the output on purpose, regenerate the baseline in that same PR:
 #
 #   scripts/summary_stats.sh demo
@@ -112,6 +118,15 @@ rules:
     kind: ignore
 
   - path: dataset.created_at
+    kind: ignore
+
+  # suMEDS records when it enriched the code metadata and with which suMEDS version. Like
+  # `created_at` and `etl_version`, neither says anything about the content; the rest of
+  # `sumeds_enrichment` (whether it ran, the rules, the pack release, the coverage) is compared.
+  - path: dataset.sumeds_enrichment.enriched_at
+    kind: ignore
+
+  - path: dataset.sumeds_enrichment.sumeds_version
     kind: ignore
 
   - path: dataset.location_uri
