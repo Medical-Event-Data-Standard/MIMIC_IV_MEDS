@@ -3,10 +3,12 @@
 `meds-extract-run spec=MIMIC-IV dataset_key=demo` downloads the public MIMIC-IV demo from PhysioNet (no
 credentials needed) and takes minutes, so it runs exactly once: `e2e_demo_test.py` checks the cohort it
 leaves behind, and `run_with_enrichment_test.py` runs the ETL again, offline, from the raw files this
-build staged. This build skips the spec's `sumeds_enrich` post-stage, so it is the plain ETL output, the
-same with or without network access. Setting `MEDS_DEMO_OUTPUT_DIR` is how CI asks for the cohort to be
-left behind for the summary-stats check; unset (the local default) it goes to a temporary directory and is
-cleaned up.
+build staged. This build runs the spec's `sumeds_enrich` post-stage, as a plain `meds-extract-run
+spec=MIMIC-IV` does, so it is the enriched dataset users get and the one the summary-stats baselines
+describe. The stage fetches suMEDS's ontology packs over the network, and `strict` makes a failed
+enrichment fail the build (a user's run only records it), so CI cannot pass on an unenriched cohort.
+Setting `MEDS_DEMO_OUTPUT_DIR` is how CI asks for the cohort to be left behind for the summary-stats
+check; unset (the local default) it goes to a temporary directory and is cleaned up.
 """
 
 import os
@@ -58,7 +60,7 @@ def run_script(name: str, *args: str) -> None:
 
 @pytest.fixture(scope="session")
 def demo_cohort():
-    """The MEDS cohort `meds-extract-run spec=MIMIC-IV` builds from the downloaded demo.
+    """The enriched MEDS cohort `meds-extract-run spec=MIMIC-IV` builds from the downloaded demo.
 
     Driving it through the registered name rather than a path is deliberate: it makes the tests cover the
     registration too.
@@ -76,7 +78,9 @@ def demo_cohort():
             f"spec={SPEC}",
             f"output_dir={out.resolve()!s}",
             "dataset_key=demo",
-            "skip_stages=[sumeds_enrich]",
+            # Options of the `sumeds_enrich` stage. Overrides reach every stage of the pipeline, so
+            # `++` adds the key where a stage does not have it.
+            "overrides=['++stage_cfg.strict=true']",
         ]
         if download_dir := os.environ.get(DOWNLOAD_DIR_ENV_VAR):
             args.append(f"download_dest_dir={Path(download_dir).resolve()!s}")
