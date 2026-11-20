@@ -318,11 +318,19 @@ groups pair a unit with `…//UNK`). This shared stage replaced the package's ow
 (suMEDS 0.6.6); the spec gives it the options below, and the suMEDS defaults otherwise
 (`link_unknown_units: true`, `stem_description: without_unit`):
 
-| Option                     | Value                                                                         |
-| -------------------------- | ----------------------------------------------------------------------------- |
-| `description_unit_pattern` | `\s[(\[]([^()\[\]]+)[)\]]\s*$`, a bracketed unit at the end of a label        |
-| `description_units`        | the bracketed units `icu/d_items` labels use (listed in `event_configs.yaml`) |
-| `fill_units`               | `unknown_component`: only `…//UNK` codes get a unit from their label          |
+| Option                     | Value                                                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `description_unit_pattern` | `\s[(\[]([^()\[\]]+)[)\]]\s*$`, a bracketed unit at the end of a label                                   |
+| `description_units`        | the bracketed units `icu/d_items` labels use (listed in `event_configs.yaml`)                            |
+| `fill_units`               | `unknown_component`: only `…//UNK` codes get a unit from their label                                     |
+| `link_single_units`        | `true`: a code ending in its unit gets its stem also when its item has one unit                          |
+| `unknown_unit_prefixes`    | the infusion codes: an `INFUSION//START//<itemid>//UNK` start without a rate (a bolus) gets its stem too |
+
+With the last two, every infusion start pairs with its end by stem, swapping `START` for `END`
+(`INFUSION//START//225158//mL/hour` and `INFUSION//END//225158//mL` both get `…//225158`;
+alignEHR#53), and every other code that ends in its unit (`ICU_CHART//<itemid>//<unit>`,
+`LAB//RESULT//…//<unit>`, `SUBJECT_FLUID_OUTPUT//…//<unit>`) gets its unit-free stem as well; `…//UNK` outside the infusion codes
+gets none, as there it is no unit.
 
 | Codes                                                                          | unit as recorded from                                                                                                                  |
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -707,6 +715,16 @@ mappings may depend on, newest release first.
     `data/`, `metadata/`, `.logs/` and `.meds_extract_run/`. The MEDS data and metadata are
     unchanged. To migrate, add `"overrides=['cleanup_intermediates=false']"` to `meds-extract-run`
     wherever you read a stage directory after the run.
+- **`codes.parquet` gains unit-free stem rows and stem parents for single-unit codes**
+    ([#114](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/pull/114)). suMEDS's
+    `sumeds_link_unit_siblings` now runs with `link_single_units` and `unknown_unit_prefixes` (see
+    [Code metadata](#code-metadata)): every code that ends in its unit gets the code without the unit
+    as its last `parent_codes` entry, and that stem gets a row of its own (no unit, no events), also
+    when the item has a single unit, and so does an infusion code without a recorded unit. Before,
+    only items with two or more units did. Events are unchanged. On the public MIMIC-IV demo, 604 codes gain a stem parent and 604 stem rows are added (290 `LAB//RESULT`, 275 `LAB`, 39 `SUBJECT_FLUID_OUTPUT`); a MESSY-synth build has none. Once every infusion code ends in its unit (#111, #112), the infusion starts and ends get stems as well (on the demo, 203 more single-unit infusion codes and 83 `INFUSION//START//<itemid>//UNK` starts).
+    To migrate, nothing is needed unless a tool expects every `codes.parquet` row to carry events or
+    a unit: drop the stem rows with `code_template` null and `unit` null, or ignore a parent that
+    is the code without its last `//` component.
 
 ## 📚 Citing this work
 

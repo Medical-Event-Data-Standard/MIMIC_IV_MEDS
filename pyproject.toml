@@ -42,11 +42,13 @@ classifiers = [
 # `sumeds_link_unit_siblings` post-stage, which links codes that differ only by unit and fills the
 # units item labels state (it replaced this package's own `mimic_iv_unit_metadata`). It is capped below the next
 # minor for the same reason (its rules format and CLI are still 0.x).
+# suMEDS 0.6.9 adds the `link_single_units` and `unknown_unit_prefixes` options of
+# `sumeds_link_unit_siblings`, which the spec sets.
 dependencies = [
     # 0.9.2 is the first MEDS-Extract release that reads the spec's
     # `etl.cleanup_intermediates` (mmcdermott/MEDS_extract#340).
     "meds-extract[download]>=0.9.2,<0.10",
-    "sumeds>=0.6.7,<0.7",
+    "sumeds>=0.6.9,<0.7",
 ]
 
 [dependency-groups]

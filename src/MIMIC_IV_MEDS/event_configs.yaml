@@ -50,8 +50,14 @@ etl:
   # was not recorded (`…//UNK`) joins its item's siblings. A charted item without a recorded unit
   # (`…//UNK`) gets the unit its label states, only from the list below (read off the public
   # demo's `icu/d_items` labels; other bracketed endings such as `(serum)`, `(500ml)` or
-  # `(cm at teeth)` are not units). It runs first so that unit normalisation and the enrichment,
-  # now or retried later with `suMEDS-enrich`, always read the same `codes.parquet`.
+  # `(cm at teeth)` are not units). With `link_single_units`, a code that ends in its unit gets
+  # its stem also when its item has a single unit, so that every infusion start pairs with its end
+  # by stem (alignEHR#53); `unknown_unit_prefixes` does the same for an infusion code without a
+  # recorded unit (a bolus start has no rate: `INFUSION//START//<itemid>//UNK`), while `UNK`
+  # elsewhere (`TRANSFER_TO//UNK`, a medication's missing NDC) is no unit and gets no stem. The
+  # prefixes are the infusion codes' spelling since alignEHR#53 (`INFUSION//START//<itemid>`,
+  # `INFUSION//END//<itemid>`). It runs first so that unit normalisation and the enrichment, now
+  # or retried later with `suMEDS-enrich`, always read the same `codes.parquet`.
   post_stages:
     - sumeds_link_unit_siblings:
         description_unit_pattern: '\s[(\[]([^()\[\]]+)[)\]]\s*$'
@@ -75,6 +81,8 @@ etl:
             units/mL,
           ]
         fill_units: unknown_component
+        link_single_units: true
+        unknown_unit_prefixes: [INFUSION//START//, INFUSION//END//]
     # One UCUM spelling for every `unit` (suMEDS's shared table, e.g. `Cel`, `mm[Hg]`, `mg/dL`); the
     # spelling as recorded stays in `unit_source_value`, and an unknown spelling is kept as it is.
     - sumeds_normalize_units
