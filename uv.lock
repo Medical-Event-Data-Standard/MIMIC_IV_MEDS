@@ -338,7 +338,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "meds-extract", extras = ["download"], specifier = ">=0.9.0,<0.10" },
-    { name = "sumeds", git = "https://github.com/rvandewater/suMEDS?branch=unknown-unit-prefixes" },
+    { name = "sumeds", specifier = ">=0.6.9,<0.7" },
 ]
 
 [package.metadata.requires-dev]
@@ -802,14 +802,18 @@ wheels = [
 
 [[package]]
 name = "sumeds"
-version = "0.6.8"
-source = { git = "https://github.com/rvandewater/suMEDS?branch=unknown-unit-prefixes#0b828f1297d1af2136dfd0189263929353452d21" }
+version = "0.6.9"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "meds" },
     { name = "polars" },
     { name = "pyarrow" },
     { name = "pyyaml" },
     { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d9/d8/28397865ed5591c69a1d80dc1845b3c5346b460bc2d8ab5191eb489b3356/sumeds-0.6.9.tar.gz", hash = "sha256:c631f5284c9e36301c51bf6f0764c05f370f3b98bf0fa054ae81d77b1d3beea3", size = 91395, upload-time = "2026-11-20T20:46:59.158Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ba/57/83d093d3fcc07e54398666fd4760eef9ecdd90bacd5707eecb70da11819b/sumeds-0.6.9-py3-none-any.whl", hash = "sha256:1505c42ae934519b67ecaa69e816a12d5ebbd7aa63f8677b355e1c0b773ca5d8", size = 101260, upload-time = "2026-11-20T20:46:57.619Z" },
 ]
 
 [[package]]

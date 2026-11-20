@@ -338,9 +338,9 @@
     }
   },
   "dataset": {
-    "created_at": "2026-11-20T19:39:00.248979+00:00",
+    "created_at": "2026-11-20T21:27:00.438415+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.3.1.dev35+g06f4699f8.d20261120",
+    "dataset_version": "2.2:0.3.1.dev36+gf792d0f1a.d20261120",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.3",
     "meds_version": "0.4.1",
@@ -379,7 +379,7 @@
         ]
       },
       "enriched": true,
-      "enriched_at": "2026-11-20T19:39:02Z",
+      "enriched_at": "2026-11-20T21:27:03Z",
       "ontology_source": "rvandewater/sumeds-ontologies@v0.2.0",
       "options": {
         "child_codes": false,
@@ -392,7 +392,7 @@
       },
       "rules": "MIMIC-IV",
       "rules_sha256": "d63566f80088f714f48d6830acca237bdd08bb555fa65b1eeb584e00ab678023",
-      "sumeds_version": "0.6.8"
+      "sumeds_version": "0.6.9"
     }
   },
   "dataset_digest": {
@@ -401,7 +401,7 @@
       "data/train/0.parquet": "sha256:e54944f8cfba132cdc1ecac5a9830f056b40fae6a44e0c7f89bd39fb5c1fcfa9",
       "data/tuning/0.parquet": "sha256:095b23377abcdb137c1d9fafcee0d1dbb7bf023a19e80ec4c2123d8949e56c6e",
       "metadata/codes.parquet": "sha256:a3fccfc2ee8b045ba1411c7c2cf20e93ad4847efd01e8769778c53642a9be6b2",
-      "metadata/dataset.json": "sha256:aab22067440f729b1d1317b793f1b8251ac334bb3db3ba8581aad2f2b8c11f44",
+      "metadata/dataset.json": "sha256:79b8130118a82e9a1732129ef8ac42b9421f7dfb639ceef92553248ad05da185",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
     "code_metadata": "sha256:7dacc6f5827f88a7f9cef0bce80973bfbda16b1a47e663740a52f9d106758417",
@@ -410,12 +410,12 @@
       "digest": "sha256:ed4dbb3b399954cc738ca35469c343d6ee0dc25e62c6e21e9be43d6aad095cca",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:e0520229f0dd98104306c6db0a3da290f9ff836244bad810c053489f782863fb",
+    "dataset_metadata": "sha256:15042d209a83ede0b24b65e1e668825ab6bdc08c24f0532dc66f83979a456427",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-20T19:39:03.515184",
+  "extracted_at": "2026-11-20T21:27:03.490232",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
