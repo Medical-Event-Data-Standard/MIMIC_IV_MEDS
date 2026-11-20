@@ -21,6 +21,8 @@ etl:
   # this is a fallback: it is what makes the spec self-describing when it is resolved by
   # `pkg://` reference or filesystem path instead of by registered name.
   dataset_name: MIMIC-IV
+  # Delete the <output_dir>/<stage> dirs after a successful run; keep: "overrides=['cleanup_intermediates=false']"
+  cleanup_intermediates: true
   # Carried over from the pre-0.7 `ETL.yaml` stage block. That block's other entry,
   # `shard_events.infer_schema_length: 999999999`, has no successor and needs none: 0.7
   # removed the knob and always infers CSV schemas from the full file, which is exactly

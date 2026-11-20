@@ -35,7 +35,9 @@ When you run this, the program will:
 2. Construct the final MEDS cohort directly from those raw files — all transformations,
     joins, and metadata extraction are declared in
     `src/MIMIC_IV_MEDS/event_configs.yaml` — and write it to `$MEDS_OUTPUT_DIR`
-    (`data/` and `metadata/`, alongside the run's intermediate stage outputs).
+    (`data/` and `metadata/`). Each stage writes its intermediate output to
+    `$MEDS_OUTPUT_DIR/<stage>/`, and those directories are deleted once the whole run has succeeded
+    (see below).
 3. Enrich `metadata/codes.parquet` in place with the suMEDS rules this package ships, and record
     the enrichment in `metadata/dataset.json`.
 
@@ -53,6 +55,15 @@ meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false inp
 ```
 
 Run `meds-extract-run --help` for the full set of arguments and options.
+
+Intermediate stage outputs are deleted after a successful run, by default: the spec sets
+MEDS-Extract's `etl.cleanup_intermediates: true`, so a finished `$MEDS_OUTPUT_DIR` holds only `data/`,
+`metadata/`, `.logs/` and `.meds_extract_run/`. A failed run keeps them, so the same command resumes
+where it stopped, and the same command on a finished output still does nothing. To keep them (to look
+at a stage's output or at its own logs in `$MEDS_OUTPUT_DIR/<stage>/.logs/`), add
+`"overrides=['cleanup_intermediates=false']"`. Cleanup never deletes raw data: a download into the
+default `$MEDS_OUTPUT_DIR/.meds_extract_run/raw_input` stays, and `download_dest_dir=` elsewhere lets
+other output directories reuse it.
 
 Budget for the download rather than the extraction: the raw release is 41 files and 9.9 GiB
 from PhysioNet, which rate-limits each connection to roughly 50 KB/s, while the extraction
@@ -436,6 +447,11 @@ YAML
 MEDS_transform-pipeline $MEDS_OUTPUT_DIR/.meds_extract_run/pipeline.yaml
 ```
 
+The written config carries the spec's `cleanup_intermediates: true`, so this run deletes the stage
+directories at the end too; add `--overrides cleanup_intermediates=false` to keep them. Only
+`meds-extract-run` puts back the stage done markers that the cleanup deletes, so a later
+`meds-extract-run` on an output that `MEDS_transform-pipeline` cleaned up runs every stage again.
+
 The pipeline config lists the `sumeds_enrich` stage too, so this also enriches the code metadata.
 
 That file is self-contained (every path and version inlined), so it is also the place to
@@ -477,13 +493,13 @@ meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false inp
 Measured on the full MIMIC-IV 3.1 release — all 364,627 subjects — with MEDS-Extract 0.7.0, no
 parallelism configured, raw data already downloaded:
 
-|                   |                                          |
-| ----------------- | ---------------------------------------- |
-| wall time         | **32 min**                               |
-| peak RSS          | **20.3 GB**                              |
-| MEDS data output  | 4.5 GB (366 shards)                      |
-| metadata output   | 8.6 MB                                   |
-| whole output tree | 15 GB (includes per-stage intermediates) |
+|                   |                                      |
+| ----------------- | ------------------------------------ |
+| wall time         | **32 min**                           |
+| peak RSS          | **20.3 GB**                          |
+| MEDS data output  | 4.5 GB (366 shards)                  |
+| metadata output   | 8.6 MB                               |
+| whole output tree | 15 GB (with per-stage intermediates) |
 
 Hardware: 20-core aarch64, 121 GB RAM, local NVMe. The run used ~350–400% CPU, i.e. about four
 cores' worth, so it is I/O- and single-thread-bound rather than CPU-bound — adding cores alone
@@ -520,10 +536,9 @@ stages that see every row regardless. Wall time, by contrast, is close to linear
 > reworked that stage into a shard-scoped map-reduce, cutting its marginal cost by ~45× at no
 > measurable runtime cost.
 
-Intermediate stage outputs are retained under the output directory, which is why the tree is
-15 GB against 4.5 GB of actual MEDS data. See
-[this github issue](https://github.com/Medical-Event-Data-Standard/MEDS_transforms/issues/235) for tracking on ensuring these
-directories are automatically cleaned up in the future.
+The 15 GB tree was measured with the intermediate stage outputs kept, against 4.5 GB of actual MEDS
+data. A successful run now deletes them (see [Usage](#usage)), but they exist until the last stage has
+finished, so budget the full 15 GB of disk for the run.
 
 ## Summary statistics
 
@@ -556,6 +571,18 @@ access to the data. CI cannot rebuild the credentialed release, so regenerate it
 
 Both baselines are built with `skip_stages=[sumeds_enrich]`: they fingerprint what the ETL writes, which
 does not depend on network access or on the suMEDS pack release. Summarize a build made the same way.
+
+## Breaking changes
+
+### Unreleased
+
+- **Intermediate stage outputs are no longer kept.** Up to 0.3.0, a run left each stage's output in
+    `<output_dir>/<stage>/` (`convert_to_parquet/`, `convert_to_MEDS_events/`, `mimic_iv_unit_keys/`,
+    …, about 10 GB of the full release's 15 GB tree). The spec now sets MEDS-Extract's
+    `etl.cleanup_intermediates: true`, so a successful run deletes those directories and keeps only
+    `data/`, `metadata/`, `.logs/` and `.meds_extract_run/`. The MEDS data and metadata are
+    unchanged. To migrate, add `"overrides=['cleanup_intermediates=false']"` to `meds-extract-run`
+    wherever you read a stage directory after the run.
 
 ## 📚 Citing this work
 
