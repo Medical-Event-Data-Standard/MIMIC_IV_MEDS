@@ -621,6 +621,25 @@ enrichment statistics too, so check it with `--compare`.
 Changes that alter codes, columns or metadata that cohorts, predicates, tokenizers or downstream
 mappings may depend on, newest release first.
 
+### Unreleased (next release)
+
+The full-release counts need a credentialed rebuild (`baseline_MEDS_summary_stats full`).
+
+**Code metadata**
+
+- **Three spreadsheet-mangled parents are repaired** ([#117](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/117)).
+    The mimic-code concept maps store three codes as numbers. The parent is now the code that the row's
+    `omop_concept_id` names. Codes, events and descriptions are unchanged.
+
+    | Codes                                                                        | Parent up to 0.4.0    | Parent now                |
+    | ---------------------------------------------------------------------------- | --------------------- | ------------------------- |
+    | `PROCEDURE//START//225792`, `PROCEDURE//END//225792` (Invasive Ventilation)  | `SNOMED//2.26471E+14` | `SNOMED//226471000000101` |
+    | `LAB//RESULT//51643//…`, `LAB//SPECIMEN_COLLECTED//51643//…` (Hemoglobin A2) | `LOINC//968472`       | `LOINC//4551-8`           |
+    | `LAB//RESULT//51777//…`, `LAB//SPECIMEN_COLLECTED//51777//…` (Albumin, CSF)  | `LOINC//-56064`       | `LOINC//1746-7`           |
+
+    On the demo, only the two 225792 codes change (51643 and 51777 do not occur there). To migrate, replace
+    each old parent with the new one.
+
 ### 0.4.0 (2026-11-20)
 
 - Rebuilt on the full release; `tests/regression/full_summary_stats.json` regenerated.
