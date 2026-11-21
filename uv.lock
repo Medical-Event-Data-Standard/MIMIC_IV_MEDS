@@ -339,7 +339,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "meds-extract", extras = ["download"], specifier = ">=0.9.2,<0.10" },
-    { name = "sumeds", specifier = ">=0.6.10,<0.7" },
+    { name = "sumeds", specifier = ">=0.6.11,<0.7" },
 ]
 
 [package.metadata.requires-dev]
@@ -349,7 +349,7 @@ dev = [
     { name = "pytest-rerunfailures", specifier = "==16.1" },
     { name = "ruff", specifier = ">=0.11,<1.0" },
     { name = "shfmt-py", specifier = "==3.12.0.2" },
-    { name = "sumeds", extras = ["testing"], specifier = ">=0.6.10,<0.7" },
+    { name = "sumeds", extras = ["testing"], specifier = ">=0.6.11,<0.7" },
 ]
 
 [[package]]
@@ -804,7 +804,7 @@ wheels = [
 
 [[package]]
 name = "sumeds"
-version = "0.6.10"
+version = "0.6.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "meds" },
@@ -813,9 +813,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/56/b4a123778294f20b521b9191a31be9b464761d63173016121d90fbb0f97a/sumeds-0.6.10.tar.gz", hash = "sha256:66658c74dd409233b0f768ed75186a3b2fc2c39840e4706efd8ea1dc93ebeaad", size = 96465, upload-time = "2026-11-20T22:36:35.969Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dd/a2/cdc870e312de8573ace5c95cce91040c3780cbd0b28cff08ce235dd4a4c9/sumeds-0.6.11.tar.gz", hash = "sha256:1dd745697bde1d85b43d1a2277ad6bf85f9ebfb916df923952f403254ee9d574", size = 98638, upload-time = "2026-11-21T00:14:33.307Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a6/f9/8f38fe08138d6d3a8e007ea84abb7f6cccca0316afb7ccde75b49cb663ab/sumeds-0.6.10-py3-none-any.whl", hash = "sha256:a1a15d15634555aeb7766f27d3c1d46604c05226521eb95c5719527f67573d41", size = 106184, upload-time = "2026-11-20T22:36:34.816Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/72/0bd61cfd04378fb51e3a85b146dcfe5118aa35a2d031d7e598955eca2eb5/sumeds-0.6.11-py3-none-any.whl", hash = "sha256:3cb49c111c6617b1b3267132089009cf54b79a84de79a62f02900db6b820ad42", size = 108354, upload-time = "2026-11-21T00:14:32.025Z" },
 ]
 
 [package.optional-dependencies]

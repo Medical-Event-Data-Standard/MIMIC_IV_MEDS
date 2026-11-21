@@ -4,6 +4,8 @@ The contract finds every code of the spec whose last component is a unit and eva
 dftly, as MEDS-Extract does: the component is the unit stripped, `UNK` where a row records none
 or a blank one, and the `unit` metadata stays the raw column. `expected_unit_events` pins the
 events it finds, so a new code that ends in a unit is a conscious change here.
+`require_unit_in_code` checks the other direction: every event whose `_metadata._self.unit` reads a
+row column gives that unit in its code.
 """
 
 from sumeds.testing.contracts import UnitComponentContract
@@ -18,3 +20,4 @@ class TestUnitComponents(UnitComponentContract):
         "icu/inputevents/input_end",
         "icu/outputevents/output",
     )
+    require_unit_in_code = True
