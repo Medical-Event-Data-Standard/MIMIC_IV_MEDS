@@ -323,7 +323,14 @@ hosp/labevents:
         itemid:
           column: itemid (omop_source_code)
         description: coalesce($omop_concept_name, $label)
-        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
+        # mimic-code's map holds two LOINC codes that a spreadsheet turned into numbers (#117):
+        # 51643 has `968472` for 4551-8 and 51777 has `-56064` for 1746-7. The row's
+        # `omop_concept_id` is intact and names the real code, so the parent is keyed on it; the
+        # pinned download stays byte-identical to mimic-code.
+        parent_codes: &lab_loinc_parent >-
+          "LOINC//4551-8" if $omop_concept_id::str == "3020784"
+          else "LOINC//1746-7" if $omop_concept_id::str == "3024474"
+          else f"{$omop_vocabulary_id}//{$omop_concept_code}"
   lab_result:
     code: f"LAB//RESULT//{$itemid}//{$_value_unit}"
     hadm_id: $hadm_id
@@ -341,7 +348,7 @@ hosp/labevents:
         # unique in this file (1630 rows / 1630 distinct), so there is never a second
         # candidate row that the unit would have disambiguated.
         description: coalesce($omop_concept_name, $label)
-        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
+        parent_codes: *lab_loinc_parent
       # The unit is a component of the code, so each code has exactly one; null (`UNK` in the
       # code) gives none. See "Units" in the README.
       _self:
@@ -668,7 +675,13 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
+        # mimic-code's map holds the SNOMED code of 225792 Invasive Ventilation as `2.26471E+14`, as
+        # a spreadsheet wrote it (#117). The row's `omop_concept_id` 44790095 is intact and names
+        # SNOMED 226471000000101, so the parent is keyed on it; the pinned download stays
+        # byte-identical to mimic-code.
+        parent_codes: &proc_snomed_parent >-
+          "SNOMED//226471000000101" if $omop_concept_id::str == "44790095"
+          else f"{$omop_vocabulary_id}//{$omop_concept_code}"
   end:
     code: 'f"PROCEDURE//END//{$itemid}"'
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
@@ -695,7 +708,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
+        parent_codes: *proc_snomed_parent
 
 icu/inputevents:
   _table:

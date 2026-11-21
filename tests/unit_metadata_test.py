@@ -21,7 +21,10 @@ from dftly import Parser
 #: The tables whose events carry a numeric value, and the dictionaries their `_metadata` blocks read.
 TABLES = ["hosp/labevents", "hosp/omr", "icu/chartevents", "icu/inputevents", "icu/outputevents"]
 
-LAB_MAP = "itemid (omop_source_code),label,omop_concept_name,omop_vocabulary_id,omop_concept_code"
+# `omop_concept_id` keys the spec's repairs of mangled codes (#117); blank, it must fall through to the code.
+LAB_MAP = (
+    "itemid (omop_source_code),label,omop_concept_name,omop_vocabulary_id,omop_concept_code,omop_concept_id"
+)
 RAW = {
     "hosp/labevents.csv": [
         "subject_id,hadm_id,itemid,charttime,storetime,value,valuenum,valueuom,priority",
@@ -32,7 +35,7 @@ RAW = {
         # A blank unit is `UNK`, as a missing one is.
         "4,40,50912,2180-01-04 10:00:00,2180-01-04 11:00:00,1.2,1.2,  ,ROUTINE",
     ],
-    "d_labitems_to_loinc.csv": [LAB_MAP, "50912,Creatinine,Creatinine,LOINC,2160-0"],
+    "d_labitems_to_loinc.csv": [LAB_MAP, "50912,Creatinine,Creatinine,LOINC,2160-0,"],
     "hosp/omr.csv": [
         "subject_id,chartdate,seq_num,result_name,result_value",
         "1,2180-01-01,1,Weight (Lbs),150",
@@ -54,7 +57,7 @@ RAW = {
         "225158,NaCl 0.9%,mL",
         "226559,Foley,mL",
     ],
-    "meas_chartevents_main.csv": [LAB_MAP, "220045,Heart Rate,Heart rate,LOINC,8867-4"],
+    "meas_chartevents_main.csv": [LAB_MAP, "220045,Heart Rate,Heart rate,LOINC,8867-4,3027018"],
     "icu/inputevents.csv": [
         "subject_id,hadm_id,stay_id,starttime,endtime,itemid,amount,amountuom,rate,rateuom,orderid,"
         "linkorderid,ordercategorydescription,patientweight,statusdescription",
@@ -76,8 +79,8 @@ RAW = {
     ],
     "inputevents_to_rxnorm.csv": [
         LAB_MAP,
-        "221906,Norepinephrine,norepinephrine,RxNorm,7512",
-        "225158,NaCl 0.9%,sodium chloride,RxNorm,9863",
+        "221906,Norepinephrine,norepinephrine,RxNorm,7512,",
+        "225158,NaCl 0.9%,sodium chloride,RxNorm,9863,",
     ],
     "icu/outputevents.csv": [
         "subject_id,hadm_id,stay_id,charttime,itemid,value,valueuom",
@@ -85,7 +88,7 @@ RAW = {
         "2,20,200,2180-01-02 10:00:00,226559,300, mL",
         "3,30,300,2180-01-03 10:00:00,226559,100, ",
     ],
-    "outputevents_to_loinc.csv": [LAB_MAP, "226559,Foley,Urine output,LOINC,9187-6"],
+    "outputevents_to_loinc.csv": [LAB_MAP, "226559,Foley,Urine output,LOINC,9187-6,"],
 }
 
 #: code -> its unit as recorded (`unit_source_value`) and as UCUM (`unit`). Codes keep the recorded
@@ -221,6 +224,13 @@ def test_unit_siblings_get_the_code_without_the_unit_as_parent(codes: pl.DataFra
     assert [{k: row[k] for k in ("description", "parent_codes", "unit")} for row in stem] == [
         {"description": "Norepinephrine", "parent_codes": ["RxNorm//7512"], "unit": None}
     ]
+
+
+def test_map_parents_without_a_repair_are_the_maps_code(codes: pl.DataFrame):
+    """The repairs of mangled map codes (#117) leave every other row's `vocabulary//code` parent as it is."""
+    parents = dict(zip(codes["code"].to_list(), codes["parent_codes"].to_list(), strict=True))
+    assert "LOINC//2160-0" in parents["LAB//RESULT//50912//mg/dL"]
+    assert "LOINC//2160-0" in parents["LAB//SPECIMEN_COLLECTED//50912//STAT"]
 
 
 @pytest.mark.parametrize("code", NO_UNIT)
