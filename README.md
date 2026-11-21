@@ -621,9 +621,13 @@ enrichment statistics too, so check it with `--compare`.
 Changes that alter codes, columns or metadata that cohorts, predicates, tokenizers or downstream
 mappings may depend on, newest release first.
 
-### Unreleased (next release, 0.4.0)
+### 0.4.0 (2026-11-20)
 
-Counts are from the public MIMIC-IV demo; the full-release counts need a credentialed rebuild. Every
+- Rebuilt on the full release; `tests/regression/full_summary_stats.json` regenerated.
+
+Counts are from the public MIMIC-IV demo. On the full 3.1 release, event, subject and measurement
+counts are unchanged, the distinct codes in the data go from 148,199 to 148,492, and `codes.parquet`
+gains 1,839 unit-free stem rows without events. Every
 event keeps its subject, time, values and other columns: only codes, the code metadata and the run's
 leftovers change.
 
