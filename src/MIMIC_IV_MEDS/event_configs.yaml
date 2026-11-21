@@ -241,7 +241,16 @@ hosp/emar:
       # is not, so it is evaluated afterwards and sees the joined `ndc`. '0' is
       # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
       # it) and an unmatched join leaves it null -- both collapse to UNK.
-      ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
+      #
+      # An NDC is 11 digits and often starts with zeros. MEDS-Extract types each CSV column
+      # from the whole file, so where every `ndc` is digits -- the public demo -- the column
+      # is read as Int64 and the zeros are gone (`00904627761` -> 904627761). Padding a
+      # digit string shorter than 11 back to 11 restores them, and leaves an 11-digit
+      # string, the full release's String column, as it is; anything else is kept verbatim.
+      # MEDS-Extract has no way to declare a column's dtype yet (mmcdermott/MEDS_extract#143).
+      ndc_clean: >-
+        ((extract /\d{11}$/ from f"00000000000{$ndc}") if /^\d{1,10}$/ in $ndc::str else $ndc::str)
+        if ($ndc::str ?? '0') != '0' else 'UNK'
     joins:
       hosp/prescriptions:
         left_on: [pharmacy_id, drug_type]
@@ -258,7 +267,7 @@ hosp/emar:
     emar_id: $emar_id
     emar_seq: $emar_seq
     _metadata:
-      # The NDC is emitted as the parent verbatim. MIMIC ships no RxNorm identifier, and
+      # The NDC (as `ndc_clean`) is the parent, unmapped. MIMIC ships no RxNorm identifier, and
       # NDC -> RxNorm needs an external vocabulary whose free subset covers only currently
       # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
@@ -270,14 +279,15 @@ hosp/emar:
       # code -- a full-data materialization for a column we already have.
       _self:
         # The conditional deliberately has no `else`: an else-less dftly conditional yields
-        # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
-        # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
-        # than emitting a meaningless `NDC//0`. This reproduces the old external join, where a
-        # code whose segment rendered 'UNK' matched no metadata row.
+        # null, and null metadata attaches no parent. `ndc_clean` is UNK where prescriptions
+        # has its "no NDC on this line" sentinel '0' or the join left `ndc` null, so both drop
+        # out rather than emitting a meaningless `NDC//0`. This reproduces the old external
+        # join, where a code whose segment rendered 'UNK' matched no metadata row. The parent
+        # is the code's own 11-digit NDC component, leading zeros included.
         #
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
-        parent_codes: 'f"NDC//{$ndc}" if ($ndc ?? "0") != "0"'
+        parent_codes: 'f"NDC//{$ndc_clean}" if $ndc_clean != "UNK"'
         description: >-
           f"Medication administration recorded in the eMAR: {$medication ?? 'UNK'} (hosp/emar.medication);
           administration event: {$event_txt ?? 'UNK'} (emar.event_txt); NDC dispensed for the order:
@@ -459,7 +469,16 @@ hosp/pharmacy:
       # is not, so it is evaluated afterwards and sees the joined `ndc`. '0' is
       # prescriptions' sentinel for "no NDC on this line" (every BASE diluent row carries
       # it) and an unmatched join leaves it null -- both collapse to UNK.
-      ndc_clean: "'UNK' if ($ndc ?? '0') == '0' else $ndc"
+      #
+      # An NDC is 11 digits and often starts with zeros. MEDS-Extract types each CSV column
+      # from the whole file, so where every `ndc` is digits -- the public demo -- the column
+      # is read as Int64 and the zeros are gone (`00904627761` -> 904627761). Padding a
+      # digit string shorter than 11 back to 11 restores them, and leaves an 11-digit
+      # string, the full release's String column, as it is; anything else is kept verbatim.
+      # MEDS-Extract has no way to declare a column's dtype yet (mmcdermott/MEDS_extract#143).
+      ndc_clean: >-
+        ((extract /\d{11}$/ from f"00000000000{$ndc}") if /^\d{1,10}$/ in $ndc::str else $ndc::str)
+        if ($ndc::str ?? '0') != '0' else 'UNK'
     joins:
       hosp/prescriptions:
         left_on: [pharmacy_id, drug_type]
@@ -475,7 +494,7 @@ hosp/pharmacy:
     doses_per_24_hrs: $doses_per_24_hrs
     poe_id: $poe_id
     _metadata:
-      # The NDC is emitted as the parent verbatim. MIMIC ships no RxNorm identifier, and
+      # The NDC (as `ndc_clean`) is the parent, unmapped. MIMIC ships no RxNorm identifier, and
       # NDC -> RxNorm needs an external vocabulary whose free subset covers only currently
       # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
@@ -487,14 +506,15 @@ hosp/pharmacy:
       # code -- a full-data materialization for a column we already have.
       _self:
         # The conditional deliberately has no `else`: an else-less dftly conditional yields
-        # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
-        # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
-        # than emitting a meaningless `NDC//0`. This reproduces the old external join, where a
-        # code whose segment rendered 'UNK' matched no metadata row.
+        # null, and null metadata attaches no parent. `ndc_clean` is UNK where prescriptions
+        # has its "no NDC on this line" sentinel '0' or the join left `ndc` null, so both drop
+        # out rather than emitting a meaningless `NDC//0`. This reproduces the old external
+        # join, where a code whose segment rendered 'UNK' matched no metadata row. The parent
+        # is the code's own 11-digit NDC component, leading zeros included.
         #
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
-        parent_codes: 'f"NDC//{$ndc}" if ($ndc ?? "0") != "0"'
+        parent_codes: 'f"NDC//{$ndc_clean}" if $ndc_clean != "UNK"'
         description: >-
           f"Start of a pharmacy medication order: {$medication ?? 'UNK'} (hosp/pharmacy.medication,
           starttime); NDC dispensed for the order: {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"
@@ -506,7 +526,7 @@ hosp/pharmacy:
     time: coalesce($stoptime::?"%Y-%m-%d %H:%M:%S", $stoptime::?"%Y-%m-%d")
     poe_id: $poe_id
     _metadata:
-      # The NDC is emitted as the parent verbatim. MIMIC ships no RxNorm identifier, and
+      # The NDC (as `ndc_clean`) is the parent, unmapped. MIMIC ships no RxNorm identifier, and
       # NDC -> RxNorm needs an external vocabulary whose free subset covers only currently
       # marketed products (MIMIC spans 2008-2022, so many NDCs are retired). Downstream
       # users who want RxNorm can fan the NDC out themselves; what matters here is that the
@@ -518,14 +538,15 @@ hosp/pharmacy:
       # code -- a full-data materialization for a column we already have.
       _self:
         # The conditional deliberately has no `else`: an else-less dftly conditional yields
-        # null, and null metadata attaches no parent. '0' is prescriptions' sentinel for "no
-        # NDC on this line" and an unmatched join leaves `ndc` null, so both drop out rather
-        # than emitting a meaningless `NDC//0`. This reproduces the old external join, where a
-        # code whose segment rendered 'UNK' matched no metadata row.
+        # null, and null metadata attaches no parent. `ndc_clean` is UNK where prescriptions
+        # has its "no NDC on this line" sentinel '0' or the join left `ndc` null, so both drop
+        # out rather than emitting a meaningless `NDC//0`. This reproduces the old external
+        # join, where a code whose segment rendered 'UNK' matched no metadata row. The parent
+        # is the code's own 11-digit NDC component, leading zeros included.
         #
         # Do not write `else null` here: dftly has no null literal, and the bare word parses
         # as the *string* "null" (it warns, but the result is a wrong parent code).
-        parent_codes: 'f"NDC//{$ndc}" if ($ndc ?? "0") != "0"'
+        parent_codes: 'f"NDC//{$ndc_clean}" if $ndc_clean != "UNK"'
         description: >-
           f"End of a pharmacy medication order: {$medication ?? 'UNK'} (hosp/pharmacy.medication,
           stoptime); NDC dispensed for the order: {$ndc_clean} (hosp/prescriptions.ndc, UNK if none)"

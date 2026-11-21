@@ -621,6 +621,21 @@ enrichment statistics too, so check it with `--compare`.
 Changes that alter codes, columns or metadata that cohorts, predicates, tokenizers or downstream
 mappings may depend on, newest release first.
 
+### Unreleased
+
+- **NDCs keep their leading zeros on every input.** The NDC in `MEDICATION//START//<drug>//<ndc>`,
+    `MEDICATION//END//<drug>//<ndc>` and `MEDICATION//<drug>//<event_txt>//<ndc>`, in their `NDC//<ndc>`
+    parents and in their descriptions is now always the 11-digit NDC. Before, MEDS-Extract read
+    `hosp/prescriptions.ndc` as a number wherever every value in the file is digits, and the code then
+    lost the NDC's leading zeros (`MEDICATION//START//Quetiapine Fumarate//904627761` for
+    `…//00904627761`). This happened on the public demo, where 2,054 of 10,286 codes and 601 of 1,202
+    NDC parents change, and not on the full 3.1 release, whose `ndc` column is read as text; its codes
+    are unchanged. Events, their counts and every other column are unchanged. To migrate a build of the
+    demo, or of any extract whose `ndc` column holds only digits, zero-pad the last component of a
+    `MEDICATION//…` code and the code of an `NDC//…` parent to 11 digits:
+    `^(MEDICATION//.*//)(\d{1,10})$` and `^(NDC//)(\d{1,10})$` → `\1` followed by `\2` left-padded with
+    `0` to 11 digits.
+
 ### 0.4.0 (2026-11-20)
 
 - Rebuilt on the full release; `tests/regression/full_summary_stats.json` regenerated.
