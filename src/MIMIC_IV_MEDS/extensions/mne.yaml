@@ -105,11 +105,10 @@ medications_on_admission:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
-    cols:
-      # Constant code component; see `ed_registration_code` in the base config.
-      medication_list: "'ON_ADMISSION'"
+  # A plain literal code, like the base's ED_REGISTRATION: MEDS-Extract (>= 0.8.1) attaches `_self`
+  # metadata to literal codes.
   medication:
-    code: f"NOTE//MEDICATION//{$medication_list}"
+    code: "'NOTE//MEDICATION//ON_ADMISSION'"
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     # The drug name is free text (50k distinct), so it rides in text_value; the dose cannot go in
@@ -134,10 +133,8 @@ discharge_medications:
       hosp/admissions:
         key: hadm_id
         cols: [dischtime]
-    cols:
-      medication_list: "'AT_DISCHARGE'"
   medication:
-    code: f"NOTE//MEDICATION//{$medication_list}"
+    code: "'NOTE//MEDICATION//AT_DISCHARGE'"
     time: '$dischtime::"%Y-%m-%d %H:%M:%S"'
     hadm_id: $hadm_id
     text_value: $name
@@ -212,7 +209,7 @@ physical_exam_vitals:
     numeric_value: $temperature_c
     _metadata:
       _self:
-        parent_codes: "'LOINC/8310-5'"
+        parent_codes: "'LOINC//8310-5'"
         description: >-
           f"Body temperature in degrees Celsius from the {$timepoint} physical examination in the discharge
           summary (MIMIC-Note-Extract physical_exam_vitals.temperature_c, .timepoint)"
@@ -223,7 +220,7 @@ physical_exam_vitals:
     numeric_value: $heart_rate
     _metadata:
       _self:
-        parent_codes: "'LOINC/8867-4'"
+        parent_codes: "'LOINC//8867-4'"
         description: >-
           f"Heart rate in beats per minute from the {$timepoint} physical examination in the discharge summary
           (MIMIC-Note-Extract physical_exam_vitals.heart_rate, .timepoint)"
@@ -234,7 +231,7 @@ physical_exam_vitals:
     numeric_value: $bp_systolic
     _metadata:
       _self:
-        parent_codes: "'LOINC/8480-6'"
+        parent_codes: "'LOINC//8480-6'"
         description: >-
           f"Systolic blood pressure in mmHg from the {$timepoint} physical examination in the discharge summary
           (MIMIC-Note-Extract physical_exam_vitals.bp_systolic, .timepoint)"
@@ -245,7 +242,7 @@ physical_exam_vitals:
     numeric_value: $bp_diastolic
     _metadata:
       _self:
-        parent_codes: "'LOINC/8462-4'"
+        parent_codes: "'LOINC//8462-4'"
         description: >-
           f"Diastolic blood pressure in mmHg from the {$timepoint} physical examination in the discharge summary
           (MIMIC-Note-Extract physical_exam_vitals.bp_diastolic, .timepoint)"
@@ -256,7 +253,7 @@ physical_exam_vitals:
     numeric_value: $respiratory_rate
     _metadata:
       _self:
-        parent_codes: "'LOINC/9279-1'"
+        parent_codes: "'LOINC//9279-1'"
         description: >-
           f"Respiratory rate in breaths per minute from the {$timepoint} physical examination in the discharge
           summary (MIMIC-Note-Extract physical_exam_vitals.respiratory_rate, .timepoint)"
@@ -267,7 +264,7 @@ physical_exam_vitals:
     numeric_value: $o2_saturation
     _metadata:
       _self:
-        parent_codes: "'LOINC/59408-5'"
+        parent_codes: "'LOINC//59408-5'"
         description: >-
           f"Oxygen saturation by pulse oximetry in percent from the {$timepoint} physical examination in the
           discharge summary (MIMIC-Note-Extract physical_exam_vitals.o2_saturation, .timepoint)"
@@ -281,7 +278,7 @@ physical_exam_vitals:
     numeric_value: '$weight_value * 0.45359237 if $weight_unit == "lbs" else $weight_value'
     _metadata:
       _self:
-        parent_codes: "'LOINC/29463-7'"
+        parent_codes: "'LOINC//29463-7'"
         description: >-
           f"Body weight in kilograms from the {$timepoint} physical examination in the discharge summary
           (MIMIC-Note-Extract physical_exam_vitals.weight_value, converted from weight_unit lbs where needed)"

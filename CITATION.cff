@@ -32,5 +32,5 @@ keywords:
   - MIMIC-IV
   - electronic-health-records
 license: MIT
-version: 0.0.6
-date-released: '2025-05-13'
+# No `version` or `date-released`: the package version comes from the git tag (setuptools-scm),
+# so a version written here goes stale at the next release. Cite the release you used, e.g. by its tag.

@@ -281,8 +281,8 @@ cxr_db/radiology_jev:
         # SNOMED CT and LOINC ids are standard concept ids; the other vocabularies (OCHV, MeSH, IOBC,
         # DICOM, OBO, PathLex) have no MEDS/OMOP parent convention here.
         parent_codes: >-
-          f"SNOMED/{$object_uri[7:]}" if /^snomed:[0-9]+$/ in $object_uri
-          else f"LOINC/{$object_uri[6:]}" if /^loinc:[A-Z]*[0-9]+-[0-9]$/ in $object_uri
+          f"SNOMED//{$object_uri[7:]}" if /^snomed:[0-9]+$/ in $object_uri
+          else f"LOINC//{$object_uri[6:]}" if /^loinc:[A-Z]*[0-9]+-[0-9]$/ in $object_uri
 
 # Keyed by `hadm_id`; every admission is in MIMIC-IV 3.1. Timed at discharge like MNE: the summary
 # is written then. These are concepts from the same MIMIC-IV-Note discharge summaries MNE
@@ -306,8 +306,8 @@ cxr_db/discharge_jev:
           (MIMIC-CXR-DB discharge_jev)"
         concept_class: $class
         parent_codes: >-
-          f"SNOMED/{$object_uri[7:]}" if /^snomed:[0-9]+$/ in $object_uri
-          else f"LOINC/{$object_uri[6:]}" if /^loinc:[A-Z]*[0-9]+-[0-9]$/ in $object_uri
+          f"SNOMED//{$object_uri[7:]}" if /^snomed:[0-9]+$/ in $object_uri
+          else f"LOINC//{$object_uri[6:]}" if /^loinc:[A-Z]*[0-9]+-[0-9]$/ in $object_uri
 
 # Merged into the base `sources:` by the build script (see extensions/mne.yaml). The include list
 # fetches the three tables above (~140 MB of the ~495 MB release) and keeps CXR-DB's own

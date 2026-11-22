@@ -5,6 +5,7 @@ descriptions actually land in `metadata/codes.parquet` is checked on built cohor
 `e2e_demo_test.py` (the base spec) and the `e2e_*_synthetic_test.py` files (the extensions).
 """
 
+import re
 from importlib.resources import files
 
 import pytest
@@ -36,15 +37,37 @@ def _events(spec: str):
                 yield f"{table}/{name}", event
 
 
-@pytest.mark.parametrize("spec", SPECS)
-def test_every_code_has_a_component(spec):
-    """A literal code cannot carry metadata: MEDS-Extract attaches it only through components.
+#: The base spec's literal codes, which every extension spec inherits.
+LITERAL_CODES = {
+    "ED_REGISTRATION",
+    "ED_OUT",
+    "MEDS_BIRTH",
+    "MEDS_DEATH",
+    "SUBJECT_WEIGHT_AT_INFUSION",
+}
 
-    Literal codes are rendered from a constant `_table.cols` column instead (see
-    `ed_registration_code` in the config).
+#: The literal codes an extension adds to the base's. MNE's two medication lists are one code each
+#: (the drug is free text in `text_value`). Every other extension code reads a column of its row.
+EXTENSION_LITERAL_CODES = {
+    "event_configs_mne.yaml": {"NOTE//MEDICATION//ON_ADMISSION", "NOTE//MEDICATION//AT_DISCHARGE"},
+}
+
+
+@pytest.mark.parametrize("spec", SPECS)
+def test_literal_codes_are_plain_literals(spec):
+    """The literal codes are written as literals, not read from constant `_table.cols` columns.
+
+    MEDS-Extract >= 0.8.1 attaches `_self` metadata to literal codes (mmcdermott/MEDS_extract#166),
+    so a literal needs no column to be described.
     """
-    literal = [name for name, event in _events(spec) if "$" not in str(event["code"])]
-    assert not literal, f"literal code expressions (no $column) cannot be described: {literal}"
+    literal = {
+        str(event["code"]).strip().strip("'") for _, event in _events(spec) if "$" not in str(event["code"])
+    }
+    assert literal == LITERAL_CODES | EXTENSION_LITERAL_CODES.get(spec, set())
+    from_a_column = [
+        name for name, event in _events(spec) if re.fullmatch(r"\$\w+", str(event["code"]).strip())
+    ]
+    assert not from_a_column, f"codes read from a bare column: {from_a_column}"
 
 
 @pytest.mark.parametrize("spec", SPECS)

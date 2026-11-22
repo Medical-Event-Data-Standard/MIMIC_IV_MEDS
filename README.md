@@ -38,7 +38,9 @@ When you run this, the program will:
 2. Construct the final MEDS cohort directly from those raw files — all transformations,
     joins, and metadata extraction are declared in
     `src/MIMIC_IV_MEDS/event_configs.yaml` — and write it to `$MEDS_OUTPUT_DIR`
-    (`data/` and `metadata/`, alongside the run's intermediate stage outputs).
+    (`data/` and `metadata/`). Each stage writes its intermediate output to
+    `$MEDS_OUTPUT_DIR/<stage>/`, and those directories are deleted once the whole run has succeeded
+    (see below).
 3. Enrich `metadata/codes.parquet` in place with the suMEDS rules this package ships, and record
     the enrichment in `metadata/dataset.json`.
 
@@ -56,6 +58,15 @@ meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false inp
 ```
 
 Run `meds-extract-run --help` for the full set of arguments and options.
+
+Intermediate stage outputs are deleted after a successful run, by default: the spec sets
+MEDS-Extract's `etl.cleanup_intermediates: true`, so a finished `$MEDS_OUTPUT_DIR` holds only `data/`,
+`metadata/`, `.logs/` and `.meds_extract_run/`. A failed run keeps them, so the same command resumes
+where it stopped, and the same command on a finished output still does nothing. To keep them (to look
+at a stage's output; `$MEDS_OUTPUT_DIR/.logs/pipeline.log` keeps the stage logs either way), add
+`"overrides=['cleanup_intermediates=false']"`. Cleanup never deletes raw data: a download into the
+default `$MEDS_OUTPUT_DIR/.meds_extract_run/raw_input` stays, and `download_dest_dir=` elsewhere lets
+other output directories reuse it.
 
 Budget for the download rather than the extraction: the raw release is 41 files and 9.9 GiB
 from PhysioNet, which rate-limits each connection to roughly 50 KB/s, while the extraction
@@ -103,7 +114,7 @@ Provenance, the public schema behind each table, and what the public docs leave 
 
 ## How this ETL is defined
 
-There is no Python in this package. The entire ETL is one file —
+The entire ETL is one file —
 [`src/MIMIC_IV_MEDS/event_configs.yaml`](src/MIMIC_IV_MEDS/event_configs.yaml)
 — written in MESSY (MEDS-Extract Specification Syntax YAML):
 
@@ -111,7 +122,9 @@ There is no Python in this package. The entire ETL is one file —
     (PhysioNet for MIMIC-IV itself, checksum-pinned GitHub URLs for the
     [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps);
 - an `etl:` block with the run's few knobs, the roles of the extension columns for
-    `metadata/dataset.json`, and the suMEDS enrichment that runs after the pipeline;
+    `metadata/dataset.json`, and the three suMEDS stages that run after the pipeline, in this
+    order: `sumeds_link_unit_siblings`, `sumeds_normalize_units` and the suMEDS enrichment (the two
+    suMEDS unit stages are described under [Units](#units));
 - one block per raw table describing the events extracted from it, including joins,
     derived columns, and the code-metadata programs that attach descriptions and parent
     vocabulary codes.
@@ -149,7 +162,7 @@ no event. [Details.](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#de
 
 ### DRG
 
-`drg_type: HCFA` means MS-DRG; each DRG code gets an `MS-DRG/…` or `APR-DRG/…` parent. The DRG
+`drg_type: HCFA` means MS-DRG; each DRG code gets an `MS-DRG//…` or `APR-DRG//…` parent. The DRG
 title rides in `text_value`, not the code, because its spelling varies within one DRG.
 `drg_severity` and `drg_mortality` stay extension columns.
 [Details.](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#drg)
@@ -166,8 +179,20 @@ This changed the `omr` vocabulary relative to earlier versions.
 
 Lab `priority` is in `LAB//SPECIMEN_COLLECTED` only. Pharmacy `route` and `frequency`, and the
 `icu/inputevents` order and status descriptions, stay extension columns (see
-[#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15)).
+[#15](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/15)). The infusion units
+(`rateuom`, `amountuom`) are the codes' last component and their `unit` in `metadata/codes.parquet`;
+the events have no `unit` column (see [Units](#units)).
 [Details.](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#order-modifiers)
+
+### ICU chart events
+
+`icu/chartevents` is coded `ICU_CHART//{itemid}//{valueuom}` (`UNK` when the unit is null), for
+example `ICU_CHART//220045//bpm`: values charted at the ICU bedside, keyed on `icu/d_items`. Hospital
+lab results keep `LAB//RESULT//…` and `LAB//SPECIMEN_COLLECTED//…`, so `^LAB//` selects hospital labs
+only and `^ICU_CHART//` ICU charting only. Up to 0.3.0 chart events were `LAB//{itemid}//{valueuom}`;
+replace a leading `LAB//` followed by a digit with `ICU_CHART//` to migrate
+([#64](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/64)).
+[Details.](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#code-conventions)
 
 ## Optional extension: MIMIC-Note-Extract
 
@@ -449,17 +474,54 @@ concepts agree with the summaries.
 ## Code metadata
 
 `metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary
-applies, `parent_codes` in OMOP form (`LOINC/2160-0`, `ICD10CM/I10`, `NDC/…`). All of it is
+applies, `parent_codes` in OMOP form (`LOINC//2160-0`, `ICD10CM//I10`, `NDC//…`). All of it is
 declared in `event_configs.yaml`: dictionary-table joins at run time (MIMIC-IV's `d_*` tables and
 the mimic-code concept maps), and `_self` templates paraphrasing the
 [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) for every other code. Literal codes
-(`ED_REGISTRATION`, `MEDS_BIRTH`, …) are rendered from a constant column because MEDS-Extract
-attaches metadata only through a code's components. Every parent the ETL writes is read from
-MIMIC-IV's own tables or the mimic-code maps; links that need an external ontology (the OMOP Gender
-tags, the ICD pack hierarchy) come from suMEDS instead (next section). On the demo (2.2), 10,250 of
-10,254 codes are described and 7,899 have a parent code. The routes and what is left uncovered are
-documented under
+(`ED_REGISTRATION`, `MEDS_BIRTH`, …) are written as plain literals with a `_self` block, which
+MEDS-Extract 0.8.1 and later attach to them
+([MEDS_extract#166](https://github.com/mmcdermott/MEDS_extract/issues/166)). Every parent the ETL
+writes is read from MIMIC-IV's own tables or the mimic-code maps; links that need an external
+ontology (the OMOP Gender tags, the ICD pack hierarchy) come from suMEDS instead (next section). On
+the demo (2.2), 10,361 of 10,366 codes are described and 8,028 have a parent code. The routes and
+what is left uncovered are documented under
 [Base ETL → Code metadata](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#code-metadata).
+
+### Units
+
+**A code's unit is in `metadata/codes.parquet`, and only there: the events have no `unit` column.**
+Every code has exactly one unit (or none), so an event's unit is its code's. To get it, join the
+events to `codes.parquet` on `code`:
+
+```python
+import polars as pl
+
+codes = pl.scan_parquet(f"{MEDS_DIR}/metadata/codes.parquet").select(
+    "code", "unit", "unit_source_value"
+)
+events = pl.scan_parquet(f"{MEDS_DIR}/data/**/*.parquet").join(
+    codes, on="code", how="left"
+)
+```
+
+`unit` is the unit as a [UCUM](https://ucum.org/) code (`mg/dL`, `ug`, `mL/h`), written by suMEDS's
+`sumeds_normalize_units` post-stage (a spelling suMEDS does not know is kept as it is), and
+`unit_source_value` the unit as recorded in MIMIC-IV, stripped of surrounding whitespace. Codes keep
+the recorded spelling. Lab, chart, output and infusion codes end in their unit
+(`LAB//RESULT//<itemid>//<valueuom>`, `ICU_CHART//<itemid>//<valueuom>`,
+`SUBJECT_FLUID_OUTPUT//<itemid>//<valueuom>`, `INFUSION//START//<itemid>//<rateuom>`,
+`INFUSION//END//<itemid>//<amountuom>`), stripped, and `UNK` where missing or blank, so every code
+has one unit by construction. OMR codes take the unit in parentheses in `result_name`, and
+`SUBJECT_WEIGHT_AT_INFUSION` is in `kg`, as MIMIC-IV documents `patientweight`.
+
+suMEDS's `sumeds_link_unit_siblings` post-stage gives every code that ends in its unit its unit-free
+stem as last parent (`INFUSION//END//225150//mcg` → `INFUSION//END//225150`), with a row of its own in
+`codes.parquet` but no events, and fills the unit of a charted item recorded without one from its
+`icu/d_items` label. An interval is two codes, `<FAMILY>//START//…` and `<FAMILY>//END//…`
+(`MEDICATION`, `PROCEDURE`, `INFUSION`; [alignEHR#53](https://github.com/rvandewater/alignEHR/issues/53)):
+to pair an infusion start with its end, take the stem and swap `START` for `END`. The stage options,
+the demo counts and which codes get a stem are under
+[Base ETL → Units](https://mimic-iv-meds.readthedocs.io/en/latest/base-etl/#units).
 
 ## Enriching code metadata with suMEDS
 
@@ -540,6 +602,11 @@ YAML
 MEDS_transform-pipeline $MEDS_OUTPUT_DIR/.meds_extract_run/pipeline.yaml
 ```
 
+The written config carries the spec's `cleanup_intermediates: true`, so this run deletes the stage
+directories at the end too; add `--overrides cleanup_intermediates=false` to keep them. Only
+`meds-extract-run` puts back the stage done markers that the cleanup deletes, so a later
+`meds-extract-run` on an output that `MEDS_transform-pipeline` cleaned up runs every stage again.
+
 The pipeline config lists the `sumeds_enrich` stage too, so this also enriches the code metadata.
 
 That file is self-contained (every path and version inlined), so it is also the place to
@@ -581,13 +648,13 @@ meds-extract-run spec=MIMIC-IV output_dir=$MEDS_OUTPUT_DIR do_download=false inp
 Measured on the full MIMIC-IV 3.1 release — all 364,627 subjects — with MEDS-Extract 0.7.0, no
 parallelism configured, raw data already downloaded:
 
-|                   |                                          |
-| ----------------- | ---------------------------------------- |
-| wall time         | **32 min**                               |
-| peak RSS          | **20.3 GB**                              |
-| MEDS data output  | 4.5 GB (366 shards)                      |
-| metadata output   | 8.6 MB                                   |
-| whole output tree | 15 GB (includes per-stage intermediates) |
+|                   |                                      |
+| ----------------- | ------------------------------------ |
+| wall time         | **32 min**                           |
+| peak RSS          | **20.3 GB**                          |
+| MEDS data output  | 4.5 GB (366 shards)                  |
+| metadata output   | 8.6 MB                               |
+| whole output tree | 15 GB (with per-stage intermediates) |
 
 Hardware: 20-core aarch64, 121 GB RAM, local NVMe. The run used ~350–400% CPU, i.e. about four
 cores' worth, so it is I/O- and single-thread-bound rather than CPU-bound — adding cores alone
@@ -624,33 +691,144 @@ stages that see every row regardless. Wall time, by contrast, is close to linear
 > reworked that stage into a shard-scoped map-reduce, cutting its marginal cost by ~45× at no
 > measurable runtime cost.
 
-Intermediate stage outputs are retained under the output directory, which is why the tree is
-15 GB against 4.5 GB of actual MEDS data. See
-[this github issue](https://github.com/mmcdermott/MEDS_extract/issues/15) for tracking on ensuring these
-directories are automatically cleaned up in the future.
+The 15 GB tree was measured with the intermediate stage outputs kept, against 4.5 GB of actual MEDS
+data. A successful run now deletes them (see [Usage](#usage)), but they exist until the last stage has
+finished, so budget the full 15 GB of disk for the run.
 
 ## Summary statistics
 
 [`tests/regression/demo_summary_stats.json`](tests/regression/demo_summary_stats.json) and
 [`tests/regression/full_summary_stats.json`](tests/regression/full_summary_stats.json) are
 [meds_summary_stats](https://github.com/Medical-Event-Data-Standard/meds_summary_stats) fingerprints
-of what this ETL builds from the open MIMIC-IV demo and from the full MIMIC-IV 3.1 release. They name
-no code and report no cell of fewer than 20 subjects and no minimum or maximum, which is what makes
-them safe to publish. The Tests workflow fails when the demo no longer matches its baseline, as
-decided by [`tests/regression/policy.yaml`](tests/regression/policy.yaml). CI cannot rebuild the
-credentialed release, so regenerate both in every pull request that changes the output:
+of what `meds-extract-run spec=MIMIC-IV` builds, suMEDS enrichment included, from the open MIMIC-IV
+demo and from the full MIMIC-IV 3.1 release. They name no code and report no cell of fewer than 20
+subjects and no minimum or maximum, which is what makes them safe to publish. The Tests workflow
+fails when the demo no longer matches its baseline, as decided by meds_summary_stats's built-in
+[`etl-regression` policy](https://github.com/Medical-Event-Data-Standard/meds_summary_stats/blob/main/docs/etl-baselines.md).
+CI cannot rebuild the credentialed release, so regenerate both in every pull request that changes the
+output (the Summary stats workflow reminds a pull request that changes `src/` without it).
+`baseline_MEDS_summary_stats` (from meds_summary_stats) builds and summarizes this checkout as
+`[tool.meds_summary_stats.baselines]` in [`pyproject.toml`](pyproject.toml) describes it; pin the
+version the Tests workflow uses:
 
 ```bash
 # The demo: downloaded and built with this checkout
-scripts/summary_stats.sh demo
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats demo
 # The full release, built from a copy on disk, or summarized from an existing build
-scripts/summary_stats.sh full --input-dir $RAW_INPUT_DIR
-scripts/summary_stats.sh full --meds-dir $MEDS_OUTPUT_DIR
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats full --input-dir $RAW_INPUT_DIR
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats full --meds-dir $MEDS_OUTPUT_DIR
 ```
 
-Both baselines are built with `skip_stages=[sumeds_enrich]`; summarize a build made the same way.
+The builds use `strict` enrichment, which fetches the suMEDS ontology packs over the network, and a
+build whose `metadata/dataset.json` does not record `sumeds_enrichment.enriched: true` is refused.
 `--compare` checks a build without writing anything. See
 [Contributing → Summary-statistics baselines](https://mimic-iv-meds.readthedocs.io/en/latest/contributing/#summary-statistics-baselines).
+
+## Breaking changes
+
+Changes that alter codes, columns or metadata that cohorts, predicates, tokenizers or downstream
+mappings may depend on, newest release first.
+
+### 0.4.0 (2026-11-20)
+
+- Rebuilt on the full release; `tests/regression/full_summary_stats.json` regenerated.
+
+Counts are from the public MIMIC-IV demo. On the full 3.1 release, event, subject and measurement
+counts are unchanged, the distinct codes in the data go from 148,199 to 148,492, and `codes.parquet`
+gains 1,839 unit-free stem rows without events. Every
+event keeps its subject, time, values and other columns: only codes, the code metadata and the run's
+leftovers change.
+
+**Codes**
+
+- **ICU chart events are `ICU_CHART//…`** ([#64](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/64)).
+    `icu/chartevents` was coded `LAB//{itemid}//{valueuom}` up to 0.3.0 and is now
+    `ICU_CHART//{itemid}//{valueuom}`; `LAB//…` is hospital labs only. Migrate by replacing
+    `^LAB//(?=\d)` with `ICU_CHART//` (see [ICU chart events](#icu-chart-events)).
+
+- **ICD codes name their edition, `ICD//<edition>//<code>`.** `DIAGNOSIS//ICD//9//<code>` and
+    `DIAGNOSIS//ICD//10//<code>` are now `DIAGNOSIS//ICD//9CM//<code>` and
+    `DIAGNOSIS//ICD//10CM//<code>`; `PROCEDURE//ICD//9//<code>` and `PROCEDURE//ICD//10//<code>` are
+    now `PROCEDURE//ICD//9CM//<code>` and `PROCEDURE//ICD//10PCS//<code>`. MIMIC-IV's `icd_version` 9
+    and 10 are the US billing code sets: ICD-9-CM (diagnoses, and volume 3 for procedures), ICD-10-CM
+    and ICD-10-PCS, the vocabularies the parents already name (`ICD9CM`, `ICD9Proc`, `ICD10CM`,
+    `ICD10PCS`). Other MEDS ETLs use the same layout (`ICD//10GM`, `ICD//10CN`, ...). The code after
+    the edition is unchanged (undotted, as MIMIC-IV records it). To migrate, rename with
+    `^DIAGNOSIS//ICD//(9|10)//` → `DIAGNOSIS//ICD//\1CM//`, `^PROCEDURE//ICD//9//` →
+    `PROCEDURE//ICD//9CM//` and `^PROCEDURE//ICD//10//` → `PROCEDURE//ICD//10PCS//`.
+
+- **Interval ends are `<FAMILY>//START//…` and `<FAMILY>//END//…`**
+    ([alignEHR#53](https://github.com/rvandewater/alignEHR/issues/53)): pharmacy order ends were
+    `MEDICATION//STOP//…`, now `MEDICATION//END//…`, and infusions were `INFUSION_START//…` and
+    `INFUSION_END//…`, now `INFUSION//START//…` and `INFUSION//END//…` (see
+    [Pairing a start with its end](#units)). Migrate with `^MEDICATION//STOP//` → `MEDICATION//END//`;
+    for infusions, see the next entry.
+
+- **Every infusion code ends in its unit**: `INFUSION//START//<itemid>//<rateuom>` and
+    `INFUSION//END//<itemid>//<amountuom>`, with the unit stripped of surrounding whitespace and
+    `//UNK` where it is missing or blank (for starts, exactly those without a rate). Up to 0.3.0 the
+    codes were `INFUSION_START//<itemid>` and `INFUSION_END//<itemid>`, with the unit in the events'
+    `unit` column. Every code now has one unit by construction, as the `LAB` codes do, and the package's
+    own `mimic_iv_unit_keys` pre-stage, which found the itemids that mix units, is gone. On the demo
+    the 318 infusion codes of 0.3.0 (159 itemids, each with a start and an end code) become 350: 177
+    starts, 101 of them `…//UNK` (18 itemids have starts with and without a rate, so both a
+    `…//<rateuom>` and a `…//UNK` start), and 173 ends (14 itemids record their amounts in two units). Each code's `unit`, `unit_source_value`, description and other parents are
+    unchanged. Migrate a 0.3.0 event with `^INFUSION_(START|END)//(\d+)$` → `INFUSION//\1//\2//<unit>`,
+    where `<unit>` is the event's `unit` stripped, or `UNK` if it is null or blank. To compare with
+    codes that name no unit, strip the last component (`^(INFUSION//(START|END)//\d+)//.*$` → `\1`),
+    or follow `parent_codes` to the unit-free stem (see below).
+
+- **The unit in a lab, chart or output code is stripped of surrounding whitespace, and a blank one is
+    `UNK`.** This covers `LAB//RESULT//{itemid}//{valueuom}`, `ICU_CHART//{itemid}//{valueuom}` and
+    `SUBJECT_FLUID_OUTPUT//{itemid}//{valueuom}`. Before, the unit was copied as recorded, so a padded
+    unit gave a code of its own and a blank one a code ending in whitespace, with no `unit`. On the
+    demo, lab item 51498 records its unit as a single space (339 events), so its code was
+    `LAB//RESULT//51498//` followed by a space; it is now `LAB//RESULT//51498//UNK`. No other demo code
+    changes. To migrate, strip the last part of an old code and write `UNK` for an empty one:
+    `^(.*//)\s*(\S(?:.*\S)?)?\s*$` → `\1\2`, then `//$` → `//UNK`.
+
+- **`SUBJECT_WEIGHT_AT_INFUSION//KG` is `SUBJECT_WEIGHT_AT_INFUSION`**, eICU's code for the same
+    value; its unit, `kg`, is in `metadata/codes.parquet`. Migrate by replacing
+    `SUBJECT_WEIGHT_AT_INFUSION//KG` with `SUBJECT_WEIGHT_AT_INFUSION`.
+
+**Events and code metadata**
+
+- **The events have no `unit` column.** Every code has one unit, which is in `metadata/codes.parquet`
+    only; join the events to it on `code` (see [Units](#units)). `unit` is no longer a code modifier
+    (`code_modifier_columns` is empty).
+
+- **`codes.parquet` `unit` is a UCUM code** (`mcg` → `ug`, `mL/hour` → `mL/h`); the unit as recorded
+    is in the new column `unit_source_value`. Code strings keep the recorded spelling.
+
+- **Vocabulary parents are spelled `VOCABULARY//CODE`.** The `parent_codes` the ETL writes itself
+    (`ICD9CM`, `ICD10CM`, `ICD9Proc`, `ICD10PCS`, `NDC`, `MS-DRG`, `APR-DRG`, and the LOINC, SNOMED
+    and RxNorm parents from the mimic-code maps) used one slash, `ICD10CM/I50.23`; they now use two,
+    `ICD10CM//I50.23`, the spelling suMEDS already writes for the ancestors it adds. To migrate, respell
+    old parents with the regex `^([^/]+)/(?!/)` → `\1//` (only the first slash changes; codes after it
+    are kept as they are). suMEDS and alignEHR already read both spellings as the same parent.
+
+- **`codes.parquet` has unit-free stem rows, without events**
+    ([#114](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/pull/114)). suMEDS's
+    `sumeds_link_unit_siblings` gives every code that ends in its unit the code without the unit as its
+    last `parent_codes` entry, and that stem a row of its own (no unit, no events): where an item is
+    recorded in several units, with `link_single_units` also where it has one, and with
+    `unknown_unit_prefixes` also for an infusion code without a unit (see
+    [Code metadata](#code-metadata)). So every infusion start pairs with its end by stem. On the demo,
+    1,122 codes get a stem parent and 1,006 stem rows are added (159 `INFUSION//START`, 159
+    `INFUSION//END`, 298 `ICU_CHART`, 351 `LAB//RESULT`, 39 `SUBJECT_FLUID_OUTPUT`). Nothing needs
+    migrating unless a tool expects every `codes.parquet` row to have events or a unit: drop the stem
+    rows (`code_template` and `unit` null), or ignore a parent that is the code without its last `//`
+    component.
+
+**Running the ETL**
+
+- **Intermediate stage outputs are no longer kept.** Up to 0.3.0, a run left each stage's output in
+    `<output_dir>/<stage>/` (`convert_to_parquet/`, `convert_to_MEDS_events/`, …, about 10 GB of the
+    full release's 15 GB tree). The spec now sets MEDS-Extract's `etl.cleanup_intermediates: true`
+    (MEDS-Extract 0.9.2 or later), so a successful run deletes those directories and keeps only
+    `data/`, `metadata/`, `.logs/` and `.meds_extract_run/`. The MEDS data and metadata are
+    unchanged. To migrate, add `"overrides=['cleanup_intermediates=false']"` to `meds-extract-run`
+    wherever you read a stage directory after the run.
 
 ## 📚 Citing this work
 

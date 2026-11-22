@@ -78,15 +78,15 @@ All events are timed at `hosp/admissions.dischtime` (joined on `hadm_id`) and ca
 `{timepoint}` is the exam's own `ADMISSION`, `DISCHARGE`, `INTERIM` or `UNKNOWN`. The vitals and
 their LOINC parents are:
 
-| Vital code part    | Unit        | Parent          |
-| ------------------ | ----------- | --------------- |
-| `TEMPERATURE_C`    | °C          | `LOINC/8310-5`  |
-| `HEART_RATE`       | beats/min   | `LOINC/8867-4`  |
-| `BP_SYSTOLIC`      | mmHg        | `LOINC/8480-6`  |
-| `BP_DIASTOLIC`     | mmHg        | `LOINC/8462-4`  |
-| `RESPIRATORY_RATE` | breaths/min | `LOINC/9279-1`  |
-| `O2_SATURATION`    | %           | `LOINC/59408-5` |
-| `WEIGHT_KG`        | kg          | `LOINC/29463-7` |
+| Vital code part    | Unit        | Parent           |
+| ------------------ | ----------- | ---------------- |
+| `TEMPERATURE_C`    | °C          | `LOINC//8310-5`  |
+| `HEART_RATE`       | beats/min   | `LOINC//8867-4`  |
+| `BP_SYSTOLIC`      | mmHg        | `LOINC//8480-6`  |
+| `BP_DIASTOLIC`     | mmHg        | `LOINC//8462-4`  |
+| `RESPIRATORY_RATE` | breaths/min | `LOINC//9279-1`  |
+| `O2_SATURATION`    | %           | `LOINC//59408-5` |
+| `WEIGHT_KG`        | kg          | `LOINC//29463-7` |
 
 The discharge-condition aspects are `MENTAL_STATUS`, `LEVEL_OF_CONSCIOUSNESS`, `ACTIVITY_STATUS`,
 `GENERAL_CONDITION`, `PAIN_STATUS`, `CARDIOVASCULAR_STATUS`, `VITAL_SIGNS_STATUS`, `FEVER_STATUS`,

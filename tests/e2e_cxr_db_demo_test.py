@@ -201,8 +201,8 @@ def test_e2e_cxr_db_demo(demo_cohort: Path, demo_download: Path):
         for code, parent in parents.items():
             uri = code.rsplit("//", 1)[1]
             if uri.startswith("snomed:"):
-                assert parent == [f"SNOMED/{uri[7:]}"], code
+                assert parent == [f"SNOMED//{uri[7:]}"], code
             elif uri.startswith("loinc:"):
-                assert parent == [f"LOINC/{uri[6:]}"], code
+                assert parent == [f"LOINC//{uri[6:]}"], code
             elif uri.startswith("mesh:"):
                 assert parent in (None, []), code

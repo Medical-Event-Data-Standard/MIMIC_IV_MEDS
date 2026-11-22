@@ -108,8 +108,9 @@ repo's prettier hook, so pre-commit does not rewrite it. The generated file is c
 the entry point needs a file inside the package.
 
 Because the base `etl:` block is copied whole, every extension spec inherits its run settings: the
-extension-column roles written to `dataset.json` (`raw_source_id_columns`, `code_modifier_columns`)
-and the `sumeds_enrich` post-stage with the `MIMIC-IV` suMEDS rules (see
+extension-column roles written to `dataset.json` (`raw_source_id_columns`; there are no code
+modifier columns), `cleanup_intermediates`, and the suMEDS post-stages: the two unit stages (see
+[Base ETL → Units](../base-etl.md#units)) and `sumeds_enrich` with the `MIMIC-IV` suMEDS rules (see
 [Base ETL → Enrichment with suMEDS](../base-etl.md#enrichment-with-sumeds)). A fragment cannot add to
 them, so an identifier column that only the extension emits is listed under
 `other_extension_columns`.

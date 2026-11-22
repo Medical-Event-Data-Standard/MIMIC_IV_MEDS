@@ -210,8 +210,9 @@ def run_meds_extract(spec_fp: Path, out: Path, raw_input: Path, enrich: bool, cl
     args = [exe, f"spec={spec_fp}", f"output_dir={out}", "do_download=false", f"input_dir={raw_input}"]
     if not enrich:
         args.append("skip_stages=[sumeds_enrich]")
-    if cleanup:
-        args.append("do_cleanup_intermediates=true")
+    # Explicit either way: the composed spec inherits the base's `etl.cleanup_intermediates: true`, which
+    # only this override changes (MEDS-Extract 0.9.2 dropped the `do_cleanup_intermediates` flag).
+    args.append(f"overrides=['cleanup_intermediates={str(cleanup).lower()}']")
     # The runner spawns each stage as its own console script: they must be on PATH.
     env = {**os.environ, "PATH": os.pathsep.join([scripts, os.environ.get("PATH", "")])}
     logger.info("running meds-extract-run")

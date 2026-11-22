@@ -9,11 +9,14 @@ a code layout that the rules no longer match fails here rather than silently dro
 import re
 from importlib.resources import files
 
+import polars as pl
 import pytest
 import yaml
+from dftly import Parser
 from sumeds import load_rules, registered_rules
 
 RULES_FP = files("MIMIC_IV_MEDS").joinpath("sumeds_rules.yaml")
+PARSER = Parser()
 CONFIG = yaml.safe_load(files("MIMIC_IV_MEDS").joinpath("event_configs.yaml").read_text())
 
 #: Top-level keys of the MESSY file that are not raw tables.
@@ -40,17 +43,20 @@ def _events():
 
 
 def _render(template, constants, values):
-    """Render a MESSY code expression (`f"..."` or a bare `$column`) with synthetic values."""
+    """Render a MESSY code expression (`f"..."`, a bare `$column` or a literal) with synthetic values.
+
+    `f"..."` templates are evaluated by dftly as MEDS-Extract does.
+    """
     template = template.strip().strip("'")
+    if re.fullmatch(r"[A-Z_/]+", template):  # a literal code
+        return template
     if template.startswith("$"):
         column = template[1:].split()[0]
         return constants[column].strip("'") if column in constants else values.get(column, DEFAULT_VALUE)
     assert template.startswith('f"') and template.endswith('"'), template
-    return re.sub(
-        r"\{\$(\w+)(?:\s*\?\?\s*'[^']*')?\}",
-        lambda m: values.get(m.group(1), DEFAULT_VALUE),
-        template[2:-1],
-    )
+    columns = PARSER(template).referenced_columns
+    row = {c: [constants[c].strip("'") if c in constants else values.get(c, DEFAULT_VALUE)] for c in columns}
+    return pl.DataFrame(row).select(PARSER.expr_to_polars(template)).item()
 
 
 def _code(event_name, **values):

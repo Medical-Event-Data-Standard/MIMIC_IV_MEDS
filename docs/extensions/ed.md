@@ -81,20 +81,20 @@ patterns, but suMEDS also resolves the parents the ETL already sets, so ED diagn
 `vocabulary_id`, `concept_code` and their ICD ancestors, and the vitals' LOINC parents gain names.
 suMEDS has no NDC data, so medication codes are left as the ETL wrote them.
 
-| Source table | Code                                                                                             | Time              | Value fields                                                                       |
-| ------------ | ------------------------------------------------------------------------------------------------ | ----------------- | ---------------------------------------------------------------------------------- |
-| `edstays`    | `ED//ARRIVAL//{arrival_transport}`                                                               | `intime`          | —                                                                                  |
-| `edstays`    | `ED//DISPOSITION//{disposition}`                                                                 | `outtime`         | —                                                                                  |
-| `triage`     | `ED//TRIAGE//{TEMPERATURE_F,HEART_RATE,RESPIRATORY_RATE,O2_SATURATION,BP_SYSTOLIC,BP_DIASTOLIC}` | `edstays.intime`  | `numeric_value` (°F, bpm, /min, %, mmHg); LOINC parents                            |
-| `triage`     | `ED//TRIAGE//PAIN`                                                                               | `edstays.intime`  | `numeric_value` if a number, else `text_value`; LOINC/72514-3                      |
-| `triage`     | `ED//TRIAGE//ACUITY`                                                                             | `edstays.intime`  | `numeric_value`, ESI 1 (most urgent) to 5; no parent                               |
-| `triage`     | `ED//TRIAGE//CHIEF_COMPLAINT`                                                                    | `edstays.intime`  | `text_value`; LOINC/10154-3                                                        |
-| `vitalsign`  | `ED//VITALSIGN//{same six vitals}`                                                               | `charttime`       | `numeric_value`; LOINC parents                                                     |
-| `vitalsign`  | `ED//VITALSIGN//PAIN`                                                                            | `charttime`       | as for triage                                                                      |
-| `vitalsign`  | `ED//VITALSIGN//RHYTHM`                                                                          | `charttime`       | `text_value`                                                                       |
-| `diagnosis`  | `ED//DIAGNOSIS//ICD//{icd_version}//{icd_code}`                                                  | `edstays.outtime` | `seq_num`; description and `ICD9CM/`/`ICD10CM/` parent from `hosp/d_icd_diagnoses` |
-| `medrecon`   | `ED//MEDRECON//{name}//{NDC, 11 digits, or UNK}`                                                 | `charttime`       | `gsn` column; `NDC/…` parent                                                       |
-| `pyxis`      | `ED//PYXIS//{name}`                                                                              | `charttime`       | `med_rn`, `gsn` columns                                                            |
+| Source table | Code                                                                                             | Time              | Value fields                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------ | ----------------- | ------------------------------------------------------------------------------------ |
+| `edstays`    | `ED//ARRIVAL//{arrival_transport}`                                                               | `intime`          | —                                                                                    |
+| `edstays`    | `ED//DISPOSITION//{disposition}`                                                                 | `outtime`         | —                                                                                    |
+| `triage`     | `ED//TRIAGE//{TEMPERATURE_F,HEART_RATE,RESPIRATORY_RATE,O2_SATURATION,BP_SYSTOLIC,BP_DIASTOLIC}` | `edstays.intime`  | `numeric_value` (°F, bpm, /min, %, mmHg); LOINC parents                              |
+| `triage`     | `ED//TRIAGE//PAIN`                                                                               | `edstays.intime`  | `numeric_value` if a number, else `text_value`; LOINC//72514-3                       |
+| `triage`     | `ED//TRIAGE//ACUITY`                                                                             | `edstays.intime`  | `numeric_value`, ESI 1 (most urgent) to 5; no parent                                 |
+| `triage`     | `ED//TRIAGE//CHIEF_COMPLAINT`                                                                    | `edstays.intime`  | `text_value`; LOINC//10154-3                                                         |
+| `vitalsign`  | `ED//VITALSIGN//{same six vitals}`                                                               | `charttime`       | `numeric_value`; LOINC parents                                                       |
+| `vitalsign`  | `ED//VITALSIGN//PAIN`                                                                            | `charttime`       | as for triage                                                                        |
+| `vitalsign`  | `ED//VITALSIGN//RHYTHM`                                                                          | `charttime`       | `text_value`                                                                         |
+| `diagnosis`  | `ED//DIAGNOSIS//ICD//{9CM,10CM}//{icd_code}`                                                     | `edstays.outtime` | `seq_num`; description and `ICD9CM//`/`ICD10CM//` parent from `hosp/d_icd_diagnoses` |
+| `medrecon`   | `ED//MEDRECON//{name}//{NDC, 11 digits, or UNK}`                                                 | `charttime`       | `gsn` column; `NDC//…` parent                                                        |
+| `pyxis`      | `ED//PYXIS//{name}`                                                                              | `charttime`       | `med_rn`, `gsn` columns                                                              |
 
 ## ETL decisions
 
@@ -154,7 +154,7 @@ three times.
 
 - `medrecon` names are a pick list with some free entries (18.7k distinct), so its code takes the
     drug name and the NDC, the way `hosp/pharmacy` builds `MEDICATION//START//{name}//{ndc}`. The
-    NDC is attached as an `NDC/` parent.
+    NDC is attached as an `NDC//` parent.
 - The NDC is stored as an integer and loses its leading zeros, so the spec restores them to 11
     digits.
 - `pyxis` names come from the cabinet formulary (1.1k distinct), so the code is the name alone.

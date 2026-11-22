@@ -195,7 +195,7 @@ Every code is described in `metadata/codes.parquet`:
 Concept codes also carry:
 
 - a `concept_class` metadata column, for filtering;
-- `parent_codes` of `SNOMED/<id>` or `LOINC/<id>` where the concept is a SNOMED CT or LOINC concept
+- `parent_codes` of `SNOMED//<id>` or `LOINC//<id>` where the concept is a SNOMED CT or LOINC concept
     (890 codes).
 
 ## ETL decisions

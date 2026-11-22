@@ -204,5 +204,5 @@ def test_e2e_mne_demo(demo_cohort: Path, demo_download: Path):
         assert meta.filter(pl.col("description").is_null()).is_empty()
         assert not meta.filter(pl.col("description").str.contains("\n")).height
         parents = dict(meta.select("code", "parent_codes").iter_rows())
-        assert parents["NOTE//PHYSICAL_EXAM//ADMISSION//HEART_RATE"] == ["LOINC/8867-4"]
-        assert parents["NOTE//PHYSICAL_EXAM//ADMISSION//WEIGHT_KG"] == ["LOINC/29463-7"]
+        assert parents["NOTE//PHYSICAL_EXAM//ADMISSION//HEART_RATE"] == ["LOINC//8867-4"]
+        assert parents["NOTE//PHYSICAL_EXAM//ADMISSION//WEIGHT_KG"] == ["LOINC//29463-7"]

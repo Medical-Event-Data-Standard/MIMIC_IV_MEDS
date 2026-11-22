@@ -120,7 +120,7 @@ def _expected(raw: Path) -> pl.DataFrame:
         *_measurements(vitals, "VITALSIGN", "charttime"),
         _frame(vitals.filter(pl.col("rhythm").is_not_null()), pl.lit("ED//VITALSIGN//RHYTHM"), "charttime",
                text_value=pl.col("rhythm")),
-        _frame(dx, pl.format("ED//DIAGNOSIS//ICD//{}//{}", "icd_version", "icd_code"), "outtime",
+        _frame(dx, pl.format("ED//DIAGNOSIS//ICD//{}CM//{}", "icd_version", "icd_code"), "outtime",
                seq_num=pl.col("seq_num")),
         _frame(medrecon.filter(pl.col("etc_rn") == 1), pl.format("ED//MEDRECON//{}//{}", "name", ndc),
                "charttime", gsn=pl.when(pl.col("gsn") != 0).then(pl.col("gsn"))),
@@ -193,16 +193,16 @@ def test_e2e_ed_demo():
         assert meta.filter(pl.col("description").is_null()).is_empty()
         assert not meta.filter(pl.col("description").str.contains("\n")).height
         parents = dict(meta.select("code", "parent_codes").iter_rows())
-        assert parents["ED//TRIAGE//HEART_RATE"] == ["LOINC/8867-4"]
-        assert parents["ED//VITALSIGN//BP_SYSTOLIC"] == ["LOINC/8480-6"]
+        assert parents["ED//TRIAGE//HEART_RATE"] == ["LOINC//8867-4"]
+        assert parents["ED//VITALSIGN//BP_SYSTOLIC"] == ["LOINC//8480-6"]
         assert parents["ED//TRIAGE//ACUITY"] in (None, [])
         assert parents["ED//ARRIVAL//AMBULANCE"] in (None, [])
         ndc_parents = [
             p for c, p in parents.items() if c.startswith("ED//MEDRECON//") and not c.endswith("//UNK")
         ]
-        assert ndc_parents and all(len(p) == 1 and len(p[0]) == len("NDC/") + 11 for p in ndc_parents)
-        icd = [p for c, p in parents.items() if c.startswith("ED//DIAGNOSIS//ICD//10//")]
-        assert icd and all(p and p[0].startswith("ICD10CM/") for p in icd)
+        assert ndc_parents and all(len(p) == 1 and len(p[0]) == len("NDC//") + 11 for p in ndc_parents)
+        icd = [p for c, p in parents.items() if c.startswith("ED//DIAGNOSIS//ICD//10CM//")]
+        assert icd and all(p and p[0].startswith("ICD10CM//") for p in icd)
 
 
 if __name__ == "__main__":  # pragma: no cover

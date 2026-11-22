@@ -8,15 +8,17 @@ pip install MIMIC_IV_MEDS
 
 The package has two dependencies:
 
-- **`meds-extract[download]`, at least 0.8.1 and below 0.9.** It brings in MEDS-Transforms, polars
-    and hydra, and provides `meds-extract-run` and `meds-extract-download`. 0.8.1 is the floor
-    because the spec names its joins `_table.joins` (0.8 renamed `_table.join` and rejects the old
-    name), and because 0.8.1 is the first release that runs the `etl.post_stages` the spec declares
-    and writes the `dataset.json` fields of its `etl:` block. MEDS-Extract 0.x minor releases break
-    the spec syntax and the runner CLI, so the ceiling is raised deliberately, in a migration.
-- **`sumeds`, at least 0.6.3 and below 0.7.** [suMEDS](https://github.com/rvandewater/SumMEDS)
-    provides the `sumeds_enrich` stage that runs at the end of every run (see
-    [Code-metadata enrichment](#code-metadata-enrichment)) and the `suMEDS-enrich` command.
+- **`meds-extract[download]`, at least 0.9.2 and below 0.10.** It brings in MEDS-Transforms, polars
+    and hydra, and provides `meds-extract-run` and `meds-extract-download`. 0.9 writes the `unit`
+    code metadata as one String per code, and 0.9.2 is the first release that reads the spec's
+    `etl.cleanup_intermediates`. The spec also relies on 0.8.1, which names joins `_table.joins` (0.8
+    renamed `_table.join` and rejects the old name), runs the `etl.post_stages` the spec declares and
+    writes the `dataset.json` fields of its `etl:` block. MEDS-Extract 0.x minor releases break the
+    spec syntax and the runner CLI, so the ceiling is raised deliberately, in a migration.
+- **`sumeds`, at least 0.6.11 and below 0.7.** [suMEDS](https://github.com/rvandewater/SumMEDS)
+    provides the post-stages that run at the end of every run: `sumeds_link_unit_siblings` and
+    `sumeds_normalize_units` (see [Base ETL → Units](base-etl.md#units)) and `sumeds_enrich` (see
+    [Code-metadata enrichment](#code-metadata-enrichment)), and the `suMEDS-enrich` command.
 
 Python 3.11.4 up to 3.13 is supported, matching MEDS-Extract.
 
@@ -196,10 +198,11 @@ $MEDS_OUTPUT_DIR/
 ├── .meds_extract_run/
 │   ├── raw_input/                # the download (unless download_dest_dir is set)
 │   └── pipeline.yaml             # the fully resolved pipeline the runner executed
-├── .logs/                        # per-stage completion markers and pipeline.log
-└── convert_to_parquet/, convert_to_MEDS_events/, merge_to_MEDS_cohort/, ...
-                                  # intermediate output of each stage
+└── .logs/                        # per-stage completion markers and pipeline.log
 ```
+
+While the run is going, each stage also writes its intermediate output to `$MEDS_OUTPUT_DIR/<stage>/`
+(`convert_to_parquet/`, `convert_to_MEDS_events/`, `merge_to_MEDS_cohort/`, ...).
 
 - **Columns.** Every shard has the MEDS columns `subject_id`, `time`, `code`, `numeric_value` and
     `text_value`. It also has the extension columns the spec declares, such as `hadm_id`,
@@ -212,13 +215,17 @@ $MEDS_OUTPUT_DIR/
 - **Extension-column roles.** `dataset.json` also lists the extension columns by role, as declared in
     the spec's `etl:` block; see
     [Base ETL → Extension columns in dataset.json](base-etl.md#extension-columns-in-datasetjson).
+- **Units.** A code's unit is in `codes.parquet` only (`unit` as UCUM, `unit_source_value` as
+    recorded); the events have no `unit` column. See [Base ETL → Units](base-etl.md#units).
 - **Code metadata.** `codes.parquet` holds the ETL's `description` and `parent_codes`. An enriched
     build adds suMEDS's columns, such as `vocabulary_id`, `concept_code` and `parent_names`, and
     appends parents after the ETL's own.
-- **Intermediates.** The stage folders are kept, which is why a full run's output tree is about
-    15 GB against 4.5 GB of MEDS data. They can be deleted once `data/` and `metadata/` are written.
-    Automatic clean-up of intermediates was tracked upstream in
-    [MEDS_extract#15](https://github.com/mmcdermott/MEDS_extract/issues/15).
+- **Intermediates.** The stage folders are deleted after a successful run: the spec sets
+    MEDS-Extract's `etl.cleanup_intermediates: true` (MEDS-Extract 0.9.2 or later). A failed run
+    keeps them, so the same command resumes where it stopped. To keep them, add
+    `"overrides=['cleanup_intermediates=false']"`; `.logs/pipeline.log` keeps the stage logs either
+    way. Cleanup never deletes raw data. They exist until the last stage has finished, so budget the
+    full run's 15 GB of disk (against 4.5 GB of MEDS data).
 - **Resuming.** Stages whose output already exists are skipped, so re-running the same command
     after an interruption picks up where it stopped.
 
@@ -242,13 +249,13 @@ Extraction alone, on the full MIMIC-IV 3.1 release (all 364,627 subjects), with 
 no parallelism and the raw data already on disk. These figures predate the move to MEDS-Extract 0.8
 and the `sumeds_enrich` post-stage, which is not included:
 
-| Measure           | Value                                    |
-| ----------------- | ---------------------------------------- |
-| wall time         | **32 min**                               |
-| peak RSS          | **20.3 GB**                              |
-| MEDS data output  | 4.5 GB (366 shards)                      |
-| metadata output   | 8.6 MB                                   |
-| whole output tree | 15 GB (includes per-stage intermediates) |
+| Measure           | Value                                |
+| ----------------- | ------------------------------------ |
+| wall time         | **32 min**                           |
+| peak RSS          | **20.3 GB**                          |
+| MEDS data output  | 4.5 GB (366 shards)                  |
+| metadata output   | 8.6 MB                               |
+| whole output tree | 15 GB (with per-stage intermediates) |
 
 The hardware was a 20-core aarch64 machine with 121 GB RAM and a local NVMe disk. The run used
 about four cores (350–400% CPU), so it is limited by I/O and single-threaded work, not CPU. More
@@ -301,6 +308,11 @@ parallelize:
 YAML
 MEDS_transform-pipeline $MEDS_OUTPUT_DIR/.meds_extract_run/pipeline.yaml
 ```
+
+The written config carries the spec's `cleanup_intermediates: true`, so this run deletes the stage
+directories at the end too; add `--overrides cleanup_intermediates=false` to keep them. Only
+`meds-extract-run` puts back the stage done markers that the cleanup deletes, so a later
+`meds-extract-run` on an output that `MEDS_transform-pipeline` cleaned up runs every stage again.
 
 The pipeline config lists the `sumeds_enrich` stage too, so this also enriches the code metadata.
 `pipeline.yaml` is self-contained, with every path and version inlined. You can also edit it to

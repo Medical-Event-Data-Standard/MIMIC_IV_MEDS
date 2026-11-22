@@ -27,11 +27,14 @@ uv run pytest tests/
 | `sumeds_rules_test.py`        | `sumeds_rules.yaml` loads in suMEDS, is registered under the spec name, and matches the codes the spec's templates render                                                                                                                                                                                                             | nothing                             |
 | `e2e_mne_synthetic_test.py`   | `spec=MIMIC-IV-MNE` over the demo plus synthetic MNE rows: exact `NOTE//` events, all at `dischtime`; extension columns and metadata                                                                                                                                                                                                  | the open MIMIC-IV demo              |
 | `extension_specs_test.py`     | Generated specs are current, exactly base plus fragment, and registered                                                                                                                                                                                                                                                               | nothing                             |
-| `code_metadata_test.py`       | Every event in every shipped spec declares exactly one description and has a code component                                                                                                                                                                                                                                           | nothing                             |
+| `code_metadata_test.py`       | Every event in every shipped spec declares exactly one description; literal codes are plain literals (the spec's exact set), and no code is read from a bare column                                                                                                                                                                   | nothing                             |
+| `unit_component_test.py`      | suMEDS's `UnitComponentContract` on every spec: the codes that end in a unit, and every `_self` unit read from a row is in its code                                                                                                                                                                                                   | nothing                             |
+| `unit_metadata_test.py`       | Every code with a numeric value gets its one unit in `codes.parquet` (UCUM `unit`, recorded `unit_source_value`), and the events have no `unit` column                                                                                                                                                                                | nothing (a few made-up rows)        |
 
-The demo is built once per test session, by the `demo_cohort` fixture in `tests/conftest.py`, with
-`skip_stages=[sumeds_enrich]`, so it is the plain ETL output whatever the network allows.
-`run_with_enrichment_test.py` reruns the ETL offline from the raw files that build downloaded. Set
+The demo is built once per test session, by the `demo_cohort` fixture in `tests/conftest.py`, as a
+plain `meds-extract-run spec=MIMIC-IV` builds it, suMEDS enrichment included. The enrichment fetches
+suMEDS's ontology packs over the network, and the fixture sets `strict`, so a failed enrichment fails
+the build. `run_with_enrichment_test.py` reruns the ETL offline from the raw files that build downloaded. Set
 `MEDS_DEMO_DOWNLOAD_DIR` to a durable directory to reuse the download between runs. Set
 `MEDS_DEMO_OUTPUT_DIR` to keep the built demo cohort instead of a temporary one. CI does both,
 caching the download for a week, and retries the tests only on network-shaped PhysioNet errors.
@@ -39,7 +42,8 @@ caching the download for a week, and retries the tests only on network-shaped Ph
 ## Summary-statistics baselines
 
 Two [meds_summary_stats](https://github.com/Medical-Event-Data-Standard/meds_summary_stats)
-fingerprints of the ETL's output are committed under `tests/regression/`:
+fingerprints of the dataset `meds-extract-run spec=MIMIC-IV` builds, suMEDS enrichment included, are
+committed under `tests/regression/`:
 
 - **`demo_summary_stats.json`**, of the cohort built from the open MIMIC-IV demo.
 - **`full_summary_stats.json`**, of the full MIMIC-IV 3.1 release. Because it is committed next to
@@ -53,35 +57,41 @@ makes the full-release one safe to publish.
 
 **The demo is checked on every pull request.** The Tests workflow compares the demo cohort it builds
 with `demo_summary_stats.json`. The demo release is pinned, so the raw input never changes and any
-difference is something this repository did. `tests/regression/policy.yaml` therefore treats the
-cohort's content (counts, code-vocabulary digests, metadata coverage, splits) as an **error**, and
-byte-level digests, which a dependency bump can move, as a warning. The job also uploads the new
+difference is something this repository did. meds_summary_stats's built-in
+[`etl-regression` policy](https://github.com/Medical-Event-Data-Standard/meds_summary_stats/blob/main/docs/etl-baselines.md)
+therefore treats the cohort's content (counts, code-vocabulary digests, metadata coverage, splits) as
+an **error**, and byte-level digests, which a dependency bump can move, as a warning. The job also uploads the new
 statistics as the `mimic-demo-summary-stats` artifact.
 
 **Regenerate the baselines in every pull request that changes the output.** CI cannot rebuild the
-credentialed release, so the full baseline is your job.
-[`scripts/summary_stats.sh`](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/blob/main/scripts/summary_stats.sh)
-builds with this checkout, prints how the statistics changed against the committed baseline, and
-overwrites it. `--compare` checks a build without writing anything:
+credentialed release, so the full baseline is your job; the Summary stats workflow
+(`.github/workflows/summary-stats.yaml`) reminds a pull request that changes `src/` without it.
+`baseline_MEDS_summary_stats` (from meds_summary_stats) builds with this checkout, as
+`[tool.meds_summary_stats.baselines]` in `pyproject.toml` describes it, prints how the statistics
+changed against the committed baseline, and overwrites it. `--compare` checks a build without writing
+anything:
 
 ```bash
 # The demo: downloaded and built with this checkout
-scripts/summary_stats.sh demo
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats demo
 # The full release, built from a copy on disk, or summarized from an existing build
-scripts/summary_stats.sh full --input-dir $RAW_INPUT_DIR
-scripts/summary_stats.sh full --meds-dir $MEDS_OUTPUT_DIR
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats full --input-dir $RAW_INPUT_DIR
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats full --meds-dir $MEDS_OUTPUT_DIR
 # Compare only; exits 1 if the policy flags an error
-scripts/summary_stats.sh full --meds-dir $MEDS_OUTPUT_DIR --compare
+uvx --from meds_summary_stats==0.0.5 baseline_MEDS_summary_stats full --meds-dir $MEDS_OUTPUT_DIR --compare
 ```
 
-Both baselines are built with `skip_stages=[sumeds_enrich]`. They fingerprint what the ETL writes,
-which does not depend on network access or on the suMEDS pack release, so summarize a build made the
-same way.
+The builds run the spec's `sumeds_enrich` post-stage with `strict`, which fetches the suMEDS ontology
+packs over the network, and a build whose `metadata/dataset.json` does not record
+`sumeds_enrichment.enriched: true` is refused (`require_dataset_metadata` in `pyproject.toml`); enrich
+such a build with `suMEDS-enrich $MEDS_OUTPUT_DIR` first. A suMEDS upgrade can move the enrichment
+statistics too, so check it with `--compare`.
 
-meds_summary_stats is pinned to 0.0.4 (stats schema version 2) in three places that must move
-together: the action and its `package-spec` in `.github/workflows/tests.yaml`, `STATS_SPEC` in
-`scripts/summary_stats.sh`, and the committed baselines. A comparison across schema versions fails
-with a precondition error, not a useful diff.
+meds_summary_stats is pinned to 0.0.5 (the first release with the `etl-regression` policy) in the
+places that must move together: the action and its `package-spec` in `.github/workflows/tests.yaml`,
+the `baseline-freshness` action in `.github/workflows/summary-stats.yaml`, the commands above, and the
+committed baselines. A comparison across schema versions fails with a precondition error, not a
+useful diff.
 
 ## Synthetic-data ETL
 
