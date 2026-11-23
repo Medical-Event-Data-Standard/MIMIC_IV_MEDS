@@ -16,5 +16,8 @@ stage of its own.
 
 This package exists so the YAML is addressable as package data —
 ``importlib.resources.files("MIMIC_IV_MEDS")`` — from an installed wheel. Nothing here is
-importable API; deliberately, there is nothing to import.
+importable API; the code is two commands: ``MIMIC_IV_MEDS.multimodal`` (``mimic-iv-meds-multimodal``),
+which builds MIMIC-IV plus any combination of extensions and stores their images and waveforms
+inside the MEDS root, and ``MIMIC_IV_MEDS.prepare_cxr_db`` (``python -m MIMIC_IV_MEDS.prepare_cxr_db
+$RAW``), which converts the semicolon-delimited MIMIC-CXR-DB release to parquet.
 """

@@ -1,0 +1,20 @@
+# Multimodal module `note`: MIMIC-IV-Note 2.2 discharge summaries and radiology reports.
+#   https://physionet.org/content/mimic-iv-note/2.2/
+#
+# Composed into the multimodal spec by `MIMIC_IV_MEDS.multimodal`; not a spec on its own. It reads
+# `note/notes.parquet`, which `staging.stage_note` builds from `note/discharge.csv.gz` and
+# `note/radiology.csv.gz`: one row per note of a core subject, with the code and time already
+# decided there (see that function for why the time is max(charttime, storetime)).
+#
+# The note text stays in `text_value`, the core MEDS column every MEDS tool reads, rather than in a
+# linked file. `note_id` is the key into the release (and into `*_detail`, not extracted here).
+note/notes:
+  note:
+    code: $note_code
+    time: '$note_time::"%Y-%m-%d %H:%M:%S"'
+    text_value: $text
+    hadm_id: $hadm_id
+    note_id: $note_id
+    _metadata:
+      _self:
+        description: $note_description

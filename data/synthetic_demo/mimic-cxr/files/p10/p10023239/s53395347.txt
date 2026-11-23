@@ -1,0 +1,20 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for ward imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+Synthetic finding: atelectasis is present.
+Possible cardiomegaly, cannot be excluded.
+Synthetic finding: enlarged cardiomediastinum is present.
+No lung lesion.
+No lung opacity.
+No pleural effusion.
+
+IMPRESSION:
+Synthetic impression: atelectasis, enlarged cardiomediastinum.

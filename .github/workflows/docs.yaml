@@ -1,0 +1,42 @@
+name: Docs
+
+# Builds the documentation site with Zensical the way Read the Docs will (`.readthedocs.yaml`), with
+# `--strict` so that a broken link or a missing anchor fails the PR instead of the RTD build. Nothing
+# is deployed from here; Read the Docs builds and hosts the site.
+#
+# The build needs no data and takes seconds, so it runs on every PR rather than behind a path
+# filter.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main, "release/*", "dev"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup package
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.12"
+          group: docs
+
+      - name: Build the site
+        run: uv run --group docs zensical build --strict

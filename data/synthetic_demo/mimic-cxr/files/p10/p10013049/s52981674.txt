@@ -1,0 +1,18 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for outside imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+No consolidation.
+Synthetic finding: enlarged cardiomediastinum is present.
+Synthetic finding: pleural other is present.
+Synthetic finding: support devices is present.
+
+IMPRESSION:
+Synthetic impression: enlarged cardiomediastinum, pleural other, support devices.

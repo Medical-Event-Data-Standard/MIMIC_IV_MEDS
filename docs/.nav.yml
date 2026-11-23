@@ -1,0 +1,9 @@
+# Top-level order of the site navigation, read by Zensical's built-in awesome-nav support (see
+# zensical.toml). A new top-level page must be listed here, or it is built but left out of the nav.
+nav:
+  - index.md
+  - getting-started.md
+  - base-etl.md
+  - Extensions: extensions
+  - sources.md
+  - contributing.md

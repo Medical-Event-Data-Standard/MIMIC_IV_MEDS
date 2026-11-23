@@ -1,0 +1,17 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PORTABLE AP)
+
+INDICATION: ___ Synthetic indication for icu imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+Synthetic finding: enlarged cardiomediastinum is present.
+No lung opacity.
+Synthetic finding: pleural other is present.
+
+IMPRESSION:
+Synthetic impression: enlarged cardiomediastinum, pleural other.

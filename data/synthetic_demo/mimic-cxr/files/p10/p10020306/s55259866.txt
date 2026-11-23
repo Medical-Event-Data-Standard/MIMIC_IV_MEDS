@@ -1,0 +1,22 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PORTABLE AP)
+
+INDICATION: ___ Synthetic indication for ed imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+No cardiomegaly.
+Synthetic finding: consolidation is present.
+No fracture.
+Synthetic finding: pleural effusion is present.
+No pneumonia.
+No pneumothorax.
+Synthetic finding: pleural other is present.
+Synthetic finding: support devices is present.
+
+IMPRESSION:
+Synthetic impression: consolidation, pleural effusion, pleural other, support devices.

@@ -1,0 +1,21 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for outside imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+Synthetic finding: edema is present.
+No fracture.
+No lung lesion.
+Synthetic finding: lung opacity is present.
+Possible pleural effusion, cannot be excluded.
+Synthetic finding: pneumothorax is present.
+Synthetic finding: support devices is present.
+
+IMPRESSION:
+Synthetic impression: edema, lung opacity, pneumothorax, support devices.

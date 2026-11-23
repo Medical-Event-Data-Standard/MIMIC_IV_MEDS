@@ -1,0 +1,24 @@
+# Multimodal module `ecg`: MIMIC-IV-ECG diagnostic 12-lead ECGs (10 s, 500 Hz, WFDB).
+#   https://physionet.org/content/mimic-iv-ecg/1.0/ (demo: https://physionet.org/content/mimic-iv-ecg-demo/0.1/)
+#
+# Composed into the multimodal spec by `MIMIC_IV_MEDS.multimodal`; not a spec on its own. It reads
+# `ecg/records.parquet`, which `staging.stage_ecg` builds from `record_list.csv`: one row per
+# record of a core subject whose `.hea` and `.dat` are both on disk.
+#
+# `external_value_link` is the WFDB record name relative to the MEDS root
+# (`external_values/ecg/<sha[:2]>/<sha>/<record>`), `external_value_encoding` is `wfdb`, so
+# `wfdb.rdrecord(meds_root / external_value_link)` reads it.
+ecg/records:
+  waveform:
+    code: $code
+    time: '$time::"%Y-%m-%d %H:%M:%S"'
+    external_value_link: $link
+    external_value_encoding: $encoding
+    ecg_study_id: $ecg_study_id
+    _metadata:
+      _self:
+        description: >-
+          'Diagnostic 12-lead ECG (10 s, 500 Hz, WFDB) from MIMIC-IV-ECG, timed at its acquisition
+          (record_list.ecg_time; the ECG machine clock, mostly not synchronized with hospital clocks).
+          external_value_link is the WFDB record relative to the MEDS root; ecg_study_id is
+          record_list.study_id'

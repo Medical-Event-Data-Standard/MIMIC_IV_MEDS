@@ -1,0 +1,20 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PORTABLE AP)
+
+INDICATION: ___ Synthetic indication for ed imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+No atelectasis.
+No cardiomegaly.
+Synthetic finding: enlarged cardiomediastinum is present.
+Possible fracture, cannot be excluded.
+No pleural effusion.
+Synthetic finding: pneumothorax is present.
+
+IMPRESSION:
+Synthetic impression: enlarged cardiomediastinum, pneumothorax.

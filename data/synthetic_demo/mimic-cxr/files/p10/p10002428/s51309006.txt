@@ -1,0 +1,19 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for ward imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+Synthetic finding: cardiomegaly is present.
+No consolidation.
+Synthetic finding: edema is present.
+No enlarged cardiomediastinum.
+No pneumothorax.
+
+IMPRESSION:
+Synthetic impression: cardiomegaly, edema.

@@ -21,3 +21,17 @@ class TestUnitComponents(UnitComponentContract):
         "icu/outputevents/output",
     )
     require_unit_in_code = True
+
+
+# The extension specs carry the base's events unchanged and add none that ends in a unit or reads its
+# `unit` from a row column, so the same events are expected in each.
+class TestUnitComponentsMNE(TestUnitComponents):
+    spec = "MIMIC-IV-MNE"
+
+
+class TestUnitComponentsED(TestUnitComponents):
+    spec = "MIMIC-IV-ED"
+
+
+class TestUnitComponentsCXRDB(TestUnitComponents):
+    spec = "MIMIC-IV-CXRDB"

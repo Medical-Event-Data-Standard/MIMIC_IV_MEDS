@@ -1,0 +1,19 @@
+SYNTHETIC RADIOLOGY REPORT - NOT REAL PATIENT DATA - FOR PIPELINE TESTING ONLY
+
+EXAMINATION: CHEST (PA AND LAT)
+
+INDICATION: ___ Synthetic indication for ward imaging.
+
+TECHNIQUE: Synthetic technique description.
+
+COMPARISON: ___
+
+FINDINGS:
+No atelectasis.
+No edema.
+Synthetic finding: pleural effusion is present.
+Synthetic finding: pleural other is present.
+No support devices.
+
+IMPRESSION:
+Synthetic impression: pleural effusion, pleural other.
