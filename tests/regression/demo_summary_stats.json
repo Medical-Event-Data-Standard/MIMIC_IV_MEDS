@@ -8,18 +8,18 @@
       "present": true
     },
     "description_length": {
-      "mean": 104.44,
+      "mean": 104.856,
       "n": 11287,
       "quantiles": {
         "p1": 4.0,
         "p25": 28.0,
         "p5": 10.0,
         "p50": 72.0,
-        "p75": 173.0,
-        "p95": 221.0,
+        "p75": 174.0,
+        "p95": 222.0,
         "p99": 238.0
       },
-      "std": 79.7144
+      "std": 80.1414
     },
     "n_codes": 11292,
     "n_data_codes_missing_from_metadata": 0,
@@ -98,7 +98,7 @@
           "recognized": false
         },
         "NDC": {
-          "keys_digest": "sha256:7eaaa3e4e6d64a3136a555e6bb216158c7d448bb83669f8442bff6079b0de2cd",
+          "keys_digest": "sha256:95daaf2b5c17db7a78a74c0632f51440e3638dbe2d569514d31b7dba99154f23",
           "n_child_codes": 4043,
           "n_distinct_keys": 1202,
           "n_measurements": 50960,
@@ -179,7 +179,7 @@
       }
     },
     "present": true,
-    "vocabulary_digest": "sha256:b7ef4fcc60c950a538ef4e3d2d12380d2c36f000c2e275e125eb145d3071d8b9"
+    "vocabulary_digest": "sha256:c8dfbd0d7ddf33d1bd6bc540425c56eaa9efc5b3c4d2ccb27f10a8d287b6e61a"
   },
   "codes": {
     "concentration": {
@@ -191,9 +191,9 @@
       "n_codes_covering_99pct": 4548
     },
     "digests": {
-      "alphabetical": "sha256:eb9a3196001f536902132753d40d963cd42f4b10c870cbe82f893b4323e9ab13",
-      "by_measurement_frequency": "sha256:d4e27dc1edf00e00f6834532b255dfcdd846de272a77b03541db9a7f85cca2b9",
-      "by_subject_frequency": "sha256:dd606c0854c734afc6c6c91ad0fc673a78a29baa0402a38b945102b810918655",
+      "alphabetical": "sha256:2e78d6dbdbe11d90301ac81f285a6ada2d92c7f2dbbeef228a6f8ef48aa817e1",
+      "by_measurement_frequency": "sha256:48e51baf83c2b77fda9d3940d375df8f8df2bb183cec3008a0251d0dc86e1b0e",
+      "by_subject_frequency": "sha256:d590d1f961ee76e130ef5eb1534b964f2b2e9362f61a082f20ab29909f8606e2",
       "numeric_moments": {
         "digest": "sha256:ba43bd7d377f26a55dd04cd66a36cb145bc80b3847f21622ad4887acef22e82b",
         "n_codes": 390
@@ -212,9 +212,9 @@
           "n_codes": 0
         },
         "20": {
-          "alphabetical": "sha256:bea9e5ec082dfd423c1ac62dbc528b20aaca3b7942052e1415963a53e032ce7e",
-          "by_measurement_frequency": "sha256:c42c4547fb613e13e124a1ef7a26882ce5ca39dcc268da7731bea7e84536dfef",
-          "by_subject_frequency": "sha256:2d476d81e02504eaab51943203d92c6fadc3392a242990bc1f5d8c92d9c990ca",
+          "alphabetical": "sha256:c712ab803da31aa90bc78f2ad515ea8913b42f20a500560293e17a4d5d036622",
+          "by_measurement_frequency": "sha256:bc229e1b3c28f90e283173e99b451edb80a9a9365b0680b57e356ac6ce6a7246",
+          "by_subject_frequency": "sha256:51b48927d0916c663a3d1683ac74f8d3fb0eae627f07056089722e42a858c9de",
           "n_codes": 1134
         }
       }
@@ -301,9 +301,9 @@
     }
   },
   "dataset": {
-    "created_at": "2026-11-22T19:03:43.573230+00:00",
+    "created_at": "2026-11-23T19:37:17.496988+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.3.1.dev14+gbff4c659e.d20261122",
+    "dataset_version": "2.2:0.4.0",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.3",
     "meds_version": "0.4.1",
@@ -343,7 +343,7 @@
         ]
       },
       "enriched": true,
-      "enriched_at": "2026-11-22T19:03:46Z",
+      "enriched_at": "2026-11-23T19:37:24Z",
       "ontology_source": "rvandewater/sumeds-ontologies@v0.2.0",
       "options": {
         "child_codes": false,
@@ -361,25 +361,25 @@
   },
   "dataset_digest": {
     "by_file": {
-      "data/held_out/0.parquet": "sha256:b9b9f54eaebdfaa10fdb28a1301443457df63d5fbdc5a4f4b2aaee9d6f36038e",
-      "data/train/0.parquet": "sha256:f03dbc2aa1f3f952a0516e43ea5150571a257ddcaa187ccd532e72896ff24d30",
-      "data/tuning/0.parquet": "sha256:96ef3cb67598dfade1f11fa2725cba781a2428964fec8d327e2d8eb28ed91b30",
-      "metadata/codes.parquet": "sha256:bb3fe1472ebf119dc1d746c542ad6d2f1eed616c6ea51ce2841182c5d3585f13",
-      "metadata/dataset.json": "sha256:2195b296e6b36d92ea68c6ba5921ce53a0f2c6934d50711587bdd38d4ce3e348",
+      "data/held_out/0.parquet": "sha256:57942184ded782417142efff222204ce8c51e3e3c4ef8748eb18808d3d36ca95",
+      "data/train/0.parquet": "sha256:067faa9254797f9d8cbd806223cc7c72300e24dcd7c6789f4f2ea659e0c0cbd8",
+      "data/tuning/0.parquet": "sha256:952adc2fb549bc0ca604bbd97148c6f4d031d443c679925c0650f020815e6120",
+      "metadata/codes.parquet": "sha256:63862f39c11875039cfa84c56a9fdef4e8cf736ca26529256739b0fb1327b68a",
+      "metadata/dataset.json": "sha256:8b5b4b1e0b282925215438da900d7cc327e266ddb3a51ab5dbcaf88c9b0b196d",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
-    "code_metadata": "sha256:d7bc49bda51910fd9a1f745a76309868107d58215ac930cecfa431c0c83e1728",
-    "combined": "sha256:af25a3f9387fb0c328bc0872052a1d6f4cbb28bafef104e1c5c7b7fa008644ed",
+    "code_metadata": "sha256:cdb311546fe950c69b507fab6ff2ae22c8b7095bd241ff57d85aeb2fee6ccc75",
+    "combined": "sha256:60dbc640e6252b4f8edf89ec309beab608d05e61d8c8a30f6caec0aec2d2c3e1",
     "data": {
-      "digest": "sha256:18700af9aa836120d7ea1866e02644e943bd5d7076a51af74ca8deb2d2c742ae",
+      "digest": "sha256:3a1ee9b8f8fe64132313dfdfa5ea4437cda26a56c63e7ed345f195867d9b13b9",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:41cd5f16583dda4621571698b3372ed1918b52766e5380ec92514ba577bc4f9a",
+    "dataset_metadata": "sha256:8319811f464e19d62bfecdeda0b55001fae03fa60a66b4b53a71ac91a0a60b1d",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-22T19:03:46.538300",
+  "extracted_at": "2026-11-23T19:37:26.807183",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
