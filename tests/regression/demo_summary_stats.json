@@ -276,7 +276,7 @@
     ]
   },
   "counts": {
-    "n_events": 96949,
+    "n_events": 96916,
     "n_measurements": 1025796,
     "n_static_measurements": 100,
     "n_subjects": 100,
@@ -301,7 +301,7 @@
     }
   },
   "dataset": {
-    "created_at": "2026-11-21T15:27:56.048990+00:00",
+    "created_at": "2026-11-23T19:37:17.496988+00:00",
     "dataset_name": "MIMIC-IV",
     "dataset_version": "2.2:0.4.0",
     "etl_name": "MEDS_transforms",
@@ -312,6 +312,7 @@
       "drg_severity",
       "drg_mortality",
       "emar_seq",
+      "chartdate",
       "seq_num",
       "route",
       "frequency",
@@ -342,7 +343,7 @@
         ]
       },
       "enriched": true,
-      "enriched_at": "2026-11-21T15:27:58Z",
+      "enriched_at": "2026-11-23T19:37:24Z",
       "ontology_source": "rvandewater/sumeds-ontologies@v0.2.0",
       "options": {
         "child_codes": false,
@@ -360,25 +361,25 @@
   },
   "dataset_digest": {
     "by_file": {
-      "data/held_out/0.parquet": "sha256:b3646494cd887f8e70a964c87e96fe846be50165732fec1d869c106431329886",
-      "data/train/0.parquet": "sha256:a64313f3e99560cb66d58ec6fea5e237496c2286d1f1f069d2507edf437343d1",
-      "data/tuning/0.parquet": "sha256:da277454f2d058bd19a3db01778233c59fbe90fdeb63a74900a68312992b45b5",
+      "data/held_out/0.parquet": "sha256:57942184ded782417142efff222204ce8c51e3e3c4ef8748eb18808d3d36ca95",
+      "data/train/0.parquet": "sha256:067faa9254797f9d8cbd806223cc7c72300e24dcd7c6789f4f2ea659e0c0cbd8",
+      "data/tuning/0.parquet": "sha256:952adc2fb549bc0ca604bbd97148c6f4d031d443c679925c0650f020815e6120",
       "metadata/codes.parquet": "sha256:63862f39c11875039cfa84c56a9fdef4e8cf736ca26529256739b0fb1327b68a",
-      "metadata/dataset.json": "sha256:628e5ffe00a4cecb2981b0aeea0803825bc7dc469560970c56658e01a3174c89",
+      "metadata/dataset.json": "sha256:8b5b4b1e0b282925215438da900d7cc327e266ddb3a51ab5dbcaf88c9b0b196d",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
     "code_metadata": "sha256:cdb311546fe950c69b507fab6ff2ae22c8b7095bd241ff57d85aeb2fee6ccc75",
-    "combined": "sha256:939d864c6f60a6eed5dc12935a8f4c981a760ee9232ebdac13032cb3d82a1ad0",
+    "combined": "sha256:60dbc640e6252b4f8edf89ec309beab608d05e61d8c8a30f6caec0aec2d2c3e1",
     "data": {
-      "digest": "sha256:8b98b327a2988dae1a90a64f286b233f6cc781f1c54b9c597fce21685d56ff94",
+      "digest": "sha256:3a1ee9b8f8fe64132313dfdfa5ea4437cda26a56c63e7ed345f195867d9b13b9",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:dcb42deebe18f9556aa2063f718511d491d2f6d1bad504a6fd772c0e3785a6af",
+    "dataset_metadata": "sha256:8319811f464e19d62bfecdeda0b55001fae03fa60a66b4b53a71ac91a0a60b1d",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-21T15:29:11.868304",
+  "extracted_at": "2026-11-23T19:37:26.807183",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
@@ -397,6 +398,7 @@
     },
     "column_dtype_conflicts": {},
     "column_presence": {
+      "chartdate": 3,
       "code": 3,
       "doses_per_24_hrs": 3,
       "drg_mortality": 3,
@@ -420,6 +422,7 @@
       "time": 3
     },
     "data_columns": {
+      "chartdate": "Date",
       "code": "String",
       "doses_per_24_hrs": "Int64",
       "drg_mortality": "Int64",
@@ -443,6 +446,7 @@
       "time": "Datetime(time_unit='us', time_zone=None)"
     },
     "extra_data_columns": [
+      "chartdate",
       "doses_per_24_hrs",
       "drg_mortality",
       "drg_severity",
@@ -488,16 +492,16 @@
       "std": 331.603
     },
     "n_events": {
-      "mean": 969.49,
+      "mean": 969.16,
       "n": 100,
       "quantiles": {
         "p25": 280.25,
-        "p5": 140.95,
-        "p50": 517.5,
+        "p5": 140.0,
+        "p50": 513.5,
         "p75": 1217.75,
         "p95": 3204.4
       },
-      "std": 1097.27
+      "std": 1097.06
     },
     "n_measurements": {
       "mean": 10258.0,
