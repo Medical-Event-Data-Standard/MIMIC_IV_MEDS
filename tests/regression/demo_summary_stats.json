@@ -276,7 +276,7 @@
     ]
   },
   "counts": {
-    "n_events": 96949,
+    "n_events": 96916,
     "n_measurements": 1025796,
     "n_static_measurements": 100,
     "n_subjects": 100,
@@ -301,9 +301,9 @@
     }
   },
   "dataset": {
-    "created_at": "2026-11-20T22:12:54.388184+00:00",
+    "created_at": "2026-11-22T19:03:43.573230+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.3.1.dev77+ge8395480e.d20261120",
+    "dataset_version": "2.2:0.3.1.dev14+gbff4c659e.d20261122",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.3",
     "meds_version": "0.4.1",
@@ -312,6 +312,7 @@
       "drg_severity",
       "drg_mortality",
       "emar_seq",
+      "chartdate",
       "seq_num",
       "route",
       "frequency",
@@ -342,7 +343,7 @@
         ]
       },
       "enriched": true,
-      "enriched_at": "2026-11-20T22:12:56Z",
+      "enriched_at": "2026-11-22T19:03:46Z",
       "ontology_source": "rvandewater/sumeds-ontologies@v0.2.0",
       "options": {
         "child_codes": false,
@@ -355,30 +356,30 @@
       },
       "rules": "MIMIC-IV",
       "rules_sha256": "68245984be0ad1e0da7b20945d13f9ac452b724fd60c0816e2655bb1962c2bf2",
-      "sumeds_version": "0.6.9"
+      "sumeds_version": "0.6.11"
     }
   },
   "dataset_digest": {
     "by_file": {
-      "data/held_out/0.parquet": "sha256:4d360c23d5d4126aba6a3d1c0f4a2c2608ee8997e698111d0d0e68cdae9d29e6",
-      "data/train/0.parquet": "sha256:d4b2c52d4e8d5b63e5b756f6bf3cab861b557e3ae5d935cb8692dedec3272cb4",
-      "data/tuning/0.parquet": "sha256:0bc14f7b381d72fed747637052c2db7ebc235d187e414b800141cc1f9cbcd9cd",
+      "data/held_out/0.parquet": "sha256:b9b9f54eaebdfaa10fdb28a1301443457df63d5fbdc5a4f4b2aaee9d6f36038e",
+      "data/train/0.parquet": "sha256:f03dbc2aa1f3f952a0516e43ea5150571a257ddcaa187ccd532e72896ff24d30",
+      "data/tuning/0.parquet": "sha256:96ef3cb67598dfade1f11fa2725cba781a2428964fec8d327e2d8eb28ed91b30",
       "metadata/codes.parquet": "sha256:bb3fe1472ebf119dc1d746c542ad6d2f1eed616c6ea51ce2841182c5d3585f13",
-      "metadata/dataset.json": "sha256:042a9bba0126d5ab4cf3804de742a8c00f9f114884f6a90b830fe3047ad19b50",
+      "metadata/dataset.json": "sha256:2195b296e6b36d92ea68c6ba5921ce53a0f2c6934d50711587bdd38d4ce3e348",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
     "code_metadata": "sha256:d7bc49bda51910fd9a1f745a76309868107d58215ac930cecfa431c0c83e1728",
-    "combined": "sha256:3559827ac729d28195007f3d5f1256561734590eee3fcfbcd16a1ba25b972e65",
+    "combined": "sha256:af25a3f9387fb0c328bc0872052a1d6f4cbb28bafef104e1c5c7b7fa008644ed",
     "data": {
-      "digest": "sha256:ce978b98772fbec6c975e90c36eae42926267cc7e8a74fdd6ce74e10991de4f8",
+      "digest": "sha256:18700af9aa836120d7ea1866e02644e943bd5d7076a51af74ca8deb2d2c742ae",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:6ffc65fc6d427a7fd6c90f5bed60fac07c1993d661b1498a7be75a781748014d",
+    "dataset_metadata": "sha256:41cd5f16583dda4621571698b3372ed1918b52766e5380ec92514ba577bc4f9a",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-20T22:12:57.233218",
+  "extracted_at": "2026-11-22T19:03:46.538300",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
@@ -397,6 +398,7 @@
     },
     "column_dtype_conflicts": {},
     "column_presence": {
+      "chartdate": 3,
       "code": 3,
       "doses_per_24_hrs": 3,
       "drg_mortality": 3,
@@ -420,6 +422,7 @@
       "time": 3
     },
     "data_columns": {
+      "chartdate": "Date",
       "code": "String",
       "doses_per_24_hrs": "Int64",
       "drg_mortality": "Int64",
@@ -443,6 +446,7 @@
       "time": "Datetime(time_unit='us', time_zone=None)"
     },
     "extra_data_columns": [
+      "chartdate",
       "doses_per_24_hrs",
       "drg_mortality",
       "drg_severity",
@@ -488,16 +492,16 @@
       "std": 331.603
     },
     "n_events": {
-      "mean": 969.49,
+      "mean": 969.16,
       "n": 100,
       "quantiles": {
         "p25": 280.25,
-        "p5": 140.95,
-        "p50": 517.5,
+        "p5": 140.0,
+        "p50": 513.5,
         "p75": 1217.75,
         "p95": 3204.4
       },
-      "std": 1097.27
+      "std": 1097.06
     },
     "n_measurements": {
       "mean": 10258.0,
