@@ -1,10 +1,10 @@
 """The vocabulary parents from the mimic-code concept maps are well-formed codes of their vocabulary.
 
-Three `omop_concept_code` cells in the pinned maps were turned into numbers by a spreadsheet (#117):
-`2.26471E+14` for SNOMED 226471000000101, `968472` for LOINC 4551-8 and `-56064` for LOINC 1746-7. The spec
-repairs them, keyed on the row's intact `omop_concept_id`. These tests check the maps the demo build staged
-(the same files as for the full release, pinned by checksum), so a newly mangled code fails here, and a
-repair that mimic-code has made unnecessary is noticed; and they check the parents the demo build wrote.
+Up to mimic-code v3.0.1, a spreadsheet had turned three `omop_concept_code` cells into numbers (#117,
+MIT-LCP/mimic-code#2181): `2.26471E+14` for SNOMED 226471000000101, `968472` for LOINC 4551-8 and `-56064`
+for LOINC 1746-7. The spec pins the maps to the mimic-code commit that fixes them (MIT-LCP/mimic-code#2182).
+These tests check the maps the demo build staged (the same files as for the full release, pinned by
+checksum), so a newly mangled code fails here, and the parents the demo build wrote.
 """
 
 import re
@@ -30,18 +30,22 @@ CODE_PATTERNS = {
     "RxNorm": re.compile(r"[1-9][0-9]*"),
 }
 
-#: The spec's repairs: `omop_concept_id` -> (the mangled cell, the parent written instead).
-REPAIRED = {
-    "44790095": ("2.26471E+14", "SNOMED//226471000000101"),
-    "3020784": ("968472", "LOINC//4551-8"),
-    "3024474": ("-56064", "LOINC//1746-7"),
+#: The three rows mimic-code#2182 fixed: (map, itemid) -> the parent the spec writes for them.
+FIXED = {
+    ("proc_itemid.csv", "225792"): "SNOMED//226471000000101",
+    ("d_labitems_to_loinc.csv", "51643"): "LOINC//4551-8",
+    ("d_labitems_to_loinc.csv", "51777"): "LOINC//1746-7",
 }
 
 
 def _map_codes(raw: Path) -> pl.DataFrame:
     frames = [
         pl.read_csv(raw / name, infer_schema=False)
-        .select("omop_concept_id", "omop_vocabulary_id", "omop_concept_code")
+        .select(
+            pl.col("itemid (omop_source_code)").alias("itemid"),
+            "omop_vocabulary_id",
+            "omop_concept_code",
+        )
         .with_columns(map=pl.lit(name))
         for name in PARENT_MAPS
     ]
@@ -53,21 +57,23 @@ def _map_codes(raw: Path) -> pl.DataFrame:
     )
 
 
-def test_map_codes_are_well_formed_or_repaired(demo_raw_dir: Path):
+def test_map_codes_are_well_formed(demo_raw_dir: Path):
     rows = _map_codes(demo_raw_dir).rows(named=True)
     vocabularies = {row["omop_vocabulary_id"] for row in rows}
     assert vocabularies <= CODE_PATTERNS.keys(), f"vocabularies without a pattern: {vocabularies}"
 
     malformed = {
-        row["omop_concept_id"]: row["omop_concept_code"]
+        (row["map"], row["itemid"]): row["omop_concept_code"]
         for row in rows
         if not CODE_PATTERNS[row["omop_vocabulary_id"]].fullmatch(row["omop_concept_code"])
     }
-    expected = {concept_id: cell for concept_id, (cell, _) in REPAIRED.items()}
-    assert malformed == expected, (
-        f"malformed codes in the mimic-code maps: {malformed}; the spec repairs {expected}. Repair a new one "
-        "in event_configs.yaml (keyed on its omop_concept_id), or drop a repair mimic-code has made unneeded."
-    )
+    assert not malformed, f"malformed codes in the mimic-code maps: {malformed}"
+
+    parents = {
+        (row["map"], row["itemid"]): f"{row['omop_vocabulary_id']}//{row['omop_concept_code']}"
+        for row in rows
+    }
+    assert {key: parents.get(key) for key in FIXED} == FIXED
 
 
 def test_demo_parents_are_well_formed(demo_cohort: Path):
@@ -87,7 +93,8 @@ def test_demo_parents_are_well_formed(demo_cohort: Path):
     )
     assert not malformed, f"malformed vocabulary parents: {malformed[:10]}"
 
-    # Invasive ventilation (225792) occurs in the demo; its repaired SNOMED parent is written.
+    # Invasive ventilation (225792) occurs in the demo (51643 and 51777 do not); its fixed SNOMED parent
+    # is written.
     by_code = dict(zip(codes["code"].to_list(), codes["parent_codes"].to_list(), strict=True))
     for code in ("PROCEDURE//START//225792", "PROCEDURE//END//225792"):
         assert "SNOMED//226471000000101" in (by_code.get(code) or []), f"{code}: {by_code.get(code)}"

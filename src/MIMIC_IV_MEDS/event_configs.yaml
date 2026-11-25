@@ -346,14 +346,7 @@ hosp/labevents:
         itemid:
           column: itemid (omop_source_code)
         description: coalesce($omop_concept_name, $label)
-        # mimic-code's map holds two LOINC codes that a spreadsheet turned into numbers (#117):
-        # 51643 has `968472` for 4551-8 and 51777 has `-56064` for 1746-7. The row's
-        # `omop_concept_id` is intact and names the real code, so the parent is keyed on it; the
-        # pinned download stays byte-identical to mimic-code.
-        parent_codes: &lab_loinc_parent >-
-          "LOINC//4551-8" if $omop_concept_id::str == "3020784"
-          else "LOINC//1746-7" if $omop_concept_id::str == "3024474"
-          else f"{$omop_vocabulary_id}//{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
   lab_result:
     code: f"LAB//RESULT//{$itemid}//{$_value_unit}"
     hadm_id: $hadm_id
@@ -371,7 +364,7 @@ hosp/labevents:
         # unique in this file (1630 rows / 1630 distinct), so there is never a second
         # candidate row that the unit would have disambiguated.
         description: coalesce($omop_concept_name, $label)
-        parent_codes: *lab_loinc_parent
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
       # The unit is a component of the code, so each code has exactly one; null (`UNK` in the
       # code) gives none. See "Units" in the README.
       _self:
@@ -711,13 +704,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        # mimic-code's map holds the SNOMED code of 225792 Invasive Ventilation as `2.26471E+14`, as
-        # a spreadsheet wrote it (#117). The row's `omop_concept_id` 44790095 is intact and names
-        # SNOMED 226471000000101, so the parent is keyed on it; the pinned download stays
-        # byte-identical to mimic-code.
-        parent_codes: &proc_snomed_parent >-
-          "SNOMED//226471000000101" if $omop_concept_id::str == "44790095"
-          else f"{$omop_vocabulary_id}//{$omop_concept_code}"
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
   end:
     code: 'f"PROCEDURE//END//{$itemid}"'
     time: '$endtime::"%Y-%m-%d %H:%M:%S"'
@@ -744,7 +731,7 @@ icu/procedureevents:
         # MEDS-Extract merges them into one newline-joined string -- which put values
         # like 'Epinephrine\nepinephrine Injection' into 344 codes. This map keeps the
         # job it is uniquely good at: the RxNorm/SNOMED parent.
-        parent_codes: *proc_snomed_parent
+        parent_codes: f"{$omop_vocabulary_id}//{$omop_concept_code}"
 
 icu/inputevents:
   _table:
@@ -865,8 +852,8 @@ icu/outputevents:
 #   (mmcdermott/MEDS_extract#151, fixed upstream).
 # - The concept-map entries pin `sha256` because GitHub raw publishes no checksum
 #   manifest: without a recorded hash, an existing file cannot be verified on re-runs
-#   and the downloader (correctly) refuses to skip it. The `v2.4.0` tag is immutable,
-#   so these hashes are stable. That tag is the one version here that is *not* declared
+#   and the downloader (correctly) refuses to skip it. They are pinned to a commit, so
+#   these hashes are stable. That commit is the one version here that is *not* declared
 #   below: `dataset_version` names the MIMIC-IV release, while the concept maps are
 #   pinned inline by URL + hash.
 sources:
@@ -888,34 +875,38 @@ sources:
       base_url: https://physionet.org/files/mimic-iv-demo/${sources.dataset_version.demo}
   common:
     - type: http
+      # mimic-code commit e3e0310, the merge of MIT-LCP/mimic-code#2182, which repairs three codes a
+      # spreadsheet had turned into numbers (MIT-LCP/mimic-code#2181, #117). No mimic-code tag contains
+      # it yet (v3.0.1 is older); move to the first tag that does. Since v2.4.0 the maps live in
+      # `mimic-iv/mapping/`; only `d_labitems_to_loinc.csv` and `proc_itemid.csv` changed.
       urls:
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/d_labitems_to_loinc.csv
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/d_labitems_to_loinc.csv
           rel_path: d_labitems_to_loinc.csv
-          sha256: f7ef583bb2669cbf8f450e1b629dd83161c1d3f2f3ebe6abd2ff8111570e86b8
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/inputevents_to_rxnorm.csv
+          sha256: 0c7741d7a1808ec3eb77c9bebe8ebc9494cc5934bbee5f50a3c0d988d0ad4d0f
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/inputevents_to_rxnorm.csv
           rel_path: inputevents_to_rxnorm.csv
           sha256: ead9fd462f1165e2615f4ec99edb759ab4b8c6333f8949731fada68066181f16
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/lab_itemid_to_loinc.csv
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/lab_itemid_to_loinc.csv
           rel_path: lab_itemid_to_loinc.csv
           sha256: 2e4994fa858b55cae48286728fb6ba8dde019716080e34759fbde3d604d8ce64
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_main.csv
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/meas_chartevents_main.csv
           rel_path: meas_chartevents_main.csv
           sha256: a7a262cac30daeb18c63e124540c6a82acb6ad796af4f0ce3f2480b975fc3f28
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/meas_chartevents_value.csv
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/meas_chartevents_value.csv
           rel_path: meas_chartevents_value.csv
           sha256: 51cd79cf9d220eef94236df8d475b270670b908e82d7c078254492474b144f30
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/numerics-summary.csv
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/numerics-summary.csv
           rel_path: numerics-summary.csv
           sha256: f663f9e418d417306b55dd0e9c47e8780f1c64547d212aad0e0d908abc977fea
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/outputevents_to_loinc.csv
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/outputevents_to_loinc.csv
           rel_path: outputevents_to_loinc.csv
           sha256: e46a7b0e1ef4debcbd283d0c0fa8a698e761b36bd710eb69be3f1a1eed7ec103
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_datetimeevents.csv
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/proc_datetimeevents.csv
           rel_path: proc_datetimeevents.csv
           sha256: ee4592ddabd7f8995943c3ac18df883034e5f9960a954e738db9f0c02e9a824e
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/proc_itemid.csv
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/proc_itemid.csv
           rel_path: proc_itemid.csv
-          sha256: b77460531714501b0008f94574580dbf33724cee3de0f45186d149fe05cf04d0
-        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/v2.4.0/mimic-iv/concepts/concept_map/waveforms-summary.csv
+          sha256: 4bcbc0767fc7ebc310a54d34c81c75b5f0e64a2abdee3030a595005eb7b61888
+        - url: https://raw.githubusercontent.com/MIT-LCP/mimic-code/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2/mimic-iv/mapping/waveforms-summary.csv
           rel_path: waveforms-summary.csv
           sha256: 289e8357ff474fe6485634d176051f30161ffb52f2bb9933f1a8c482ee9f6024

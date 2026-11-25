@@ -119,7 +119,7 @@
           "recognized": true
         },
         "SNOMED": {
-          "keys_digest": "sha256:3e47e92e4a1d8fe06bd0737cfdc5f9b74f3d22abd054e9d7d56704108c1fde91",
+          "keys_digest": "sha256:8cfc6a5f65ba6ae7b703f45f70db6d24914a1094141905f66e1de9dc7326b417",
           "n_child_codes": 162,
           "n_distinct_keys": 74,
           "n_measurements": 25890,
@@ -301,9 +301,9 @@
     }
   },
   "dataset": {
-    "created_at": "2026-11-23T19:37:17.496988+00:00",
+    "created_at": "2026-11-25T20:34:28.121450+00:00",
     "dataset_name": "MIMIC-IV",
-    "dataset_version": "2.2:0.4.0",
+    "dataset_version": "2.2:0.3.1.dev86+ga714c7c15",
     "etl_name": "MEDS_transforms",
     "etl_version": "0.7.3",
     "meds_version": "0.4.1",
@@ -343,7 +343,7 @@
         ]
       },
       "enriched": true,
-      "enriched_at": "2026-11-23T19:37:24Z",
+      "enriched_at": "2026-11-25T20:34:30Z",
       "ontology_source": "rvandewater/sumeds-ontologies@v0.2.0",
       "options": {
         "child_codes": false,
@@ -364,22 +364,22 @@
       "data/held_out/0.parquet": "sha256:57942184ded782417142efff222204ce8c51e3e3c4ef8748eb18808d3d36ca95",
       "data/train/0.parquet": "sha256:067faa9254797f9d8cbd806223cc7c72300e24dcd7c6789f4f2ea659e0c0cbd8",
       "data/tuning/0.parquet": "sha256:952adc2fb549bc0ca604bbd97148c6f4d031d443c679925c0650f020815e6120",
-      "metadata/codes.parquet": "sha256:63862f39c11875039cfa84c56a9fdef4e8cf736ca26529256739b0fb1327b68a",
-      "metadata/dataset.json": "sha256:8b5b4b1e0b282925215438da900d7cc327e266ddb3a51ab5dbcaf88c9b0b196d",
+      "metadata/codes.parquet": "sha256:c87181d922033a25da245fca66d1a42c07e0622a656bd6e091b1648db99b843c",
+      "metadata/dataset.json": "sha256:f5e02f981b57aa8e80ebddf63bd0a353c30fce533fdbcf5c04f9b0a89250c230",
       "metadata/subject_splits.parquet": "sha256:d5408b774b0cfb824ca0a98e1340151cf0ed6f822fcff5e8799f9770ac02d031"
     },
-    "code_metadata": "sha256:cdb311546fe950c69b507fab6ff2ae22c8b7095bd241ff57d85aeb2fee6ccc75",
-    "combined": "sha256:60dbc640e6252b4f8edf89ec309beab608d05e61d8c8a30f6caec0aec2d2c3e1",
+    "code_metadata": "sha256:82bbd47e964a84fd47b2e2939603ab1a4aa0f2ff292fc1a588125e25a419d3b6",
+    "combined": "sha256:73340d39cbb16c23cc78700519887cb40d99ee1ca9a74dd3e12674f8d62b9b75",
     "data": {
       "digest": "sha256:3a1ee9b8f8fe64132313dfdfa5ea4437cda26a56c63e7ed345f195867d9b13b9",
       "n_files": 3
     },
-    "dataset_metadata": "sha256:8319811f464e19d62bfecdeda0b55001fae03fa60a66b4b53a71ac91a0a60b1d",
+    "dataset_metadata": "sha256:ba0fddf58661ae62e6339626602a482ed03f0a0ad037acddacd8459e5b94373f",
     "method": "files",
     "n_files": 6,
     "subject_splits": "sha256:a71fb24090a32d9bd7a6340095ebd483b4f13fb37d87f499f17955de538adf6f"
   },
-  "extracted_at": "2026-11-23T19:37:26.807183",
+  "extracted_at": "2026-11-25T20:35:26.142676",
   "layout": {
     "code_metadata_columns": {
       "code": "String",
