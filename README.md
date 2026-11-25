@@ -257,11 +257,11 @@ applies, `parent_codes` in OMOP form (`LOINC//2160-0`, `ICD10CM//I10`, `NDC//…
 that maps codes across datasets or resolves them through OHDSI Athena has something to work
 with. All of it is declared in `event_configs.yaml`, through three routes:
 
-| Codes                                                                                                                                                                                      | Route                                                   | Source                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DIAGNOSIS`, `PROCEDURE//ICD`, `HCPCS`, ICU itemid codes (`ICU_CHART//<itemid>`, `PROCEDURE//START`/`END`, `INFUSION_*`, `SUBJECT_FLUID_OUTPUT`), `LAB//RESULT`, `LAB//SPECIMEN_COLLECTED` | `_metadata` joins against dictionary tables at run time | MIMIC-IV's own `d_icd_diagnoses`, `d_icd_procedures`, `d_hcpcs` and `d_items`; the [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps (MIT, tag v2.4.0, checksum-pinned under `sources:`) for lab descriptions and the LOINC, SNOMED and RxNorm parents |
-| every other component-coded event (admissions, demographics, transfers, ICU stays, DRGs, medications, OMR)                                                                                 | `_self` templates over the code's own components        | the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) of the column each component comes from (MIT-LCP/mimic-website, MIT), paraphrased, with the column named in parentheses                                                                                  |
-| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION`                                                                                                      | `_self` text on the literal code                        | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                   |
+| Codes                                                                                                                                                                                      | Route                                                   | Source                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DIAGNOSIS`, `PROCEDURE//ICD`, `HCPCS`, ICU itemid codes (`ICU_CHART//<itemid>`, `PROCEDURE//START`/`END`, `INFUSION_*`, `SUBJECT_FLUID_OUTPUT`), `LAB//RESULT`, `LAB//SPECIMEN_COLLECTED` | `_metadata` joins against dictionary tables at run time | MIMIC-IV's own `d_icd_diagnoses`, `d_icd_procedures`, `d_hcpcs` and `d_items`; the [mimic-code](https://github.com/MIT-LCP/mimic-code) concept maps (MIT, commit `e3e0310` until a tag contains it, checksum-pinned under `sources:`) for lab descriptions and the LOINC, SNOMED and RxNorm parents |
+| every other component-coded event (admissions, demographics, transfers, ICU stays, DRGs, medications, OMR)                                                                                 | `_self` templates over the code's own components        | the [MIMIC-IV documentation](https://mimic.mit.edu/docs/iv/) of the column each component comes from (MIT-LCP/mimic-website, MIT), paraphrased, with the column named in parentheses                                                                                                                |
+| `ED_REGISTRATION`, `ED_OUT`, `MEDS_BIRTH`, `MEDS_DEATH`, `SUBJECT_WEIGHT_AT_INFUSION`                                                                                                      | `_self` text on the literal code                        | as above; `MEDS_BIRTH` and `MEDS_DEATH` are the MEDS standard codes                                                                                                                                                                                                                                 |
 
 Literal codes are written as plain literals (`code: MEDS_BIRTH`) with a `_self` block:
 MEDS-Extract 0.8.1 and later attach `_self` metadata to literal codes
@@ -681,6 +681,26 @@ mappings may depend on, newest release first.
     `MEDICATION//…` code and the code of an `NDC//…` parent to 11 digits:
     `^(MEDICATION//.*//)(\d{1,10})$` and `^(NDC//)(\d{1,10})$` → `\1` followed by `\2` left-padded with
     `0` to 11 digits.
+
+- **Three spreadsheet-mangled parents are fixed: the mimic-code concept maps are pinned to a commit**
+    ([#117](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/117),
+    [MIT-LCP/mimic-code#2182](https://github.com/MIT-LCP/mimic-code/pull/2182)). A spreadsheet had
+    turned three codes in the maps into numbers
+    ([MIT-LCP/mimic-code#2181](https://github.com/MIT-LCP/mimic-code/issues/2181)). mimic-code has fixed
+    them, but no tag contains the fix yet, so the ten maps are now downloaded from commit
+    [`e3e0310`](https://github.com/MIT-LCP/mimic-code/commit/e3e0310d9ad49dfba7947f630a55e4c7fdfa68f2)
+    instead of tag `v2.4.0` (from `mimic-iv/mapping/`, where they now live). Eight of them are
+    byte-identical; `d_labitems_to_loinc.csv` and `proc_itemid.csv` differ only in the three rows below.
+    Codes, events and descriptions are unchanged.
+
+    | Codes                                                                        | Parent up to 0.4.0    | Parent now                |
+    | ---------------------------------------------------------------------------- | --------------------- | ------------------------- |
+    | `PROCEDURE//START//225792`, `PROCEDURE//END//225792` (Invasive Ventilation)  | `SNOMED//2.26471E+14` | `SNOMED//226471000000101` |
+    | `LAB//RESULT//51643//…`, `LAB//SPECIMEN_COLLECTED//51643//…` (Hemoglobin A2) | `LOINC//968472`       | `LOINC//4551-8`           |
+    | `LAB//RESULT//51777//…`, `LAB//SPECIMEN_COLLECTED//51777//…` (Albumin, CSF)  | `LOINC//-56064`       | `LOINC//1746-7`           |
+
+    On the demo, only the two 225792 codes change (51643 and 51777 do not occur there). To migrate, replace
+    each old parent with the new one.
 
 ### 0.4.0 (2026-11-20)
 
