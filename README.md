@@ -213,6 +213,43 @@ so an old code maps to the new one by replacing a leading `LAB//` followed by a 
 `ICU_CHART//`. Cohorts, predicates and vocabularies built against the old codes need that rename
 ([#64](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/64)).
 
+## Event timing
+
+An event's `time` should be the earliest moment the information could have been known, not
+earlier, or a model trained on these timelines learns from the future. Most MIMIC-IV columns are full
+timestamps and are used as they are. Two kinds of event need a rule:
+
+**Billing and coding events are timed at hospital discharge** (`hosp/admissions.dischtime`, joined on
+`hadm_id`). This covers `DIAGNOSIS//ICD//…` (`hosp/diagnoses_icd`), `DRG//…` (`hosp/drgcodes`),
+`PROCEDURE//ICD//…` (`hosp/procedures_icd`) and `HCPCS//…` (`hosp/hcpcsevents`). These codes are
+assigned from the record, usually after the stay ends, so the stay's end is the first time they can be
+assumed known. `procedures_icd` and `hcpcsevents` do have a `chartdate`, but it is a bare date. A bare
+date parses to midnight, which puts the code before everything else that happened that day.
+`procedures_icd` was moved to discharge for this reason
+([#25](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/25)).
+
+`hcpcsevents.chartdate` approximates the date of the billed service, not the date the code was
+assigned ([#65](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/65)). On the demo, 58
+of the 61 rows fell before the admission's own `admittime` when timed at midnight. Discharge is the
+conservative reading until the source hospital confirms when the codes are entered. The service date is
+kept in the `chartdate` extension column (a `Date`, null on every other event), so it is still there
+for analyses that are not predictive. It also keeps one code billed on two days of a stay as two events.
+
+**Other date-only times are still placed at midnight.** The MIMIC maintainers recommend
+placing any date-only event at the end of its day instead
+([#65](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/65)). That change has not been
+made yet. These events are affected:
+
+| Event                                                       | Time column                            | Current time     |
+| ----------------------------------------------------------- | -------------------------------------- | ---------------- |
+| `hosp/omr` (all three blocks)                               | `chartdate`                            | midnight         |
+| `MEDS_DEATH`, when there is no in-hospital `deathtime`      | `hosp/patients.dod`                    | midnight         |
+| `MEDICATION//START` / `//END`, when the raw value is a date | `hosp/pharmacy.starttime` / `stoptime` | midnight         |
+| `MEDS_BIRTH`                                                | `anchor_year - anchor_age`             | 1 January, 00:00 |
+
+`MEDS_BIRTH` has only a year, and it comes before everything else in the timeline, so there is nothing
+it could leak.
+
 ## Code metadata
 
 `metadata/codes.parquet` gives every code a `description` and, where a standard vocabulary
@@ -621,11 +658,29 @@ enrichment statistics too, so check it with `--compare`.
 Changes that alter codes, columns or metadata that cohorts, predicates, tokenizers or downstream
 mappings may depend on, newest release first.
 
-### Unreleased (next release)
+### Unreleased
 
-The full-release counts need a credentialed rebuild (`baseline_MEDS_summary_stats full`).
+- **`HCPCS//…` events are timed at hospital discharge**
+    ([#92](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/pull/92),
+    [#65](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/65)). `hosp/hcpcsevents`
+    was timed at `chartdate` (midnight of the service date) and is now timed at
+    `hosp/admissions.dischtime`, like diagnoses, DRGs and ICD procedures. Codes are unchanged. The
+    service date moves to a new `chartdate` extension column (a `Date`, null on every other event). On
+    the public demo, 58 of the 61 HCPCS rows were timed before their admission's `admittime`. To get the
+    old times back, use `chartdate` at midnight. See [Event timing](#event-timing).
 
-**Code metadata**
+- **NDCs keep their leading zeros on every input.** The NDC in `MEDICATION//START//<drug>//<ndc>`,
+    `MEDICATION//END//<drug>//<ndc>` and `MEDICATION//<drug>//<event_txt>//<ndc>`, in their `NDC//<ndc>`
+    parents and in their descriptions is now always the 11-digit NDC. Before, MEDS-Extract read
+    `hosp/prescriptions.ndc` as a number wherever every value in the file is digits, and the code then
+    lost the NDC's leading zeros (`MEDICATION//START//Quetiapine Fumarate//904627761` for
+    `…//00904627761`). This happened on the public demo, where 2,054 of 10,286 codes and 601 of 1,202
+    NDC parents change, and not on the full 3.1 release, whose `ndc` column is read as text; its codes
+    are unchanged. Events, their counts and every other column are unchanged. To migrate a build of the
+    demo, or of any extract whose `ndc` column holds only digits, zero-pad the last component of a
+    `MEDICATION//…` code and the code of an `NDC//…` parent to 11 digits:
+    `^(MEDICATION//.*//)(\d{1,10})$` and `^(NDC//)(\d{1,10})$` → `\1` followed by `\2` left-padded with
+    `0` to 11 digits.
 
 - **Three spreadsheet-mangled parents are repaired** ([#117](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/issues/117)).
     The mimic-code concept maps store three codes as numbers. The parent is now the code that the row's
