@@ -658,7 +658,7 @@ enrichment statistics too, so check it with `--compare`.
 Changes that alter codes, columns or metadata that cohorts, predicates, tokenizers or downstream
 mappings may depend on, newest release first.
 
-### Unreleased
+### 0.5.0 (2026-11-27)
 
 - **`HCPCS//…` events are timed at hospital discharge**
     ([#92](https://github.com/Medical-Event-Data-Standard/MIMIC_IV_MEDS/pull/92),
